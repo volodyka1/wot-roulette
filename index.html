@@ -5,7 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Танковая рулетка</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff3d5a'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='white'/%3E%3C/svg%3E">
-<script>if (new URLSearchParams(location.search).has('obs')) document.documentElement.classList.add('obs');</script>
+<script>
+// Старые ссылки OBS (index.html?obs=…) -> obs.html: obs=1 — основной, obs=feed / obs=board — лента и таблица
+(function () {
+  var p = new URLSearchParams(location.search);
+  if (!p.has('obs')) return;
+  document.documentElement.classList.add('obs');
+  var o = (p.get('obs') || '').toLowerCase(), q = new URLSearchParams();
+  if (p.get('room')) q.set('room', p.get('room'));
+  if (o === 'feed' || o === 'board') q.set('w', o);
+  ['size', 'mute', 'sound', 'period'].forEach(function (k) { if (p.has(k)) q.set(k, p.get(k)); });
+  var s = q.toString();
+  location.replace(location.pathname.replace(/[^\/]*$/, '') + 'obs.html' + (s ? '?' + s : ''));
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:ital,wght@0,600;0,700;0,800;0,900;1,700;1,800;1,900&display=swap" rel="stylesheet">
@@ -337,6 +350,36 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 .hitem.st-ok .s{background:rgba(46,229,157,.14);box-shadow:inset 0 0 0 1px rgba(46,229,157,.4)}
 .hitem.st-fail .s{background:rgba(255,61,90,.14);box-shadow:inset 0 0 0 1px rgba(255,61,90,.4)}
 .stats{font-weight:700;font-size:12.5px;color:var(--muted)}
+.hitem.st-pending .s,.hitem.st-ambiguous .s{background:rgba(255,207,63,.12);box-shadow:inset 0 0 0 1px rgba(255,207,63,.35)}
+.hitem.st-cancelled{opacity:.6}
+.hside{display:flex;align-items:center;gap:6px}
+.hbtn{width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:7px;cursor:pointer;background:var(--s3);box-shadow:inset 0 0 0 1px var(--line2);font-size:12px;transform:skewX(-10deg);transition:background .2s,transform .25s var(--spring)}
+.hbtn:hover{background:var(--s4);transform:skewX(-10deg) translateY(-2px)}
+.hbtn:focus-visible{outline:2px solid var(--a2);outline-offset:2px}
+
+/* ---------- Строка результата под челленджем ---------- */
+.lt-res{margin-top:8px;font:700 13.5px/1.3 var(--fu);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lt-res:empty{display:none}
+.lt-res.st-ok{color:var(--ok)}
+.lt-res.st-fail{color:#ff7b8e}
+.lt-res.st-ambiguous{color:#ffcf3f}
+.autonote{display:inline-flex;align-items:center;height:40px;padding:0 14px;border-radius:7px;transform:skewX(-12deg);background:var(--s1);box-shadow:inset 0 0 0 1px var(--line);color:var(--muted);font:700 italic 12.5px/1 var(--fd);letter-spacing:.02em}
+.autonote>span{transform:skewX(12deg)}
+
+/* ---------- Список челленджей в настройках ---------- */
+.chlist{display:flex;flex-direction:column;gap:2px}
+.chlist .check{margin-top:8px;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.4}
+.chlist .check input{flex:0 0 34px;width:34px;height:19px;margin-top:1px}
+.chlist .check input::after{width:13px;height:13px}
+.chlist .check input:checked::after{transform:translateX(15px)}
+.chlist .cls{display:inline-block;margin-left:6px;color:var(--dim);font-style:normal;font-size:11px;font-weight:700;letter-spacing:.04em}
+#chCount{margin-left:auto;color:var(--muted);font-weight:500;font-size:12px}
+
+/* ---------- Пул: танк ждёт боя ---------- */
+.pc-wait{position:absolute;left:50%;top:52px;z-index:3;display:none;padding:4px 9px;border-radius:5px;white-space:nowrap;transform:translateX(-50%) skewX(-12deg);box-shadow:0 6px 16px rgba(0,0,0,.45);background:rgba(255,207,63,.92);color:#1a1300;font:800 italic 10.5px/1 var(--fd);letter-spacing:.06em}
+.pcard.busy{border-color:rgba(255,207,63,.4)}
+.pcard.busy img{filter:grayscale(.7) brightness(.7)}
+.pcard.busy .pc-wait{display:block}
 
 /* ---------- Фишки фильтров ---------- */
 .chips{display:flex;flex-wrap:wrap;gap:7px}
@@ -353,10 +396,42 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 .chip[data-type].on{box-shadow:0 6px 18px var(--ccs)}
 .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--cc)}
 .chip.on .dot{background:#0b0b10}
+.chip .cnt{margin-left:-2px;font:700 10px/1 var(--fu);font-style:normal;opacity:.7}
+.chip.empty:not(.on){opacity:.38}
+.more-links{margin-top:10px}
+.more-links summary{cursor:pointer;color:var(--muted);font-size:12.5px;font-weight:600}
 
 .obslink{display:flex;gap:8px;margin-top:12px}
 .obslink input{font-size:12px;color:#ffb38a}
 #obsWarn:empty{display:none}
+
+/* ---------- Комната ---------- */
+.room-links .obslink{margin-top:0}
+.room-links .hint{margin-top:6px}
+.warn{color:#ffcf3f}
+.wl{display:flex;flex-direction:column;gap:6px}
+.wl-item{display:flex;align-items:center;gap:10px;padding:7px 10px 7px 14px;border-radius:9px;background:var(--s1);border:1px solid var(--line)}
+.wl-nick{font:800 italic 14px/1.2 var(--fd);overflow-wrap:anywhere}
+.wl-st{margin-left:auto;color:var(--muted);font-size:11.5px;white-space:nowrap}
+.wl-item.on .wl-st{color:var(--ok)}
+.alert{position:relative;padding:14px 18px 14px 26px;border-radius:var(--r-md);overflow:hidden;background:linear-gradient(90deg,rgba(255,61,90,.18),rgba(24,24,34,.95) 60%);border:1px solid rgba(255,61,90,.55);box-shadow:0 18px 40px rgba(0,0,0,.4)}
+.alert::before{content:"";position:absolute;left:0;top:0;bottom:0;width:7px;background:var(--grad)}
+.alert b{display:block;font:900 italic 16px/1.2 var(--fd);margin-bottom:6px}
+.alert .hint{margin-top:8px}
+
+/* ---------- Игроки комнаты ---------- */
+.players{display:flex;flex-direction:column;gap:14px}
+.pl{display:flex;flex-direction:column;gap:8px}
+.pl-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pl-nick{font:900 italic 17px/1.1 var(--fd);letter-spacing:-.01em}
+.pl-tag{padding:4px 8px;border-radius:5px;transform:skewX(-12deg);background:var(--grad);color:#fff;font:800 italic 10px/1 var(--fd);letter-spacing:.1em}
+.pl-meta{color:var(--muted);font-size:12px}
+.pl-cnt{margin-left:auto;color:var(--muted);font-weight:700;font-size:12px}
+.pl-empty{padding:10px 14px;border-radius:10px;border:1px dashed var(--line2);color:var(--dim);font:700 italic 12.5px/1.3 var(--fd)}
+.hitem .c2{font-size:12px;margin-top:2px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hitem .c2.st-ok{color:var(--ok)}
+.hitem .c2.st-fail{color:#ff7b8e}
+.hitem .c2.st-ambiguous{color:#ffcf3f}
 
 /* ---------- Тосты ---------- */
 .toasts{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none}
@@ -428,6 +503,11 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 
   <div class="layout">
     <div class="stage">
+      <div class="alert no-obs" id="roomAlert" hidden>
+        <b>Комнаты не работают: в Firebase не вставлены правила базы</b>
+        <div id="roomAlertText"></div>
+        <div class="hint">Открой файл <code class="k">database.rules.json</code> из папки рулетки, скопируй его целиком и вставь в консоли Firebase: <b>Realtime Database → Правила → Опубликовать</b>. Потом обнови эту страницу.</div>
+      </div>
       <div class="stage-top enter" style="--i:1">
         <div class="reel-wrap" id="reelWrap">
           <div class="reel" id="reel">
@@ -460,6 +540,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
             <div class="lt-ch">
               <div class="lt-lbl">ЧЕЛЛЕНДЖ НА БОЙ</div>
               <div class="flap" id="chBox"><div class="txt" id="chText"></div><i class="sweep"></i></div>
+              <div class="lt-res" id="resLine"></div>
             </div>
             <div class="lt-status" id="resStatus"></div>
           </div>
@@ -479,7 +560,17 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Выполнил</span></button>
           <button class="btn fail" id="failBtn" disabled><span class="bi">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>Провал</span></button>
+          <span class="autonote" id="autoNote" hidden><span>проверится автоматически</span></span>
         </div>
+      </div>
+
+      <div class="card no-obs enter" style="--i:3" id="playersCard" hidden>
+        <div class="card-head">
+          <h2>Игроки комнаты</h2>
+          <span class="sp"></span>
+          <span class="stats" id="playersInfo"></span>
+        </div>
+        <div class="players" id="players"></div>
       </div>
 
       <div class="card no-obs enter" style="--i:3">
@@ -488,7 +579,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
           <span class="sp"></span>
           <span class="counter" id="poolInfo"></span>
         </div>
-        <div class="hint" style="margin:0 0 8px">Клик по танку — исключить/вернуть его в рулетку.</div>
+        <div class="hint" style="margin:0 0 8px">Клик по танку — исключить/вернуть его в рулетку. Танк с пометкой ⏳ ждёт боя по челленджу и пока не выпадет.</div>
         <div class="pool-grid" id="poolGrid"></div>
       </div>
 
@@ -523,6 +614,43 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
         <div class="statusline" id="status"></div>
       </div>
 
+      <div class="card enter" style="--i:3" id="roomCard">
+        <div class="card-head"><h2>Комната</h2><span class="sp"></span><span class="counter" id="roomBadge"></span></div>
+        <div id="roomSolo">
+          <div class="hint" style="margin-top:0">Играй вместе с друзьями: они крутят рулетку у себя, их челленджи видны тебе и зрителям, результат проверяется сам после боя. Друзья входят по ссылке через Wargaming — только ники из твоего списка.</div>
+          <button class="btn primary wide" id="roomCreate"><span class="bi">Создать комнату</span></button>
+        </div>
+        <div id="roomOwner" hidden>
+          <div class="acct"><span class="acct-nick" id="roTitle"></span><span class="acct-meta" id="roMeta"></span></div>
+          <div class="room-links" id="roLinks"></div>
+          <details>
+            <summary>Админ-ссылка (секретная)</summary>
+            <div class="hint warn">⚠️ Никому не отправляй и не показывай на стриме: с этой ссылкой любой станет владельцем комнаты. Она нужна, чтобы открыть комнату на другом компьютере или в другом браузере.</div>
+            <div class="room-links" id="roAdmin"></div>
+          </details>
+          <label class="f" for="wlNick">Кто может войти</label>
+          <div class="wl" id="wlList"></div>
+          <div class="row" style="margin-top:8px">
+            <input type="text" id="wlNick" placeholder="Ник друга в World of Tanks" spellcheck="false" autocomplete="off">
+            <button class="btn" id="wlAdd"><span class="bi">Добавить</span></button>
+          </div>
+          <div class="hint" id="wlHint"></div>
+          <div class="row">
+            <div><label class="f" for="rmMax">Челленджей сразу</label><select id="rmMax"></select></div>
+            <div><label class="f" for="rmRerolls">Перекруток у друга</label><select id="rmRerolls"></select></div>
+          </div>
+          <button class="btn wide" id="roomLeave"><span class="bi">Выйти из комнаты</span></button>
+        </div>
+        <div id="roomFriend" hidden>
+          <div class="acct"><span class="acct-nick" id="rfTitle"></span><span class="acct-meta" id="rfMeta"></span></div>
+          <div class="hint" id="rfHint"></div>
+          <button class="btn primary wide" id="rfLogin"><span class="bi">Войти через Wargaming</span></button>
+          <button class="btn primary wide" id="rfJoin" hidden><span class="bi">Войти в комнату</span></button>
+          <button class="btn ghost wide" id="rfLeave"><span class="bi">Играть одному</span></button>
+        </div>
+        <div class="statusline" id="roomStatus"></div>
+      </div>
+
       <div class="card enter" style="--i:3">
         <h2>Фильтры</h2>
         <label class="f">Уровни</label>
@@ -541,17 +669,24 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
           <option value="hard">Хардкор</option>
         </select>
         <details>
-          <summary>Редактировать список</summary>
-          <div class="hint">Одна строка — один челлендж. Префикс <code class="k">[ЛТ,СТ]</code> — только для этих классов (ЛТ, СТ, ТТ, ПТ, САУ). Подстановки зависят от уровня танка и сложности: <code class="k">{dmg}</code> <code class="k">{frags}</code> <code class="k">{assist}</code> <code class="k">{block}</code> <code class="k">{spots}</code> <code class="k">{stuns}</code> <code class="k">{tier}</code></div>
-          <textarea id="chList" spellcheck="false" style="margin-top:10px"></textarea>
-          <button class="btn sm" id="chReset" style="margin-top:10px"><span class="bi">Сбросить к стандартным</span></button>
+          <summary>Выбрать челленджи <span id="chCount"></span></summary>
+          <label class="f">Проверяются автоматически</label>
+          <div class="hint" style="margin-top:0">Рулетка сама посмотрит статистику после боя на выпавшем танке. Цифры здесь — для VIII уровня, в рулетке зависят от уровня танка и сложности.</div>
+          <div class="chlist" id="chAuto"></div>
+          <label class="f">Отмечаешь сам</label>
+          <div class="chlist" id="chManual"></div>
+          <label class="f" for="chCustom">Свои челленджи</label>
+          <div class="hint" style="margin-top:0">Одна строка — один челлендж, результат отмечаешь сам. Префикс <code class="k">[ЛТ,СТ]</code> — только для этих классов (ЛТ, СТ, ТТ, ПТ, САУ). Подстановки зависят от уровня танка и сложности: <code class="k">{dmg}</code> <code class="k">{frags}</code> <code class="k">{assist}</code> <code class="k">{block}</code> <code class="k">{spots}</code> <code class="k">{stuns}</code> <code class="k">{tier}</code></div>
+          <textarea id="chCustom" spellcheck="false" style="margin-top:10px;min-height:110px" placeholder="[ЛТ,СТ] Набрать {assist} урона по засвету"></textarea>
+          <button class="btn sm" id="chReset" style="margin-top:10px"><span class="bi">Сбросить</span></button>
         </details>
         <label class="check"><input type="checkbox" id="sound"> Звук в этом окне</label>
       </div>
 
       <div class="card enter" style="--i:5">
         <h2>OBS</h2>
-        <div class="hint" style="margin-top:0">Добавь <b>Источник → Браузер</b> с этим адресом, ширина 1920, высота 460. Фон у оверлея прозрачный, крутишь отсюда — на стриме анимация повторится.</div>
+        <div class="hint" style="margin-top:0">Добавь <b>Источник → Браузер</b> с этим адресом, ширина <b>760</b>, высота <b>320</b> — это маленький виджет. Нужен широкий, как раньше (1920×460), — допиши в конец адреса <code class="k" id="obsBig">&amp;size=big</code>. Фон прозрачный, крутишь отсюда — на стриме анимация повторится.</div>
+        <div class="hint" id="obsMode"></div>
         <div class="obslink">
           <input type="text" id="obsUrl" readonly>
           <button class="btn" id="copyObs"><span class="bi">Копировать</span></button>
@@ -563,13 +698,28 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 </div>
 <div class="toasts" id="toasts"></div>
 
+<script src="js/catalog.js"></script>
+<script src="js/tracker.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="js/room.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
+// WG может дописать параметры входа через второй «?»: ?room=ID?status=ok&… — разберём сами
+(function () {
+  const r = params.get('room') || '', q = r.indexOf('?');
+  if (q < 0) return;
+  params.set('room', r.slice(0, q));
+  new URLSearchParams(r.slice(q + 1)).forEach((v, k) => { if (!params.has(k)) params.set(k, v); });
+})();
 const OBS = params.has('obs');
 const HAS_SERVER = location.protocol.startsWith('http');
 const KEY = 'wotRoulette.v1';
 const HANGAR_KEY = 'wotRoulette.hangar.v1';
+const ROOM_KEY = 'wotRoulette.room.v1';          // { roomId, key } — комната стримера
+const PENDING_ROOM_KEY = 'wotRoulette.pendingRoom'; // sessionStorage: комната друга на время входа через WG
 
 const REGIONS = {
   eu:   { name: 'EU (Европа)',              api: 'https://api.worldoftanks.eu' },
@@ -581,7 +731,8 @@ const TYPES = { lightTank: 'ЛТ', mediumTank: 'СТ', heavyTank: 'ТТ', 'AT-SP
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 const TIERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
-const DEFAULT_CH = `Нанести {dmg} урона
+// Старый стандартный список (до каталога) — нужен только для переноса своих строк
+const OLD_DEFAULT_CH = `Нанести {dmg} урона
 Уничтожить {frags} противников
 Быть №1 по урону в своей команде
 Попасть в топ-3 команды по опыту
@@ -598,9 +749,6 @@ const DEFAULT_CH = `Нанести {dmg} урона
 Взять базу или сбить захват
 Чат решает: челлендж выбирают зрители`;
 
-const DMG = [0, 350, 550, 750, 1000, 1300, 1700, 2100, 2600, 3100, 3600, 4000];
-const DIFF = { easy: 0.75, normal: 1, hard: 1.35 };
-
 // ---------- Состояние ----------
 function loadJSON(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
 function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -609,12 +757,26 @@ const S = Object.assign({
   region: 'eu', appId: '1e984dbbdf7b1c1fbd284d4cadc0b17f', nick: '',
   accountId: null, token: null, tokenExp: 0,
   tiers: [...TIERS], types: Object.keys(TYPES), onlyPrem: false,
-  diff: 'normal', sound: true, excluded: [], challenges: DEFAULT_CH, history: [],
+  diff: 'normal', sound: true, excluded: [], history: [],
+  challengeIds: null,      // включённые челленджи каталога; null — все
+  customManual: '',        // свои ручные строки
+  maxActive: 3,            // сколько челленджей одновременно ждут боя
 }, loadJSON(KEY, {}));
 const save = () => saveJSON(KEY, S);
+// Перенос старого текстового списка: строки не из старого стандартного становятся своими
+if (typeof S.challenges === 'string') {
+  const old = new Set(OLD_DEFAULT_CH.split('\n').map(l => l.trim()));
+  const own = S.challenges.split('\n').map(l => l.trim()).filter(l => l && !old.has(l));
+  S.customManual = [S.customManual, ...own].filter(Boolean).join('\n');
+  delete S.challenges;
+  save();
+}
+if (!Array.isArray(S.history)) S.history = [];
 let hangar = loadJSON(HANGAR_KEY, []);
 let current = null;      // последний результат (payload)
+let curEntry = null;     // запись истории текущего спина
 let spinning = false;
+let rerollBusy = false;
 let playSeq = 0;         // номер текущего проигрывания (новый payload отменяет старое)
 
 const tokenValid = () => S.token && S.tokenExp * 1000 > Date.now() + 60000;
@@ -628,7 +790,6 @@ function tanksWord(n) {
 }
 const pick = arr => arr[Math.floor(rnd() * arr.length)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const round50 = n => Math.max(50, Math.round(n / 50) * 50);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const RAR = tier => tier >= 10 ? 'r4' : tier >= 8 ? 'r3' : tier >= 5 ? 'r2' : 'r1';
 const RAR_COLORS = {
@@ -765,15 +926,32 @@ async function loadHangar() {
     for (let i = 0; i < ids.length; i += 100) {
       Object.assign(info, await api('encyclopedia/vehicles', {
         tank_id: ids.slice(i, i + 100).join(','), language: 'ru',
-        fields: 'tank_id,name,short_name,tier,type,nation,is_premium,images.big_icon',
+        fields: 'tank_id,name,short_name,tier,type,nation,is_premium,images.big_icon,default_profile.hp,default_profile.hull_hp,turrets',
       }));
     }
+    // Прочность в полной прокачке: корпус + самая прочная башня (default_profile — со стоковой башней)
+    const turretIds = [...new Set(Object.values(info).flatMap(v => (v && v.turrets) || []))];
+    const turretHp = {};
+    try {
+      for (let i = 0; i < turretIds.length; i += 100) {
+        const mods = await api('encyclopedia/modules', {
+          module_id: turretIds.slice(i, i + 100).join(','), extra: 'default_profile', fields: 'default_profile.turret.hp',
+        });
+        for (const [mid, m] of Object.entries(mods || {})) turretHp[mid] = +(m?.default_profile?.turret?.hp) || 0;
+      }
+    } catch { /* без модулей останется стоковая прочность */ }
+    const topHp = v => {
+      const best = Math.max(0, ...(v.turrets || []).map(m => turretHp[m] || 0));
+      const hull = +(v.default_profile?.hull_hp) || 0;
+      return best && hull ? hull + best : +(v.default_profile?.hp) || 0;
+    };
     hangar = mine.map(t => {
       const v = info[t.tank_id];
       if (!v) return null;
       return {
         id: t.tank_id, name: v.short_name || v.name, tier: v.tier, type: v.type,
         prem: !!v.is_premium, img: (v.images?.big_icon || '').replace(/^http:/, 'https:'), battles: t.battles,
+        hp: topHp(v),
       };
     }).filter(Boolean).sort((a, b) => b.tier - a.tier || a.name.localeCompare(b.name, 'ru'));
     saveJSON(HANGAR_KEY, hangar);
@@ -789,7 +967,10 @@ async function loadHangar() {
 
 function login() {
   if (!HAS_SERVER) return toast('Для входа запусти start.bat и открой http://localhost:8080');
-  const redirect = location.origin + location.pathname;
+  // друг в комнате возвращается на ту же ?room=ID
+  const friendRoom = inRoom() && !RM.owner ? RM.id : '';
+  try { if (friendRoom) sessionStorage.setItem(PENDING_ROOM_KEY, friendRoom); else sessionStorage.removeItem(PENDING_ROOM_KEY); } catch {}
+  const redirect = location.origin + location.pathname + (friendRoom ? '?room=' + encodeURIComponent(friendRoom) : '');
   location.href = `${REGIONS[S.region].api}/wot/auth/login/?application_id=${encodeURIComponent(S.appId.trim())}&redirect_uri=${encodeURIComponent(redirect)}`;
 }
 function logout() {
@@ -804,48 +985,104 @@ function handleAuthRedirect() {
     S.accountId = +params.get('account_id');
     S.nick = params.get('nickname') || S.nick;
     save();
-    history.replaceState(null, '', location.pathname);
+    history.replaceState(null, '', cleanUrl());
     setTimeout(loadHangar, 0);
   } else if (params.get('status') === 'error') {
-    history.replaceState(null, '', location.pathname);
+    history.replaceState(null, '', cleanUrl());
     setTimeout(() => setStatus('Вход не удался: ' + (params.get('message') || 'ошибка'), true), 0);
   }
 }
 
 // ---------- Пул ----------
 const inFilters = t => S.tiers.includes(t.tier) && S.types.includes(t.type) && (!S.onlyPrem || t.prem);
-const pool = () => hangar.filter(t => inFilters(t) && !S.excluded.includes(t.id));
 const slim = t => ({ id: t.id, name: t.name, tier: t.tier, type: t.type, prem: t.prem, img: t.img });
+const tankOf = t => ({ ...slim(t), hp: +t.hp || 0 });
+const ACTIVE = ['pending', 'ambiguous'];
+const isActive = s => !!s && ACTIVE.includes(s.status);
+const accStr = () => (S.accountId ? String(S.accountId) : '');
+// Спины этого игрока, которые ещё ждут результата
+const activeSpins = () => store.all().filter(s => isActive(s) && String(s.acc || '') === accStr());
+const busyTankIds = () => new Set(activeSpins().map(s => s.tank && s.tank.id));
+// в комнате лимиты задаёт стример (meta), в соло — свои настройки
+const maxActive = () => Math.max(1, +(inRoom() && RM.meta ? RM.meta.maxActive : S.maxActive) || 3);
+const friendRerolls = () => { const n = RM.meta ? +RM.meta.friendRerolls : 1; return isFinite(n) && n >= 0 ? n : 1; };
+const isFriend = () => inRoom() && !RM.owner;
+const pool = () => {
+  const busy = busyTankIds();
+  return hangar.filter(t => inFilters(t) && !S.excluded.includes(t.id) && !busy.has(t.id));
+};
 
-// ---------- Челленджи ----------
-function parseChallenges() {
-  return S.challenges.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
-    const m = l.match(/^\[([^\]]+)\]\s*(.+)$/);
-    return m ? { types: m[1].split(',').map(s => s.trim().toUpperCase()), text: m[2] } : { types: null, text: l };
-  });
+// ---------- Челленджи (каталог WR.catalog) ----------
+const FREE_CH = { id: 'free', text: 'Просто победить 🙂', auto: false, v: null };
+// opts.autoOnly — для друзей (только автоматические)
+function challengeOpts(autoOnly = false) {
+  return { difficulty: S.diff, enabledIds: S.challengeIds, customManual: S.customManual, autoOnly };
 }
-function fillChallenge(text, tank) {
-  const k = DIFF[S.diff] || 1;
-  const dmg = round50((DMG[tank.tier] || 3000) * k * (tank.type === 'SPG' ? 0.75 : 1));
-  const vals = {
-    dmg, tier: ROMAN[tank.tier],
-    frags: Math.max(1, (tank.tier <= 4 ? 4 : 3) + (S.diff === 'hard' ? 1 : S.diff === 'easy' ? -1 : 0)),
-    assist: round50(dmg * 0.8), block: round50(dmg * 0.9),
-    spots: { easy: 4, normal: 6, hard: 8 }[S.diff], stuns: { easy: 6, normal: 10, hard: 15 }[S.diff],
-  };
-  return text.replace(/\{(\w+)\}/g, (m, key) => vals[key] ?? m);
+function instancesOf(tank, autoOnly = false) {
+  let list = WR.catalog.instancesFor(tank, challengeOpts(autoOnly));
+  // другу ручной «Просто победить» нельзя: если всё автоматическое выключено — берём весь каталог
+  if (!list.length && autoOnly) list = WR.catalog.instancesFor(tank, { ...challengeOpts(true), enabledIds: null });
+  return list.length ? list : [FREE_CH];
 }
-function challengeSequence(tank) {
-  const label = TYPES[tank.type];
-  let list = parseChallenges().filter(c => !c.types || c.types.includes(label)).map(c => fillChallenge(c.text, tank));
-  if (!list.length) list = ['Просто победить 🙂'];
+// Случайный экземпляр; avoidId — не повторять текущий при перекрутке
+function pickInstance(tank, avoidId = null, autoOnly = false) {
+  const list = instancesOf(tank, autoOnly);
+  const rest = list.length > 1 ? list.filter(i => i.id !== avoidId) : list;
+  return { ...pick(rest) };
+}
+// Тексты для перелистывания: 19 случайных + итоговый
+function rollSeq(tank, final, autoOnly = false) {
+  const texts = [...new Set(instancesOf(tank, autoOnly).map(i => i.text))];
   const seq = [];
-  for (let i = 0; i < 20; i++) {
-    let c = pick(list);
-    if (list.length > 1) while (c === seq[seq.length - 1]) c = pick(list);
+  for (let i = 0; i < 19; i++) {
+    let c = pick(texts);
+    if (texts.length > 1) while (c === seq[seq.length - 1]) c = pick(texts);
     seq.push(c);
   }
-  return seq; // последний — итоговый
+  if (texts.length > 1 && seq[seq.length - 1] === final.text) seq[seq.length - 1] = texts.find(t => t !== final.text);
+  seq.push(final.text);
+  return seq;
+}
+
+// ---------- Спин: одна функция собирает запись ----------
+const newId = () => Date.now().toString(36) + '-' + Math.floor(rnd() * 1e9).toString(36);
+// Запись спина в формате комнаты (rooms/{room}/spins/{id}); соло хранит её в истории без items
+function buildSpin({ kind = 'full', items, winIndex, jitter, dur, ch, tank, challenge }) {
+  return {
+    id: newId(), acc: accStr(), nick: S.nick || '', owner: true, ts: Date.now(),
+    kind, items, winIndex, jitter, dur, ch,
+    tank: tankOf(tank), challenge, snapshot: null, rerolls: 0,
+    status: 'pending', result: null,
+  };
+}
+// Payload для локального оверлея (/api/state): как раньше + spinId и resultText
+function payloadOf(spin, kind = spin.kind) {
+  return {
+    id: newId(), spinId: spin.id, kind, ts: Date.now(),
+    items: spin.items, winIndex: spin.winIndex, jitter: spin.jitter, dur: spin.dur, ch: spin.ch,
+    status: spin.status, resultText: (spin.result && spin.result.text) || '',
+  };
+}
+// Запись истории (соло): старые поля pid, ts, tank, ch, status + новые
+function histEntry(spin, pid) {
+  return {
+    pid, id: spin.id, ts: spin.ts, spunAt: spin.ts, acc: spin.acc, nick: spin.nick, owner: spin.owner,
+    tank: spin.tank, ch: spin.challenge.text, challenge: spin.challenge, snapshot: spin.snapshot,
+    rerolls: spin.rerolls, status: spin.status, result: spin.result,
+  };
+}
+
+// Строка статуса под челленджем
+function statusLine(status, text) {
+  const t = text ? ' · ' + text : '';
+  switch (status) {
+    case 'pending': return '⏳ Ждём бой на этом танке';
+    case 'ok': return '✅ Выполнено' + t;
+    case 'fail': return '❌ Провал' + t;
+    case 'ambiguous': return isFriend() ? '⚠️ Сыграно несколько боёв — отметит стример' : '⚠️ Сыграно несколько боёв — отметь сам';
+    case 'cancelled': return '✖ Челлендж отменён';
+    default: return '';
+  }
 }
 
 // ---------- Конфетти (косметика, на canvas поверх сцены) ----------
@@ -1074,6 +1311,13 @@ function showStatus(st, withSound = false) {
     : `<div class="stamp fail"><span>${ICON_FAIL}ПРОВАЛ</span><i class="streak"></i></div>`;
   if (withSound) (st === 'ok' ? sfx.ok : sfx.fail)();
 }
+// Строка «ждём бой / выполнено · цифры» под челленджем
+function showResLine(p) {
+  const el = $('#resLine');
+  const st = p ? p.status : null;
+  el.textContent = p ? statusLine(st, p.resultText) : '';
+  el.className = 'lt-res' + (st ? ' st-' + st : '');
+}
 
 async function play(p, animate = true) {
   const my = ++playSeq;
@@ -1093,6 +1337,7 @@ async function play(p, animate = true) {
     markWinner(p, reelOnly);
     showTank(win, reelOnly);
     showStatus(null);
+    showResLine(null);
     if (reelOnly) { $('#chText').textContent = ''; $('#chBox').classList.remove('final', 'rolling'); }
     const wasHidden = res.hidden;
     res.hidden = false;
@@ -1102,6 +1347,7 @@ async function play(p, animate = true) {
     await animateChallenge(p.ch, animate, my);
     if (my !== playSeq) return;
     showStatus(p.status);
+    showResLine(p);
   } catch (e) {
     console.error(e);
   } finally {
@@ -1115,66 +1361,259 @@ async function pushState(p) {
   try { await fetch('/api/state', { method: 'POST', body: JSON.stringify(p) }); } catch {}
 }
 
-function startOverlay() {
-  document.documentElement.classList.add('obs');
-  document.body.classList.add('obs');
-  $('#reelEmpty').textContent = '';
-  let lastId = null, first = true;
-  setInterval(async () => {
-    try {
-      const r = await fetch('/api/state', { cache: 'no-store' });
-      if (r.status !== 200) return;
-      const p = await r.json();
-      if (!p || !p.id) return;
-      if (p.id !== lastId) {
-        lastId = p.id;
-        // При первой загрузке/перезагрузке источника не прокручиваем заново — просто показываем результат
-        play(p, !first);
-      } else if (!spinning && current && current.status !== p.status) {
-        current.status = p.status; showStatus(p.status, true);
-      }
-    } catch {} finally { first = false; }
-  }, 400);
+// Оверлей OBS теперь в obs.html (он же читает /api/state без комнаты); ?obs=… перенаправляется туда в <head>
+
+// ---------- Хранилище спинов ----------
+// Соло: история в localStorage. Комнаты подставят в store объект с теми же методами.
+const canTrack = s => !!(s && s.challenge && s.challenge.auto && s.acc);
+const soloStore = {
+  all: () => S.history,
+  find: id => S.history.find(h => h.id === id) || (curEntry && curEntry.id === id ? curEntry : null),
+  // Спины, которые проверяет этот экран: свои, автоматические, ждут боя
+  toCheck: () => S.history.filter(h => h.status === 'pending' && canTrack(h) && String(h.acc) === accStr()),
+  // Как WR.room.resolveSpin: пишет, только если статус ещё 'pending'; force — ручное решение
+  async resolve(spin, { status, result }, { force = false } = {}) {
+    const h = soloStore.find(spin.id);
+    if (!h || (!force && h.status !== 'pending')) return false;
+    h.status = status; h.result = result || null;
+    save();
+    onSpinChanged(h);
+    return true;
+  },
+  // Новый слепок (бои были до спина или слепок сняли позже)
+  async rebase(spin, snapshot) {
+    const h = soloStore.find(spin.id);
+    if (!h || h.status !== 'pending') return;
+    h.snapshot = snapshot; save();
+  },
+};
+let store = soloStore;
+
+// Спин сменил статус: история, пул, плашка, оверлей
+function onSpinChanged(h) {
+  renderHistory(); renderPool();
+  if (curEntry && current && curEntry.id === h.id) {
+    current.status = h.status;
+    current.resultText = (h.result && h.result.text) || '';
+    pushState(current);
+    if (!spinning) { showStatus(h.status, true); showResLine(current); }
+  } else if (h.result && h.result.by === 'auto' && (h.status === 'ok' || h.status === 'fail' || h.status === 'ambiguous')) {
+    // в комнате стример видит итоги всех, друг — только свои
+    const own = String(h.acc || '') === accStr();
+    if (!inRoom() || RM.owner || own) toast(`${own ? '' : (h.nick || 'Друг') + ' · '}${h.tank.name}: ${statusLine(h.status, h.result.text)}`);
+  }
+  updateButtons();
+}
+
+// ---------- Проверка боёв (WR.tracker) ----------
+const TRACK_MS = 30000;
+const snapJobs = {};   // id спина -> слепок, который ещё снимается
+let trackTimer = 0, tracking = false;
+// регион аккаунта: в комнате — из players/{acc}, иначе свой
+function regionOf(acc) {
+  const p = inRoom() ? RM.players[String(acc)] : null;
+  return p && REGIONS[p.region] ? p.region : S.region;
+}
+const trackBase = acc => ({ apiBase: (REGIONS[regionOf(acc)] || REGIONS.eu).api, appId: S.appId, accountId: acc });
+const nowSrv = () => (inRoom() ? WR.room.serverNow() : Date.now());
+const spunAtOf = s => +s.spunAt || +s.ts || 0;
+const trackItem = s => ({
+  key: s.id, tankId: s.tank.id, snapshot: s.snapshot, spunAt: spunAtOf(s),
+  withAchievements: WR.catalog.needsAchievements(s.challenge),
+});
+function trackErr(e) {
+  console.warn('Проверка боёв:', e);
+  setStatus('Проверка боёв: ' + ((e && e.message) || e) + '. Попробую позже.', true);
+}
+
+// Слепок для автоматического челленджа. Анимацию не держит; соло — в запись, комната — через updateSpin.
+function startSnapshot(entry) {
+  if (!canTrack(entry)) return null;
+  const ch = entry.challenge, chKey = ch.id + '|' + ch.text;
+  // запись из комнаты подменяет объект challenge при каждом обновлении — сравниваем по содержимому
+  const same = () => !!entry.challenge && entry.challenge.id + '|' + entry.challenge.text === chKey;
+  const rid = RM.id;   // комната, в которой спин (null — соло)
+  const job = WR.tracker.snapshot({ ...trackBase(entry.acc), tankId: entry.tank.id, withAchievements: WR.catalog.needsAchievements(ch) })
+    .then(snap => {
+      if (!same() || entry.snapshot || entry.status !== 'pending' || (rid && RM.id !== rid)) return;
+      entry.snapshot = snap;
+      if (rid) return WR.room.updateSpin(rid, entry.id, { snapshot: snap }).catch(e => roomErr(e));
+      save();
+    })
+    .catch(e => console.warn('Слепок не снят:', e))
+    .finally(() => { if (snapJobs[entry.id] === job) delete snapJobs[entry.id]; });
+  snapJobs[entry.id] = job;
+  return job;
+}
+async function waitSnapshot(s) { if (snapJobs[s.id]) await snapJobs[s.id]; }
+
+// Слепка нет (не удалось снять при спине) — снять сейчас
+async function lateSnapshot(s) {
+  try {
+    const snap = await WR.tracker.snapshot({ ...trackBase(s.acc), tankId: s.tank.id, withAchievements: WR.catalog.needsAchievements(s.challenge) });
+    if (snap.lastBattle * 1000 > spunAtOf(s)) {
+      // после спина уже были бои — посчитать бой на этом танке нельзя
+      await store.resolve(s, { status: 'ambiguous', result: { text: 'статистику сняли уже после боя', checkedAt: Date.now(), by: 'auto' } });
+    } else await store.rebase(s, snap);
+  } catch (e) { trackErr(e); }
+}
+
+// Результат проверки одного спина -> статус
+async function applyCheck(s, r) {
+  if (!r) return;
+  const res = d => ({ text: WR.catalog.describe(s.challenge, d), delta: d, checkedAt: Date.now(), by: 'auto' });
+  if (r.state === 'done') {
+    const ok = WR.catalog.evaluate(s.challenge, r.delta);
+    await store.resolve(s, { status: ok ? 'ok' : 'fail', result: res(r.delta) });
+  } else if (r.state === 'ambiguous') {
+    await store.resolve(s, { status: 'ambiguous', result: res(r.delta) });
+  } else if (r.state === 'rebaseline' && r.snapshot) {
+    await store.rebase(s, r.snapshot);
+  } else if (r.state === 'error') {
+    console.warn('Проверка спина', s.id, r.error);
+  }
+}
+
+// Проверить список спинов (любых аккаунтов): по запросу WG API на аккаунт -> { id: ответ трекера }
+async function checkPending(spins) {
+  const byAcc = {};
+  for (const s of spins) if (canTrack(s) && s.status === 'pending') (byAcc[s.acc] = byAcc[s.acc] || []).push(s);
+  const out = {};
+  for (const [acc, list] of Object.entries(byAcc)) {
+    const ready = [];
+    for (const s of list) {
+      await waitSnapshot(s);
+      if (s.snapshot) ready.push(s);
+      // чужой свежий спин: слепок ещё снимает страница друга — подождём
+      else if (String(s.acc) !== accStr() && nowSrv() - spunAtOf(s) < 60000) continue;
+      else await lateSnapshot(s);
+    }
+    if (!ready.length) continue;
+    let res;
+    try { res = await WR.tracker.check({ ...trackBase(acc), items: ready.map(trackItem) }); }
+    catch (e) { trackErr(e); continue; }
+    for (const s of ready) {
+      out[s.id] = res[s.id];
+      await applyCheck(s, res[s.id]);
+    }
+  }
+  return out;
+}
+
+// Цикл: сразу после спина и раз в 30 с, пока есть что проверять
+async function trackTick() {
+  clearTimeout(trackTimer); trackTimer = 0;
+  if (tracking) return;
+  tracking = true;
+  try {
+    const list = store.toCheck();
+    if (list.length) await checkPending(list);
+  } catch (e) { trackErr(e); }
+  finally { tracking = false; scheduleTrack(); }
+}
+function scheduleTrack(ms = TRACK_MS) {
+  clearTimeout(trackTimer); trackTimer = 0;
+  if (store.toCheck().length) trackTimer = setTimeout(trackTick, ms);
+}
+
+// Перекрутка разрешена, только пока на танке не сыграно ни одного боя после спина
+async function canReroll(s) {
+  await waitSnapshot(s);
+  if (!canTrack(s) || !s.snapshot) return true; // ручной челлендж — проверять нечем
+  let r;
+  try { r = (await WR.tracker.check({ ...trackBase(s.acc), items: [trackItem(s)] }))[s.id]; }
+  catch (e) { toast('Не удалось проверить бои: ' + e.message); return false; }
+  if (!r || r.state === 'error') { toast('Не удалось проверить бои, попробуй ещё раз'); return false; }
+  if (r.state === 'waiting') return true;
+  if (r.state === 'rebaseline') { await store.rebase(s, r.snapshot); return true; }
+  await applyCheck(s, r);
+  toast('Бой на этом танке уже сыгран — перекрутить нельзя');
+  return false;
 }
 
 // ---------- Действия ----------
 async function spin() {
-  if (spinning) return;
+  if (spinning || rerollBusy) return;
+  if (inRoom()) { const why = roomSpinBlock(); if (why) return toast(why); }
+  const act = activeSpins().length;
+  if (act >= maxActive()) {
+    return toast(`Уже ${act} из ${maxActive()} челленджей ждут боя — ${isFriend() ? 'сначала сыграй их' : 'сыграй их или отметь результат в истории'}`);
+  }
   const p = pool();
-  if (!p.length) return toast('Пул пуст — загрузи ангар или ослабь фильтры');
+  if (!p.length) {
+    return toast(busyTankIds().size ? 'Пул пуст: остальные танки ждут боя по челленджу' : 'Пул пуст — загрузи ангар или ослабь фильтры');
+  }
   const win = pick(p);
   const N = 64, W = 56;
   const items = Array.from({ length: N }, (_, i) => slim(i === W ? win : pick(p)));
-  const payload = {
-    id: Date.now() + '-' + Math.floor(rnd() * 1e6), kind: 'full', ts: Date.now(),
-    items, winIndex: W, jitter: (rnd() - 0.5) * 0.8, dur: 7000,
-    ch: challengeSequence(win), status: null,
-  };
+  const autoOnly = isFriend();   // друзьям — только автоматические
+  const challenge = pickInstance(win, null, autoOnly);
+  const s = buildSpin({
+    kind: 'full', items, winIndex: W, jitter: (rnd() - 0.5) * 0.8, dur: 7000,
+    ch: rollSeq(win, challenge, autoOnly), tank: win, challenge,
+  });
+  if (inRoom()) return roomSpin(s);
+  const payload = payloadOf(s);
+  const entry = histEntry(s, payload.id);
+  curEntry = entry;
+  startSnapshot(entry);           // слепок снимается, пока крутится лента
   pushState(payload);
   await play(payload, true);
-  addHistory(payload);
+  addHistory(entry);
+  if (curEntry === entry && !spinning) showResLine(current);
+  trackTick();
 }
 
 async function rerollChallenge() {
-  if (spinning || !current) return;
-  const win = current.items[current.winIndex];
-  const payload = { ...current, id: Date.now() + '-' + Math.floor(rnd() * 1e6), kind: 'challenge', ts: Date.now(), ch: challengeSequence(win), status: null };
+  if (spinning || rerollBusy || !current || !curEntry) return;
+  const e = curEntry;
+  if (e.status !== 'pending') return toast('Челлендж уже завершён — крути новый танк');
+  const friend = isFriend();
+  if (friend && (+e.rerolls || 0) >= friendRerolls()) return toast(`Перекрутки закончились: в этой комнате ${friendRerolls()} на спин`);
+  rerollBusy = true; updateButtons();
+  let ok = false;
+  try { ok = await canReroll(e); } finally { rerollBusy = false; updateButtons(); }
+  if (!ok || curEntry !== e || spinning || e.status !== 'pending') return;
+  const challenge = pickInstance(e.tank, e.challenge.id, friend);
+  const ch = rollSeq(e.tank, challenge, friend);
+  const hadSnap = !!e.snapshot;
+  const rerolls = (+e.rerolls || 0) + 1;
+  const payload = { ...current, id: newId(), kind: 'challenge', ts: Date.now(), ch, status: e.status, resultText: '' };
+  if (inRoom()) {
+    // в комнате ch — вся последовательность (виджеты OBS ловят смену последнего текста)
+    const patch = { challenge, ch, rerolls, result: null };
+    if (!challenge.auto) patch.snapshot = null;
+    else if (!hadSnap) patch.spunAt = WR.room.serverNow();
+    rerollBusy = true; updateButtons();
+    try { await WR.room.updateSpin(RM.id, e.id, patch); }
+    catch (err) { return roomErr(err, true); }
+    finally { rerollBusy = false; updateButtons(); }
+    if (curEntry !== e || spinning) return;
+    Object.assign(e, patch);
+    if (challenge.auto && !hadSnap) startSnapshot(e);
+    roomRender();
+  } else {
+    e.challenge = challenge; e.ch = challenge.text; e.rerolls = rerolls; e.result = null;
+    if (!challenge.auto) e.snapshot = null;
+    else if (!hadSnap) { e.spunAt = Date.now(); startSnapshot(e); }
+    e.pid = payload.id;
+    save(); renderHistory();
+  }
   pushState(payload);
   await play(payload, true);
-  addHistory(payload);
+  trackTick();
 }
 
-function setResult(st) {
-  if (!current || spinning) return;
-  current.status = st; showStatus(st, true); pushState(current);
-  const h = S.history.find(x => x.pid === current.id);
-  if (h) { h.status = st; save(); renderHistory(); }
+// Ручное решение стримера (ручной челлендж или «несколько боёв»)
+async function setResult(st) {
+  if (!curEntry || !current || spinning) return;
+  await store.resolve(curEntry, { status: st, result: { text: 'отмечено вручную', checkedAt: Date.now(), by: 'manual' } }, { force: true });
 }
 
-function addHistory(p) {
-  S.history.unshift({ pid: p.id, ts: p.ts, tank: p.items[p.winIndex], ch: p.ch[p.ch.length - 1], status: null });
+function addHistory(entry) {
+  S.history.unshift(entry);
   S.history = S.history.slice(0, 200);
-  save(); renderHistory(true);
+  save(); renderHistory(true); renderPool();
 }
 
 // ---------- Рендер панели ----------
@@ -1185,30 +1624,44 @@ function renderAuth() {
   $('#acctNick').textContent = S.nick || 'игрок';
   $('#acctMeta').textContent = `Сервер ${(REGIONS[S.region] || REGIONS.eu).name} · ${hangar.length ? `${tanksWord(hangar.length)} в рулетке` : 'ангар не загружен'}`;
   $('#who').textContent = hangar.length ? `${S.nick || 'игрок'} · ${tanksWord(hangar.length)}` : 'ангар не загружен';
+  renderRoom(); // кнопки комнаты зависят от входа
 }
 
 function renderChips() {
-  $('#tierChips').innerHTML = TIERS.map(t => `<span class="chip rar-${RAR(t)} ${S.tiers.includes(t) ? 'on' : ''}" data-tier="${t}" tabindex="0" role="button" aria-pressed="${S.tiers.includes(t)}"><span>${ROMAN[t]}</span></span>`).join('');
-  $('#typeChips').innerHTML = Object.entries(TYPES).map(([k, v]) => `<span class="chip ct-${k} ${S.types.includes(k) ? 'on' : ''}" data-type="${k}" tabindex="0" role="button" aria-pressed="${S.types.includes(k)}"><span><i class="dot"></i>${v}</span></span>`).join('');
+  // сколько танков ангара на каждом уровне / в каждом классе; уровни — от старших к младшим
+  const byTier = {}, byType = {};
+  for (const t of hangar) { byTier[t.tier] = (byTier[t.tier] || 0) + 1; byType[t.type] = (byType[t.type] || 0) + 1; }
+  const cnt = n => hangar.length ? `<small class="cnt">${n || 0}</small>` : '';
+  const empty = n => hangar.length && !n ? 'empty' : '';
+  $('#tierChips').innerHTML = [...TIERS].reverse().map(t => `<span class="chip rar-${RAR(t)} ${S.tiers.includes(t) ? 'on' : ''} ${empty(byTier[t])}" data-tier="${t}" tabindex="0" role="button" aria-pressed="${S.tiers.includes(t)}" title="${byTier[t] || 0} в ангаре"><span>${ROMAN[t]}${cnt(byTier[t])}</span></span>`).join('');
+  $('#typeChips').innerHTML = Object.entries(TYPES).map(([k, v]) => `<span class="chip ct-${k} ${S.types.includes(k) ? 'on' : ''} ${empty(byType[k])}" data-type="${k}" tabindex="0" role="button" aria-pressed="${S.types.includes(k)}" title="${byType[k] || 0} в ангаре"><span><i class="dot"></i>${v}${cnt(byType[k])}</span></span>`).join('');
+}
+
+function poolInfoText() {
+  if (!hangar.length) return '';
+  const n = busyTankIds().size;
+  return `в рулетке ${pool().length} из ${hangar.length}${n ? ` · ⏳ ${n}` : ''}`;
 }
 
 function renderPool(animate = false) {
   let k = 0;
   const grid = $('#poolGrid');
   grid.classList.toggle('anim', !!animate);
+  const busy = busyTankIds();
   grid.innerHTML = hangar.map(t => {
-    const vis = inFilters(t);
+    const vis = inFilters(t), wait = busy.has(t.id);
     return `
-    <div class="pcard rar-${RAR(t.tier)} ct-${t.type} ${S.excluded.includes(t.id) ? 'off' : ''} ${vis ? '' : 'filtered'}" data-id="${t.id}" title="${esc(t.name)} — боёв: ${t.battles}" style="--i:${vis ? Math.min(k++, 40) : 0}">
+    <div class="pcard rar-${RAR(t.tier)} ct-${t.type} ${S.excluded.includes(t.id) ? 'off' : ''} ${wait ? 'busy' : ''} ${vis ? '' : 'filtered'}" data-id="${t.id}" title="${esc(t.name)} — боёв: ${t.battles}${wait ? ' · ждёт боя по челленджу' : ''}" style="--i:${vis ? Math.min(k++, 40) : 0}">
       <span class="pc-tier">${ROMAN[t.tier]}${t.prem ? '<i class="gem"></i>' : ''}</span>
       <span class="ctag">${TYPES[t.type]}</span>
       <img src="${esc(t.img)}" alt="" loading="lazy">
       <div class="pc-nm">${esc(t.name)}</div>${t.prem ? '<i class="foil"></i>' : ''}
       <i class="glare"></i>
+      <span class="pc-wait">⏳ ЖДЁТ БОЯ</span>
       <span class="pc-x"><span>ИСКЛЮЧЁН</span></span>
     </div>`;
   }).join('') || '<div class="empty-note">Здесь появятся твои танки</div>';
-  $('#poolInfo').textContent = hangar.length ? `в рулетке ${pool().length} из ${hangar.length}` : '';
+  $('#poolInfo').textContent = poolInfoText();
   if (!current) {
     $('#reelEmpty').hidden = false;
     $('#reelEmpty').textContent = hangar.length ? 'Жми КРУТИТЬ 🎰' : 'Войди через Wargaming справа →';
@@ -1220,26 +1673,91 @@ function fmtTime(ts) {
   try { return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
 }
 
-function renderHistory(animFirst = false) {
-  $('#hist').innerHTML = S.history.map((h, i) => `
-    <div class="hitem rar-${RAR(h.tank.tier)} st-${h.status || 'wait'} ${animFirst && i === 0 ? 'new' : ''}">
-      <img src="${esc(h.tank.img)}" alt="">
+const HIST_ICON = { ok: '✅', fail: '❌', pending: '⏳', ambiguous: '⚠️', cancelled: '✖' };
+// Кнопки у активных челленджей: ✅/❌ — если отмечать вручную, ✖ — отменить
+function histActions(h) {
+  if (!h.id || !isActive(h) || isFriend()) return ''; // в комнате решает только стример
+  const btn = (act, ic, tip) => `<button class="hbtn" data-act="${act}" data-id="${esc(h.id)}" title="${tip}">${ic}</button>`;
+  const manual = !canTrack(h) || h.status === 'ambiguous';
+  return (manual ? btn('ok', '✅', 'Выполнил') + btn('fail', '❌', 'Провал') : '') + btn('cancel', '✖', 'Отменить челлендж');
+}
+
+// Текст челленджа: соло хранит строку в ch, комната — массив ch и объект challenge
+const chText = h => (h.challenge && h.challenge.text) || (Array.isArray(h.ch) ? h.ch[h.ch.length - 1] : h.ch) || '';
+
+// Строка спина (история и «Игроки комнаты»); live — отдельная строка статуса
+function spinRow(h, { isNew = false, live = false } = {}) {
+  const t = h.tank || {}, txt = chText(h);
+  const res = h.result && h.result.text ? ` · ${h.result.text}` : '';
+  const line = live ? '' : h.status === 'ambiguous' ? (isFriend() ? ' · несколько боёв — отметит стример' : ' · несколько боёв — отметь сам') : res;
+  const st = live ? statusLine(h.status, h.result && h.result.text) : '';
+  return `
+    <div class="hitem rar-${RAR(t.tier)} st-${h.status || 'wait'} ${isNew ? 'new' : ''}">
+      <img src="${esc(t.img || '')}" alt="">
       <div style="min-width:0">
-        <div class="h-t"><b>${ROMAN[h.tank.tier]}</b><span>${esc(h.tank.name)}</span><time>${fmtTime(h.ts)}</time></div>
-        <div class="c">${esc(h.ch)}</div>
+        <div class="h-t"><b>${ROMAN[t.tier] || ''}</b><span>${esc(t.name || '')}</span><time>${fmtTime(h.ts)}</time></div>
+        <div class="c" title="${esc(txt + line)}">${esc(txt)}${esc(line)}</div>
+        ${st ? `<div class="c2 st-${h.status}">${esc(st)}</div>` : ''}
       </div>
-      <div class="s"><span>${h.status === 'ok' ? '✅' : h.status === 'fail' ? '❌' : '⏳'}</span></div>
-    </div>`).join('') || '<div class="empty-note">Пока пусто</div>';
-  const ok = S.history.filter(h => h.status === 'ok').length, fail = S.history.filter(h => h.status === 'fail').length;
+      <div class="hside">${histActions(h)}<div class="s"><span>${HIST_ICON[h.status] || '—'}</span></div></div>
+    </div>`;
+}
+
+// История: соло — локальная, в комнате — свои спины комнаты
+function historyList() {
+  if (!inRoom()) return S.history;
+  return Object.values(RM.spins).filter(s => String(s.acc || '') === accStr() && shown(s)).sort((a, b) => (+b.ts || 0) - (+a.ts || 0));
+}
+
+function renderHistory(animFirst = false) {
+  const list = historyList();
+  $('#hist').innerHTML = list.map((h, i) => spinRow(h, { isNew: animFirst && i === 0 })).join('')
+    || `<div class="empty-note">${inRoom() ? 'В этой комнате ты ещё не крутил' : 'Пока пусто'}</div>`;
+  const ok = list.filter(h => h.status === 'ok').length, fail = list.filter(h => h.status === 'fail').length;
   $('#histStats').textContent = ok + fail ? `✅ ${ok} · ❌ ${fail}` : '';
 }
 
 function updateButtons() {
-  $('#spinBtn').disabled = spinning || !hangar.length;
-  for (const b of ['#rerollBtn', '#okBtn', '#failBtn']) $(b).disabled = spinning || !current;
+  $('#spinBtn').disabled = spinning || rerollBusy || !hangar.length;
+  const e = current && curEntry ? curEntry : null;
+  const friend = isFriend();
+  // ✅/❌ — для ручных челленджей и «несколько боёв»; автоматические проверятся сами. У друга — никогда (решает стример)
+  const manual = !!e && !friend && (!canTrack(e) || e.status === 'ambiguous');
+  const left = friend && e ? friendRerolls() - (+e.rerolls || 0) : Infinity;
+  $('#rerollBtn').disabled = spinning || rerollBusy || !e || e.status !== 'pending' || left <= 0;
+  $('#rerollBtn').title = friend && e ? (left > 0 ? `Можно перекрутить ещё ${left}` : 'Перекрутки на этот спин закончились') : '';
+  $('#okBtn').hidden = $('#failBtn').hidden = friend || (!!e && !manual);
+  $('#okBtn').disabled = $('#failBtn').disabled = spinning || !manual;
+  const waitOwner = friend && !!e && e.status === 'ambiguous';
+  $('#autoNote').firstElementChild.textContent = waitOwner ? 'отметит стример' : 'проверится автоматически';
+  $('#autoNote').hidden = !e || manual || (e.status !== 'pending' && !waitOwner);
 }
 
-function renderAll() { renderAuth(); renderChips(); renderPool(true); renderHistory(); updateButtons(); }
+// ---------- Настройки челленджей ----------
+function renderChallengeSettings() {
+  const defs = WR.catalog.list();
+  const on = id => !Array.isArray(S.challengeIds) || S.challengeIds.includes(id);
+  const row = d => `<label class="check"><input type="checkbox" data-ch="${esc(d.id)}" ${on(d.id) ? 'checked' : ''}>`
+    + `<span>${esc(d.sample)}${d.classes ? `<i class="cls">${d.classes.map(c => TYPES[c]).join(', ')}</i>` : ''}</span></label>`;
+  $('#chAuto').innerHTML = defs.filter(d => d.auto).map(row).join('');
+  $('#chManual').innerHTML = defs.filter(d => !d.auto).map(row).join('');
+  $('#chCustom').value = S.customManual || '';
+  updateChCount();
+}
+function updateChCount() {
+  const defs = WR.catalog.list();
+  const n = defs.filter(d => !Array.isArray(S.challengeIds) || S.challengeIds.includes(d.id)).length;
+  const own = String(S.customManual || '').split('\n').filter(l => l.trim()).length;
+  $('#chCount').textContent = `${n} из ${defs.length}${own ? ` + свои ${own}` : ''}`;
+}
+function onChallengeToggle() {
+  const boxes = Array.from(document.querySelectorAll('#chAuto [data-ch], #chManual [data-ch]'));
+  const ids = boxes.filter(b => b.checked).map(b => b.dataset.ch);
+  S.challengeIds = ids.length === boxes.length ? null : ids;
+  save(); updateChCount();
+}
+
+function renderAll() { renderAuth(); renderChips(); renderPool(true); renderHistory(); renderPlayers(); updateButtons(); }
 
 // пересчёт позиции ленты при изменении ширины окна / источника
 window.addEventListener('resize', () => {
@@ -1252,6 +1770,452 @@ window.addEventListener('resize', () => {
   } catch {}
 });
 
+// ---------- Комната (Firebase, WR.room) ----------
+// Стример: { roomId, key } в localStorage, права через claimOwner. Друг: ?room=ID + вход через WG + join.
+const RM = {};
+function resetRM() {
+  Object.assign(RM, {
+    id: null, key: null, owner: false, claimed: false,
+    meta: null, ready: false, players: {}, whitelist: {}, spins: {},
+    me: null, joining: false, fatal: '', conn: null, unsubs: [],
+  });
+}
+resetRM();
+const inRoom = () => !!RM.id;
+// Пока крутится свой новый спин, он уже в базе — не показываем его в истории, пуле и списке игроков раньше ленты
+let holdIds = null;
+const shown = s => !(holdIds && String(s.acc || '') === accStr() && !holdIds.has(s.id));
+const ROOM_RE = /^[a-z0-9]{10}$/;
+const PUBLIC_URL = 'https://volodyka1.github.io/wot-roulette/'; // сайт для друзей, когда стример сидит на localhost
+// адрес без параметров входа; другу оставляем ?room=ID
+const cleanUrl = () => location.pathname + (isFriend() ? '?room=' + encodeURIComponent(RM.id) : '');
+
+// Хранилище спинов комнаты — те же методы, что у soloStore
+const roomStore = {
+  all: () => Object.values(RM.spins).filter(shown),
+  find: id => RM.spins[id] || null,
+  // друг проверяет свои спины, стример — все спины комнаты
+  toCheck: () => Object.values(RM.spins).filter(s => s.status === 'pending' && canTrack(s) && (RM.owner || String(s.acc) === accStr())),
+  async resolve(spin, { status, result }, { force = false } = {}) {
+    try {
+      const r = await WR.room.resolveSpin(RM.id, spin.id, { status, result }, { force });
+      if (r.spin) mergeSpin('changed', r.spin);
+      return r.committed;
+    } catch (e) { roomErr(e, !!force); return false; }
+  },
+  async rebase(spin, snapshot) {
+    const h = RM.spins[spin.id] || spin;
+    if (h.status !== 'pending') return;
+    h.snapshot = snapshot;
+    try { await WR.room.updateSpin(RM.id, h.id, { snapshot }); } catch (e) { roomErr(e); }
+  },
+};
+
+function roomSay(msg, err = false) {
+  const el = $('#roomStatus');
+  el.textContent = msg || ''; el.classList.toggle('err', !!err);
+}
+// Любая ошибка комнаты — видна: строка в карточке, тост, а «нет правил» — крупно над сценой
+function roomErr(e, toastIt = false, fatal = false) {
+  const msg = (e && e.message) || String(e);
+  console.warn('Комната:', e);
+  if (e && e.code === 'RULES_MISSING') showRulesAlert(msg);
+  roomSay(msg, true);
+  if (fatal) RM.fatal = msg;
+  if (toastIt) toast(msg);
+  renderRoom();
+}
+function showRulesAlert(text) {
+  $('#roomAlertText').textContent = text || '';
+  $('#roomAlert').hidden = false;
+}
+
+// Разбор адреса при загрузке: ?room=ID&key=KEY — стать владельцем, ?room=ID — друг, иначе сохранённая комната
+function roomBoot() {
+  let room = (params.get('room') || '').trim().toLowerCase();
+  const key = (params.get('key') || '').trim();
+  // WG мог вернуть без ?room — берём комнату, запомненную перед входом
+  if (!room && params.has('status')) { try { room = sessionStorage.getItem(PENDING_ROOM_KEY) || ''; } catch {} }
+  try { sessionStorage.removeItem(PENDING_ROOM_KEY); } catch {}
+  const saved = loadJSON(ROOM_KEY, null);
+  const mine = saved && ROOM_RE.test(saved.roomId || '') && saved.key ? saved : null;
+  if (room && !ROOM_RE.test(room)) {
+    setTimeout(() => toast('Неверная ссылка на комнату — нужен код из 10 латинских букв и цифр'), 0);
+    room = '';
+  }
+  if (room && key) Object.assign(RM, { id: room, key, owner: true });
+  else if (room && !(mine && mine.roomId === room)) Object.assign(RM, { id: room, owner: false });
+  else if (mine) Object.assign(RM, { id: mine.roomId, key: mine.key, owner: true });
+  if (inRoom()) store = roomStore;
+  // ключ из адресной строки убираем сразу (он попадёт в историю браузера и на стрим)
+  if (key || (room && RM.owner)) history.replaceState(null, '', cleanUrl());
+}
+
+async function roomStart() {
+  if (!inRoom()) return renderRoom();
+  if (!window.WR || !WR.room) return roomErr(new Error('Не загрузился js/room.js — комнаты недоступны'), true, true);
+  const id = RM.id;
+  renderRoom();
+  roomSay('Подключаюсь к комнате…');
+  try { await WR.room.init(); }
+  catch (e) { return roomErr(e, true, true); }
+  if (RM.id !== id) return;
+  if (RM.owner) {
+    try {
+      const ok = await WR.room.claimOwner(id, RM.key);
+      if (RM.id !== id) return;
+      if (ok) {
+        RM.claimed = true;
+        saveJSON(ROOM_KEY, { roomId: id, key: RM.key });
+        roomSay('');
+      } else if ((loadJSON(ROOM_KEY, null) || {}).roomId !== id) {
+        // ключ из ссылки не подошёл — открываем как друг
+        Object.assign(RM, { owner: false, key: null });
+        history.replaceState(null, '', cleanUrl());
+        roomErr(new Error('Ключ в админ-ссылке не подошёл к этой комнате — открываю её как гость'), true);
+      } else {
+        roomErr(new Error('Сохранённый ключ не подошёл к комнате — открой админ-ссылку заново или выйди из комнаты'), true, true);
+      }
+    } catch (e) {
+      // нет связи или нет правил: ключ сохраняем, при следующей загрузке попробуем снова
+      saveJSON(ROOM_KEY, { roomId: id, key: RM.key });
+      roomErr(e, true, true);
+    }
+  }
+  if (RM.id !== id) return;
+  roomSubscribe();
+  if (RM.owner) WR.room.diagnose().then(d => { if (d && d.ok === false) showRulesAlert(d.text); }).catch(() => {});
+  else if (tokenValid() && S.accountId) joinRoom();
+  roomRender();
+}
+
+function roomSubscribe() {
+  const id = RM.id, keep = off => RM.unsubs.push(off);
+  const err = e => { if (RM.id === id) roomErr(e, false, e && e.code === 'RULES_MISSING'); };
+  const lost = 'Комната не найдена — проверь ссылку';
+  keep(WR.room.onMeta(id, m => {
+    if (RM.id !== id) return;
+    RM.meta = m; RM.ready = !!m;
+    if (!m) { RM.fatal = lost; roomSay(lost, true); }
+    else if (RM.fatal === lost) { RM.fatal = ''; roomSay(''); }
+    roomRender();
+  }, err));
+  keep(WR.room.onPlayers(id, p => {
+    if (RM.id !== id) return;
+    RM.players = p || {};
+    if (!RM.owner && RM.me && !RM.players[RM.me.acc]) {
+      RM.me = null;
+      roomSay('Стример убрал тебя из комнаты — крутить здесь больше нельзя', true);
+    }
+    roomRender();
+  }, err));
+  if (RM.owner) keep(WR.room.onWhitelist(id, w => { if (RM.id === id) { RM.whitelist = w || {}; roomRender(); } }, err));
+  keep(WR.room.onSpins(id, { limit: 300 }, (ev, sp) => { if (RM.id === id) mergeSpin(ev, sp); }, err));
+  keep(WR.room.onConnection(c => { if (RM.id === id) { RM.conn = c; renderRoom(); } }));
+}
+function roomStop() {
+  for (const off of RM.unsubs) { try { off(); } catch {} }
+  resetRM();
+}
+
+// Спин из базы -> в RM.spins. Объект сохраняем (на него ссылается curEntry), итог — через onSpinChanged
+function mergeSpin(ev, sp) {
+  if (!sp || !sp.id) return;
+  if (ev === 'removed') { delete RM.spins[sp.id]; return roomRender(); }
+  const old = RM.spins[sp.id];
+  if (!old) { RM.spins[sp.id] = sp; return roomRender(); }
+  const txt = s => (s.result && s.result.text) || '';
+  const changed = old.status !== sp.status || txt(old) !== txt(sp);
+  Object.assign(old, sp);
+  old.snapshot = sp.snapshot || null;
+  old.result = sp.result || null;
+  if (changed) onSpinChanged(old);
+  roomRender();
+}
+
+// Перерисовка после событий базы — пачкой
+let roomRT = 0, poolKey = '';
+function roomRender() {
+  if (roomRT) return;
+  roomRT = setTimeout(() => {
+    roomRT = 0;
+    renderHistory(); renderPlayers(); renderRoom();
+    const k = [...busyTankIds()].sort().join(',');
+    if (k !== poolKey) { poolKey = k; renderPool(); }
+    updateButtons(); ensureTrack();
+  }, 60);
+}
+// Запустить цикл проверки, если он стоит, а проверять есть что
+function ensureTrack() {
+  if (!trackTimer && !tracking && store.toCheck().length) trackTimer = setTimeout(trackTick, 3000);
+}
+
+// Почему в комнате сейчас нельзя крутить ('' — можно)
+function roomSpinBlock() {
+  if (RM.fatal) return RM.fatal;
+  if (!RM.ready) return 'Комната ещё подключается…';
+  if (!accStr()) return 'Войди через Wargaming, чтобы крутить в комнате';
+  if (RM.owner && !RM.claimed) return 'Нет прав владельца комнаты — обнови страницу';
+  if (!RM.owner && !(RM.me && RM.me.acc === accStr())) return 'Сначала войди в комнату — карточка «Комната» справа';
+  return '';
+}
+
+// Спин в комнате: сначала публикуем (без записи в базе спин не считается), потом крутим
+async function roomSpin(s) {
+  const id0 = RM.id;
+  s.owner = !!RM.owner;
+  s.nick = (RM.me && RM.me.nick) || S.nick || 'Игрок';
+  spinning = true; updateButtons();
+  holdIds = new Set(Object.keys(RM.spins));
+  let entry;
+  try {
+    let id;
+    try { id = await WR.room.publishSpin(id0, s); }
+    catch (e) { spinning = false; updateButtons(); return roomErr(e, true); }
+    spinning = false;
+    if (RM.id !== id0) return updateButtons();
+    // событие базы могло прийти раньше ответа — берём тот объект
+    entry = RM.spins[id] || (RM.spins[id] = Object.assign(s, { id, ts: WR.room.serverNow() }));
+    const payload = payloadOf(entry);
+    curEntry = entry;
+    startSnapshot(entry);           // слепок снимается, пока крутится лента
+    pushState(payload);
+    await play(payload, true);
+  } finally { holdIds = null; }
+  poolKey = ''; renderHistory(true); roomRender();
+  if (curEntry === entry && !spinning) showResLine(current);
+  trackTick();
+}
+
+async function joinRoom() {
+  if (!inRoom() || RM.owner || RM.joining) return;
+  if (!tokenValid() || !S.accountId) return renderRoom();
+  const id = RM.id;
+  RM.joining = true; renderRoom();
+  roomSay('Вхожу в комнату…');
+  try {
+    const r = await WR.room.join(id, { acc: accStr(), nick: S.nick || '', region: S.region });
+    if (RM.id !== id) return;
+    RM.me = { acc: r.acc, nick: r.nick };
+    roomSay(`Ты в комнате как ${r.nick}`);
+  } catch (e) {
+    if (RM.id !== id) return;
+    RM.me = null;
+    const err = e && e.code === 'NOT_WHITELISTED'
+      ? Object.assign(new Error(`Ника ${S.nick || ''} нет в списке игроков этой комнаты — попроси стримера добавить его и нажми «Войти в комнату» ещё раз`), { code: e.code })
+      : e;
+    roomErr(err, true);
+  } finally {
+    if (RM.id === id) { RM.joining = false; roomRender(); }
+  }
+}
+
+async function createRoom() {
+  if (inRoom()) return;
+  if (!tokenValid() || !S.accountId) return roomSay('Сначала войди через Wargaming — карточка «Ангар»', true);
+  const btn = $('#roomCreate');
+  btn.disabled = true;
+  roomSay('Создаю комнату…');
+  try {
+    const nick = S.nick || 'Стример';
+    const r = await WR.room.create({ title: 'Комната ' + nick, region: S.region, owner: { acc: accStr(), nick } });
+    saveJSON(ROOM_KEY, r);
+    roomStop();
+    Object.assign(RM, { id: r.roomId, key: r.key, owner: true });
+    store = roomStore; curEntry = null;
+    await roomStart();
+    toast('Комната создана — добавь друзей и отправь им ссылку');
+  } catch (e) {
+    roomErr(e, true);
+  } finally { btn.disabled = false; }
+}
+
+// Стример: забыть комнату здесь (вернуться — по админ-ссылке). Друг: играть одному.
+function leaveRoom() {
+  if (RM.owner && !confirm('Забыть комнату на этом компьютере? Вернуться можно по админ-ссылке — сохрани её, если ещё не сохранил.')) return;
+  if (RM.owner) { try { localStorage.removeItem(ROOM_KEY); } catch {} }
+  roomStop();
+  store = soloStore; curEntry = null; poolKey = '';
+  history.replaceState(null, '', location.pathname);
+  $('#roomAlert').hidden = true;
+  roomSay('');
+  renderAll(); scheduleTrack();
+}
+
+// Строка «подпись + адрес + Копировать»
+function linkRow(label, url, note = '') {
+  return `<label class="f">${label}</label>`
+    + `<div class="obslink"><input type="text" readonly value="${esc(url)}"><button class="btn sm" data-copy="${esc(url)}"><span class="bi">Копировать</span></button></div>`
+    + (note ? `<div class="hint">${note}</div>` : '');
+}
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('Ссылка скопирована'), () => toast('Не удалось скопировать — выдели адрес и нажми Ctrl+C'));
+  else toast('Не удалось скопировать — выдели адрес и нажми Ctrl+C');
+}
+
+// Карточка OBS: адрес основного виджета (в комнате — из комнаты)
+function renderObsCard() {
+  const dir = HAS_SERVER ? location.origin + location.pathname.replace(/[^/]*$/, '') : 'http://localhost:8080/';
+  const own = inRoom() && RM.owner && !!(window.WR && WR.room);
+  $('#obsUrl').value = own ? WR.room.links(RM.id, RM.key).obsTeam : dir + 'obs.html';
+  $('#obsBig').textContent = own ? '&size=big' : '?size=big';
+  $('#obsMode').innerHTML = own
+    ? 'Виджет читает комнату — <b>start.bat</b> для него не нужен. Лента друзей и таблица — в карточке «Комната».'
+    : 'Без комнаты виджет берёт спины с локального сервера — держи <b>start.bat</b> открытым.';
+}
+
+function renderRoom() {
+  const solo = !inRoom();
+  $('#roomSolo').hidden = !solo;
+  $('#roomOwner').hidden = solo || !RM.owner;
+  $('#roomFriend').hidden = solo || RM.owner;
+  $('#clearHist').hidden = !solo;   // спины комнаты отсюда не удаляются
+  $('#roomBadge').textContent = solo ? '' : RM.conn === false ? 'нет связи' : RM.owner ? 'ты стример' : RM.me ? 'ты в игре' : 'гость';
+  renderObsCard();
+  if (solo) return;
+  const title = (RM.meta && RM.meta.title) || 'Комната';
+  if (RM.owner) renderOwnerRoom(title); else renderFriendRoom(title);
+}
+
+function renderOwnerRoom(title) {
+  const region = ((RM.meta && RM.meta.region) || 'eu');
+  const wl = Object.entries(RM.whitelist || {});
+  $('#roTitle').textContent = title;
+  $('#roMeta').textContent = `Код ${RM.id} · сервер ${region.toUpperCase()} · в списке ${wl.length}`;
+  // ссылки не меняются, пока комната та же — не трогаем (чтобы не сбивать выделение)
+  if ($('#roLinks').dataset.room !== RM.id && window.WR && WR.room) {
+    const L = WR.room.links(RM.id, RM.key);
+    // localhost друзьям не открыть — их ссылка ведёт на сайт
+    const local = !HAS_SERVER || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+    if (local) L.friends = WR.room.links(RM.id, null, PUBLIC_URL).friends;
+    $('#roLinks').innerHTML = linkRow('Ссылка для друзей', L.friends, 'Отправь друзьям: откроют, войдут через Wargaming — и в игре, если ник есть в списке ниже.'
+        + (local ? ' Ссылка ведёт на сайт рулетки (GitHub Pages) — там должна быть выложена эта версия.' : ''))
+      + linkRow('OBS: команда', L.obsTeam, 'Источник «Браузер» <b>960×320</b> — три танка в ряд: твой в центре, друзья по бокам, под каждым челлендж и итог.')
+      + linkRow('OBS: серия', L.obsSeries, '<b>560×300</b> — серии выполнений и провалов у каждого игрока.')
+      + `<details class="more-links"><summary>Другие виджеты</summary>`
+      + linkRow('OBS: барабан', L.obsMain, '<b>760×320</b> — только твой спин с барабаном. Широкий, как раньше (1920×460), — допиши <code class="k">&amp;size=big</code>.')
+      + linkRow('OBS: лента друзей', L.obsFeed, '<b>480×600</b> — спины друзей и их итоги по мере появления.')
+      + linkRow('OBS: таблица', L.obsBoard, '<b>480×420</b> — выполнено / провалено у каждого игрока.')
+      + `</details>`;
+    $('#roAdmin').innerHTML = L.admin ? linkRow('Админ-ссылка', L.admin) : '';
+    $('#roLinks').dataset.room = RM.id;
+  }
+  const rows = wl.map(([acc, w]) => ({ acc, nick: (w && w.nick) || acc, p: RM.players[acc] || null }))
+    .sort((a, b) => (+!!(b.p && b.p.owner) - +!!(a.p && a.p.owner)) || a.nick.localeCompare(b.nick, 'ru'));
+  $('#wlList').innerHTML = rows.map(x => {
+    const own = !!(x.p && x.p.owner);
+    const st = own ? 'стример' : x.p ? 'в комнате' : 'ещё не заходил';
+    return `<div class="wl-item ${x.p && !own ? 'on' : ''}"><span class="wl-nick">${esc(x.nick)}</span><span class="wl-st">${st}</span>`
+      + (own ? '' : `<button class="hbtn" data-wl-rm="${esc(x.acc)}" title="Убрать из комнаты">✖</button>`) + '</div>';
+  }).join('') || '<div class="hint" style="margin-top:0">Список пуст</div>';
+  $('#wlHint').textContent = `Ник ищется на сервере комнаты (${region.toUpperCase()}). Войти и крутить смогут только ники из этого списка.`;
+  const setSel = (sel, v) => { if (document.activeElement !== sel && v != null) sel.value = String(v); };
+  setSel($('#rmMax'), RM.meta ? RM.meta.maxActive : null);
+  setSel($('#rmRerolls'), RM.meta ? RM.meta.friendRerolls : null);
+  $('#rmMax').disabled = $('#rmRerolls').disabled = !RM.claimed || !RM.meta;
+  $('#wlAdd').disabled = !RM.claimed;
+}
+
+function renderFriendRoom(title) {
+  const logged = tokenValid() && !!S.accountId;
+  const me = RM.me && RM.me.acc === accStr() ? RM.me : null;
+  $('#rfTitle').textContent = title;
+  $('#rfMeta').textContent = `Код ${RM.id}` + (RM.meta ? ` · сервер ${String(RM.meta.region || 'eu').toUpperCase()}` : '');
+  $('#rfLogin').hidden = logged;
+  $('#rfJoin').hidden = !logged || !!me || RM.joining || !!RM.fatal;
+  const n = friendRerolls();
+  $('#rfHint').innerHTML = RM.fatal ? ''
+    : !logged ? 'Войди через Wargaming — проверю, есть ли твой ник в списке игроков этой комнаты.'
+    : me ? `Ты в игре как <b>${esc(me.nick)}</b>. Крути рулетку: челлендж увидят стример и зрители, после боя он проверится сам. Тебе выпадают только автоматические челленджи, ${n ? `перекрутить можно ${n} ${n >= 2 && n <= 4 ? 'раза' : 'раз'} за спин` : 'перекрутка выключена'}.`
+    : RM.joining ? 'Вхожу в комнату…'
+    : 'Нажми «Войти в комнату».';
+}
+
+// Игроки комнаты: стример видит всех, друг — себя
+function roomPlayersList() {
+  const accs = new Set([...Object.keys(RM.whitelist || {}), ...Object.keys(RM.players || {})]);
+  let list = [...accs].map(acc => {
+    const p = RM.players[acc] || null, w = RM.whitelist[acc] || null;
+    return { acc, nick: (p && p.nick) || (w && w.nick) || acc, owner: !!(p && p.owner), joined: !!p, region: (p && p.region) || '' };
+  });
+  if (!RM.owner) list = list.filter(p => p.acc === accStr() && RM.me);
+  return list.sort((a, b) => (+b.owner - +a.owner) || a.nick.localeCompare(b.nick, 'ru'));
+}
+
+function renderPlayers() {
+  const card = $('#playersCard');
+  card.hidden = !inRoom();
+  if (!inRoom()) return;
+  const all = Object.values(RM.spins).filter(shown);
+  const list = roomPlayersList();
+  let act = 0;
+  $('#players').innerHTML = list.map(p => {
+    const mine = all.filter(s => String(s.acc) === p.acc);
+    const active = mine.filter(isActive).sort((a, b) => (+b.ts || 0) - (+a.ts || 0));
+    act += active.length;
+    const ok = mine.filter(s => s.status === 'ok').length, fail = mine.filter(s => s.status === 'fail').length;
+    const meta = [p.joined ? (p.region || '').toUpperCase() : 'ещё не заходил', ok + fail ? `✅ ${ok} · ❌ ${fail}` : ''].filter(Boolean).join(' · ');
+    return `<div class="pl">
+      <div class="pl-head"><span class="pl-nick">${esc(p.nick)}</span>${p.owner ? '<span class="pl-tag">СТРИМЕР</span>' : ''}<span class="pl-meta">${esc(meta)}</span><span class="pl-cnt">⏳ ${active.length} / ${maxActive()}</span></div>
+      ${active.length ? `<div class="hist">${active.map(s => spinRow(s, { live: true })).join('')}</div>` : '<div class="pl-empty">Нет активных челленджей</div>'}
+    </div>`;
+  }).join('') || `<div class="empty-note">${RM.owner ? 'Добавь друзей в карточке «Комната» справа' : 'Войди в комнату, чтобы видеть свои челленджи'}</div>`;
+  $('#playersInfo').textContent = act ? `ждут боя: ${act}` : '';
+}
+
+// Добавить ник: account_id ищем через WG API (точное совпадение) на сервере комнаты
+async function wlAdd() {
+  const inp = $('#wlNick'), nick = inp.value.trim();
+  if (!nick || !RM.owner) return;
+  const region = (RM.meta && REGIONS[RM.meta.region] && RM.meta.region) || S.region;
+  const btn = $('#wlAdd');
+  btn.disabled = true;
+  roomSay(`Ищу ${nick}…`);
+  try {
+    let a;
+    try { a = await WR.tracker.findAccount({ apiBase: REGIONS[region].api, appId: S.appId, nick }); }
+    catch (e) { throw new Error(`${nick}: ${e.message}`); }
+    const acc = String(a.account_id);
+    if (RM.whitelist[acc]) { roomSay(`${a.nickname} уже в списке`); return; }
+    await WR.room.addToWhitelist(RM.id, { acc, nick: a.nickname });
+    inp.value = '';
+    roomSay(`${a.nickname} добавлен — отправь ему ссылку для друзей`);
+  } catch (e) {
+    roomErr(e, true);
+  } finally { btn.disabled = !RM.claimed; }
+}
+async function wlRemove(acc) {
+  const w = RM.whitelist[acc];
+  if (!confirm(`Убрать ${(w && w.nick) || acc} из комнаты? Его спины останутся, но крутить он больше не сможет.`)) return;
+  try { await WR.room.removeFromWhitelist(RM.id, acc); roomSay(`${(w && w.nick) || acc} убран из комнаты`); }
+  catch (e) { roomErr(e, true); }
+}
+async function setRoomMeta(patch) {
+  try { await WR.room.updateMeta(RM.id, patch); toast('Настройки комнаты сохранены'); }
+  catch (e) { roomErr(e, true); renderRoom(); }
+}
+
+// Обработчики карточки «Комната» (один раз)
+function initRoomUI() {
+  $('#rmMax').innerHTML = [1, 2, 3, 4, 5, 6].map(n => `<option value="${n}">${n}</option>`).join('');
+  $('#rmRerolls').innerHTML = [0, 1, 2, 3].map(n => `<option value="${n}">${n ? n : 'нельзя'}</option>`).join('');
+  $('#roomCreate').onclick = createRoom;
+  $('#roomLeave').onclick = leaveRoom;
+  $('#rfLeave').onclick = leaveRoom;
+  $('#rfLogin').onclick = login;
+  $('#rfJoin').onclick = joinRoom;
+  $('#wlAdd').onclick = wlAdd;
+  $('#wlNick').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); wlAdd(); } };
+  $('#rmMax').onchange = e => setRoomMeta({ maxActive: +e.target.value });
+  $('#rmRerolls').onchange = e => setRoomMeta({ friendRerolls: +e.target.value });
+  $('#roomCard').addEventListener('click', e => {
+    const c = e.target.closest('[data-copy]');
+    if (c) return copyText(c.dataset.copy);
+    const r = e.target.closest('[data-wl-rm]');
+    if (r) wlRemove(r.dataset.wlRm);
+  });
+}
+
 // ---------- Инициализация ----------
 function initPanel() {
   // RU (Lesta) требует свой Application ID, поэтому в списке только серверы Wargaming
@@ -1261,11 +2225,10 @@ function initPanel() {
   $('#onlyPrem').checked = S.onlyPrem;
   $('#diff').value = S.diff;
   $('#sound').checked = S.sound;
-  $('#chList').value = S.challenges;
+  renderChallengeSettings();
 
-  const obsUrl = HAS_SERVER ? `${location.origin}${location.pathname}?obs=1` : 'http://localhost:8080/?obs=1';
-  $('#obsUrl').value = obsUrl;
   if (!HAS_SERVER) $('#obsWarn').innerHTML = '⚠️ Сейчас страница открыта как файл. Для OBS и входа запусти <b>start.bat</b>.';
+  initRoomUI();
 
   $('#region').onchange = e => { S.region = e.target.value; S.token = null; S.accountId = null; save(); renderAuth(); };
   $('#loadBtn').onclick = loadHangar;
@@ -1274,8 +2237,14 @@ function initPanel() {
   $('#onlyPrem').onchange = e => { S.onlyPrem = e.target.checked; save(); renderPool(); };
   $('#diff').onchange = e => { S.diff = e.target.value; save(); };
   $('#sound').onchange = e => { S.sound = e.target.checked; save(); };
-  $('#chList').oninput = e => { S.challenges = e.target.value; save(); };
-  $('#chReset').onclick = () => { S.challenges = DEFAULT_CH; $('#chList').value = DEFAULT_CH; save(); };
+  $('#chAuto').onchange = onChallengeToggle;
+  $('#chManual').onchange = onChallengeToggle;
+  $('#chCustom').oninput = e => { S.customManual = e.target.value; save(); updateChCount(); };
+  $('#chReset').onclick = () => {
+    if (String(S.customManual || '').trim() && !confirm('Включить все челленджи и удалить свои строки?')) return;
+    S.challengeIds = null; S.customManual = ''; save(); renderChallengeSettings();
+    toast('Челленджи сброшены');
+  };
   $('#copyObs').onclick = () => { navigator.clipboard?.writeText($('#obsUrl').value).then(() => toast('Ссылка скопирована'), () => $('#obsUrl').select()); };
 
   $('#tierChips').onclick = e => {
@@ -1304,7 +2273,7 @@ function initPanel() {
     const c = e.target.closest('.pcard'); if (!c) return;
     const id = +c.dataset.id;
     S.excluded = S.excluded.includes(id) ? S.excluded.filter(x => x !== id) : [...S.excluded, id];
-    save(); c.classList.toggle('off'); $('#poolInfo').textContent = `в рулетке ${pool().length} из ${hangar.length}`;
+    save(); c.classList.toggle('off'); $('#poolInfo').textContent = poolInfoText();
   };
   // 3D-наклон карточек пула за курсором
   let tiltEl = null;
@@ -1325,7 +2294,23 @@ function initPanel() {
   $('#rerollBtn').onclick = rerollChallenge;
   $('#okBtn').onclick = () => setResult('ok');
   $('#failBtn').onclick = () => setResult('fail');
-  $('#clearHist').onclick = () => { if (confirm('Очистить историю?')) { S.history = []; save(); renderHistory(); } };
+  $('#clearHist').onclick = () => {
+    if (!confirm('Очистить историю? Незавершённые челленджи тоже пропадут.')) return;
+    S.history = []; save(); renderHistory(); renderPool(); updateButtons(); scheduleTrack();
+  };
+  // Кнопки у активных челленджей: история и «Игроки комнаты» (там стример решает и за друзей)
+  const onSpinAct = e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const h = store.find(b.dataset.id);
+    if (!h || !isActive(h) || isFriend()) return;
+    const act = b.dataset.act;
+    const who = inRoom() && String(h.acc) !== accStr() ? ` у ${h.nick || 'друга'}` : '';
+    if (act === 'cancel' && !confirm(`Отменить челлендж на ${h.tank.name}${who}? Танк вернётся в рулетку.`)) return;
+    const status = act === 'cancel' ? 'cancelled' : act === 'ok' ? 'ok' : 'fail';
+    store.resolve(h, { status, result: { text: act === 'cancel' ? 'отменён' : 'отмечено вручную', checkedAt: Date.now(), by: 'manual' } }, { force: true });
+  };
+  $('#hist').onclick = onSpinAct;
+  $('#players').onclick = onSpinAct;
 
   document.addEventListener('keydown', e => {
     if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
@@ -1333,11 +2318,17 @@ function initPanel() {
     }
   });
 
+  roomBoot();                    // ?room / ?key / сохранённая комната — до разбора входа (адрес возврата)
+  const justLoggedIn = params.get('status') === 'ok' && params.has('access_token');
   handleAuthRedirect();
   renderAll();
+  // свежий ангар при каждом открытии (новые танки, прочность в полной прокачке); сразу после входа он и так грузится
+  if (!justLoggedIn && tokenValid()) setTimeout(loadHangar, 0);
+  roomStart();
+  setTimeout(trackTick, 2000);   // незавершённые челленджи с прошлого раза
 }
 
-if (OBS) startOverlay(); else initPanel();
+if (!OBS) initPanel(); // с ?obs=… страница уже уходит на obs.html
 </script>
 </body>
 </html>

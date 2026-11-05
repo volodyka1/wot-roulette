@@ -1,5 +1,5 @@
 # Локальный сервер рулетки: http://localhost:8080/
-# - отдаёт index.html (панель управления) и оверлей для OBS (index.html?obs=1)
+# - отдаёт index.html (панель управления) и виджеты для OBS (obs.html)
 # - /api/state: панель шлёт сюда результат прокрутки, оверлей в OBS его забирает
 # - нужен и для входа через Wargaming (OpenID редиректит обратно на http-адрес)
 param([int]$Port = 8080, [switch]$NoBrowser)
@@ -53,7 +53,7 @@ $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")
 $listener.Start()
 Write-Host "Рулетка запущена: http://localhost:$Port/"
-Write-Host "Оверлей для OBS:  http://localhost:$Port/?obs=1"
+Write-Host "Оверлей для OBS:  http://localhost:$Port/obs.html (760x320)"
 Write-Host "Не закрывай это окно, пока идёт стрим (Ctrl+C чтобы остановить)."
 if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" }
 

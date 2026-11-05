@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        ".read": true,
+        "meta": {
+          ".write": "auth != null && root.child('claims/' + $room + '/' + auth.uid).exists()"
+        },
+        "whitelist": {
+          ".write": "auth != null && root.child('claims/' + $room + '/' + auth.uid).exists()"
+        },
+        "players": {
+          "$acc": {
+            ".write": "auth != null && (root.child('claims/' + $room + '/' + auth.uid).exists() || (root.child('rooms/' + $room + '/whitelist/' + $acc).exists() && newData.child('uid').val() === auth.uid && (!data.exists() || data.child('uid').val() === auth.uid) && (!newData.child('owner').exists() || newData.child('owner').val() === false) && newData.child('nick').val() === root.child('rooms/' + $room + '/whitelist/' + $acc + '/nick').val()))"
+          }
+        },
+        "spins": {
+          ".indexOn": ["ts", "acc", "status"],
+          "$spin": {
+            ".write": "auth != null && (root.child('claims/' + $room + '/' + auth.uid).exists() || (newData.exists() && newData.child('acc').isString() && newData.child('acc').val().matches(/^[0-9]+$/) && root.child('rooms/' + $room + '/whitelist/' + newData.child('acc').val()).exists() && root.child('rooms/' + $room + '/players/' + newData.child('acc').val() + '/uid').val() === auth.uid && (!newData.child('owner').exists() || newData.child('owner').val() === false) && (!data.exists() || data.child('acc').val() === newData.child('acc').val())))"
+          }
+        }
+      }
+    },
+    "secrets": {
+      "$room": {
+        ".read": false,
+        ".write": "auth != null && $room.matches(/^[a-z0-9]{10}$/) && !data.exists() && newData.isString() && newData.val().length >= 20"
+      }
+    },
+    "claims": {
+      "$room": {
+        "$uid": {
+          ".read": false,
+          ".write": "auth != null && auth.uid === $uid && newData.val() === root.child('secrets/' + $room).val()"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1892 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Рулетка OBS</title>
+<!--
+  Виджеты для OBS (Источник → Браузер). Фон прозрачный, кликать нечего.
+    obs.html?room=ID                 основной: спины стримера, 760x320 (&size=big — 1920x460)
+    obs.html?room=ID&w=feed          лента друзей, 480x600
+    obs.html?room=ID&w=board         таблица, 480x420 (&period=all — за всё время)
+    obs.html?room=ID&w=team          команда: стример в центре, два друга по бокам, 960x320
+    obs.html?room=ID&w=series        серия выполнений/провалов, 560x300 (&period=all — за всё время)
+    obs.html                         основной без комнаты: опрос /api/state локального сервера
+  Звук: основной и команда — WebAudio (&mute выключает), лента, таблица и серия молчат (&sound=1 включает).
+-->
+<script>
+(function () {
+  var p = new URLSearchParams(location.search), w = (p.get('w') || p.get('obs') || 'main').toLowerCase();
+  if (w !== 'feed' && w !== 'board' && w !== 'team' && w !== 'series') w = 'main';
+  document.documentElement.className = 'w-' + w + (p.get('size') === 'big' ? ' big' : '');
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --s0:#0d0d13; --s1:#121219; --s2:#181822; --s3:#20202c; --s4:#2a2a39;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.14);
+  --text:#f3f3f8; --muted:#8d8da3; --dim:#5c5c70;
+  --a1:#ff3d5a; --a2:#ff8a3d; --grad:linear-gradient(100deg,#ff3d5a 0%,#ff8a3d 100%);
+  --a-glow:rgba(255,61,90,.38); --a-soft:rgba(255,61,90,.14);
+  --ok:#2ee59d; --ok2:#14b877; --fail:#ff3d5a; --fail2:#c0163a; --amb:#ffb627; --amb2:#e08a00;
+  --out:cubic-bezier(.16,1,.3,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  --fd:Montserrat,Inter,system-ui,sans-serif; --fu:Inter,system-ui,sans-serif;
+  --rc:#ff3d5a; --rc2:#ffb0bd; --rcg:rgba(255,61,90,.45); --rcs:rgba(255,61,90,.14);
+  /* основной виджет, компактный размер (760x320) */
+  --cw:124px; --chh:140px; --gap:10px; --reel-h:168px; --pl-h:132px; --st-gap:10px;
+}
+html.big{--cw:176px;--chh:188px;--gap:14px;--reel-h:252px;--pl-h:176px;--st-gap:14px}
+.rar-r1{--rc:#5f93d6;--rc2:#b6d3f8;--rcg:rgba(95,147,214,.5);--rcs:rgba(95,147,214,.14)}
+.rar-r2{--rc:#9b5cff;--rc2:#d4b9ff;--rcg:rgba(155,92,255,.55);--rcs:rgba(155,92,255,.15)}
+.rar-r3{--rc:#ff2d6f;--rc2:#ffa3c1;--rcg:rgba(255,45,111,.55);--rcs:rgba(255,45,111,.15)}
+.rar-r4{--rc:#ffb627;--rc2:#ffe49e;--rcg:rgba(255,182,39,.55);--rcs:rgba(255,182,39,.15)}
+.ct-lightTank{--cc:#3ddc84;--ccs:rgba(61,220,132,.14)}
+.ct-mediumTank{--cc:#ffcf3f;--ccs:rgba(255,207,63,.14)}
+.ct-heavyTank{--cc:#ff6150;--ccs:rgba(255,97,80,.14)}
+.ct-AT-SPG{--cc:#4aa8ff;--ccs:rgba(74,168,255,.14)}
+.ct-SPG{--cc:#c18cff;--ccs:rgba(193,140,255,.14)}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;padding:0;background:transparent!important;overflow:hidden}
+body{color:var(--text);font:14px/1.4 var(--fu);-webkit-font-smoothing:antialiased;pointer-events:none;user-select:none}
+#fx{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:30}
+.w-main #feed,.w-main #board,.w-feed #main,.w-feed #board,.w-board #main,.w-board #feed{display:none!important}
+
+/* ---------- Основной: рулетка ---------- */
+#main{position:relative;display:flex;flex-direction:column;gap:var(--st-gap);padding-top:4px}
+html.big #main{padding-top:12px}
+.reel-wrap{position:relative;will-change:transform}
+.reel{position:relative;height:var(--reel-h);border-radius:16px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(55% 140% at 50% 50%,#1c1c28 0%,#101017 60%,#0b0b10 100%);
+  box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.08)}
+html.big .reel{border-radius:22px}
+.reel::before,.reel::after{content:"";position:absolute;left:0;right:0;height:2px;z-index:6;background:linear-gradient(90deg,transparent,var(--a1) 30%,var(--a2) 70%,transparent);opacity:.7}
+.reel::before{top:0}.reel::after{bottom:0}
+.rays{position:absolute;top:50%;left:var(--wx,50%);width:560px;height:560px;margin:-280px 0 0 -280px;z-index:0;opacity:0;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg,transparent 0deg 7deg,var(--rcg) 9deg 12deg,transparent 14deg 22deg);
+  -webkit-mask-image:radial-gradient(closest-side,#000 15%,transparent 100%);mask-image:radial-gradient(closest-side,#000 15%,transparent 100%);
+  transition:opacity .8s var(--out)}
+html.big .rays{width:760px;height:760px;margin:-380px 0 0 -380px}
+.reel.won .rays{opacity:.85;animation:spinr 18s linear infinite}
+@keyframes spinr{to{transform:rotate(360deg)}}
+.track{position:absolute;inset:0;overflow:hidden;z-index:1}
+.track.mb1{filter:url(#mb1)}.track.mb2{filter:url(#mb2)}.track.mb3{filter:url(#mb3)}
+.strip{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;gap:var(--gap);will-change:transform}
+.speedfx{position:absolute;inset:0;z-index:2;opacity:0;pointer-events:none;
+  background:repeating-linear-gradient(180deg,transparent 0 13px,rgba(255,255,255,.05) 13px 14px,transparent 14px 31px,rgba(255,170,140,.06) 31px 32px);
+  -webkit-mask-image:linear-gradient(90deg,#000,transparent 35%,transparent 65%,#000);mask-image:linear-gradient(90deg,#000,transparent 35%,transparent 65%,#000)}
+.fade{position:absolute;top:0;bottom:0;width:14%;z-index:3;pointer-events:none}
+.fade.l{left:0;background:linear-gradient(90deg,#0b0b10 5%,rgba(11,11,16,0))}
+.fade.r{right:0;background:linear-gradient(-90deg,#0b0b10 5%,rgba(11,11,16,0))}
+.vig{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;transition:opacity .9s var(--out);
+  background:radial-gradient(170px 150% at var(--wx,50%) 50%,transparent 58%,rgba(6,6,10,.8) 100%)}
+.reel.won .vig{opacity:1}
+#flash{position:absolute;inset:0;z-index:7;pointer-events:none;opacity:0;background:radial-gradient(40% 90% at var(--wx,50%) 50%,rgba(255,255,255,.75),rgba(255,180,150,.15) 60%,transparent)}
+.marker{position:absolute;top:0;bottom:0;left:50%;width:0;z-index:5;pointer-events:none}
+.marker .beam{position:absolute;top:0;bottom:0;left:-1.5px;width:3px;background:linear-gradient(180deg,#fff,#ffe1d6 50%,#fff);box-shadow:0 0 10px #fff,0 0 22px var(--a1),0 0 46px var(--a2)}
+.marker .halo{position:absolute;top:0;bottom:0;left:-30px;width:60px;background:linear-gradient(90deg,transparent,rgba(255,90,90,.16),transparent)}
+.marker .mflash{position:absolute;top:0;bottom:0;left:-20px;width:40px;opacity:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)}
+.glint{position:absolute;left:-20px;width:40px;height:40px;animation:glint 2.6s ease-in-out infinite}
+.glint.t{top:-20px}.glint.b{bottom:-20px;animation-delay:-1.3s}
+.glint::before,.glint::after{content:"";position:absolute;left:50%;top:50%;background:#fff;border-radius:2px;box-shadow:0 0 8px #fff,0 0 18px var(--a2)}
+.glint::before{width:40px;height:2px;margin:-1px 0 0 -20px}
+.glint::after{width:2px;height:40px;margin:-20px 0 0 -1px}
+.glint i{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:radial-gradient(#fff,rgba(255,138,61,.6) 45%,transparent 70%)}
+@keyframes glint{0%,100%{transform:scale(.75) rotate(0);opacity:.75}50%{transform:scale(1.08) rotate(45deg);opacity:1}}
+
+/* ---------- Карточка танка ---------- */
+.tcard{position:relative;flex:0 0 var(--cw);width:var(--cw);height:var(--chh);will-change:transform;backface-visibility:hidden}
+.tcard.win{z-index:4}
+.tc-in{position:absolute;inset:0;border-radius:12px;overflow:hidden;
+  background:radial-gradient(120% 70% at 50% 108%,var(--rcs),transparent 70%),linear-gradient(180deg,#1d1d29,#111118);
+  border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 14px 30px rgba(0,0,0,.45)}
+.tc-in::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--rc),var(--rc2),var(--rc))}
+.tc-tier{position:absolute;top:7px;left:10px;font:900 italic 19px/1 var(--fd);letter-spacing:-.03em;color:var(--rc2);text-shadow:0 0 16px var(--rcg)}
+.ctag{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:var(--ccs);color:var(--cc);border:1px solid var(--cc);font:800 10.5px/1 var(--fu);letter-spacing:.06em;white-space:nowrap}
+.tc-in .ctag{position:absolute;top:8px;right:8px;height:17px;padding:0 5px;font-size:9.5px}
+.tc-in img{position:absolute;left:50%;top:30px;width:112px;height:70px;margin-left:-56px;object-fit:contain;filter:drop-shadow(0 8px 10px rgba(0,0,0,.65))}
+.tc-nm{position:absolute;left:8px;right:8px;bottom:11px;text-align:center;font:800 italic 12px/1.15 var(--fd);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.big .tc-in{border-radius:14px}
+html.big .tc-tier{top:8px;left:12px;font-size:25px}
+html.big .tc-in .ctag{top:10px;right:10px;height:20px;padding:0 7px;font-size:10.5px}
+html.big .tc-in img{top:40px;width:160px;height:100px;margin-left:-80px}
+html.big .tc-nm{left:10px;right:10px;bottom:14px;font-size:14.5px}
+.prem .tc-in{border-color:rgba(255,214,140,.35)}
+.gem{display:inline-block;width:8px;height:8px;margin-left:5px;vertical-align:3px;transform:rotate(45deg);background:linear-gradient(135deg,#fff3c4,#ffb627 50%,#ff5ab4);box-shadow:0 0 8px rgba(255,200,90,.8)}
+.foil{position:absolute;top:-50%;bottom:-50%;left:-50%;right:-50%;z-index:2;pointer-events:none;mix-blend-mode:screen;
+  background:linear-gradient(115deg,transparent 36%,rgba(255,80,200,.22) 42%,rgba(90,220,255,.26) 48%,rgba(255,240,120,.24) 54%,rgba(140,255,170,.14) 58%,transparent 64%);
+  animation:foil 3.4s cubic-bezier(.45,.05,.55,.95) infinite}
+@keyframes foil{0%{transform:translateX(-38%)}100%{transform:translateX(38%)}}
+.reel.spinning .foil{animation:none;opacity:.45}
+.tcard.win .tc-in{border-color:var(--rc2);box-shadow:0 0 0 2px var(--rc),0 0 40px var(--rcg),0 20px 40px rgba(0,0,0,.6);animation:winzoom .9s cubic-bezier(.17,1.75,.4,1) both}
+.tcard.win .tc-in::before{content:"";position:absolute;inset:0;z-index:1;border-radius:inherit;box-shadow:inset 0 0 30px var(--rcg);animation:winpulse 1.6s ease-in-out infinite}
+.tcard.win.nofx .tc-in{animation:none;transform:scale(1.1)}
+@keyframes winzoom{0%{transform:scale(1)}100%{transform:scale(1.1)}}
+@keyframes winpulse{50%{opacity:.3}}
+/* ---------- Плашка результата ---------- */
+.plate{position:relative;height:var(--pl-h);display:grid;column-gap:16px;row-gap:6px;padding:12px 18px 12px 0;
+  grid-template-columns:22px 150px minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"s t i" "s t c"}
+html.big .plate{column-gap:24px;row-gap:0;padding:0 26px 0 0;align-items:center;
+  grid-template-columns:30px 206px minmax(220px,.95fr) minmax(0,1.55fr);grid-template-rows:1fr;grid-template-areas:"s t i c"}
+.pl-clip{position:absolute;inset:0;overflow:hidden;border-radius:6px 16px 16px 6px;
+  background:linear-gradient(90deg,rgba(24,24,34,.97),rgba(15,15,22,.96) 55%,rgba(20,14,20,.96));box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.pl-clip::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--rc),transparent 60%)}
+.pl-water{position:absolute;left:150px;top:50%;transform:translateY(-52%);font:900 italic 170px/1 var(--fd);letter-spacing:-.06em;color:var(--rcs);-webkit-text-stroke:2px var(--rcg);opacity:.5;white-space:nowrap}
+html.big .pl-water{left:230px;font-size:250px;opacity:.55}
+.pl-wipe{position:absolute;top:-10%;bottom:-10%;left:0;width:45%;opacity:0;background:linear-gradient(90deg,transparent,var(--a1) 30%,var(--a2) 70%,transparent);transform:translateX(-150%) skewX(-24deg)}
+.pl-stripe{grid-area:s;position:relative;z-index:2;align-self:stretch;margin:-12px 0 -12px -6px}
+html.big .pl-stripe{margin:0 0 0 -6px}
+.pl-stripe::before,.pl-stripe::after{content:"";position:absolute;top:0;bottom:0;transform:skewX(-14deg);transform-origin:bottom}
+.pl-stripe::before{left:0;width:14px;background:var(--grad);box-shadow:0 0 28px var(--a-glow);border-radius:6px 0 0 6px}
+.pl-stripe::after{left:19px;width:4px;background:var(--rc);box-shadow:0 0 14px var(--rcg)}
+html.big .pl-stripe::before{width:20px}html.big .pl-stripe::after{left:26px;width:5px}
+.pl-tank{grid-area:t;position:relative;z-index:2;display:grid;place-items:center;height:100%}
+.pl-tank::before{content:"";position:absolute;left:8%;right:8%;bottom:14px;height:26px;border-radius:50%;background:radial-gradient(closest-side,var(--rcg),transparent)}
+.pl-tank img{position:relative;width:150px;height:94px;object-fit:contain;filter:drop-shadow(0 10px 14px rgba(0,0,0,.75))}
+html.big .pl-tank img{width:206px;height:129px}
+.pl-id{grid-area:i;position:relative;z-index:2;min-width:0;display:flex;align-items:center;gap:8px}
+html.big .pl-id{display:block}
+.pl-meta{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+html.big .pl-meta{margin-bottom:10px;gap:8px}
+.tierpill{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:5px;transform:skewX(-12deg);background:var(--rc);color:#0b0b10;font:900 italic 12px/1 var(--fd);letter-spacing:.04em;box-shadow:0 0 18px var(--rcg);white-space:nowrap}
+.tierpill span{transform:skewX(12deg)}
+.tierpill .lv{font-style:inherit}
+html:not(.big) .tierpill .lv{display:none}
+.pl-meta .ctag{height:22px;padding:0 7px;font-size:10.5px}
+html.big .tierpill,html.big .pl-meta .ctag{height:24px;font-size:12.5px}
+.premtag{position:relative;overflow:hidden;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:5px;font:800 10px/1 var(--fu);letter-spacing:.1em;color:#2a1a00;background:linear-gradient(100deg,#ffe49e,#ffb627 45%,#ff8fd0 75%,#9fe7ff)}
+.premtag .foil{opacity:.9}
+.pl-name{min-width:0;font:900 italic 24px/1.1 var(--fd);letter-spacing:-.03em;color:#fff;text-shadow:0 4px 24px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.big .pl-name{font-size:44px;line-height:1.02;white-space:normal;overflow-wrap:anywhere;max-height:2.1em}
+.pl-name.typing::after{content:"";display:inline-block;width:.12em;height:.8em;margin-left:.08em;background:var(--a2);vertical-align:-.02em;animation:live .5s steps(1) infinite}
+@keyframes live{50%{opacity:.25}}
+.pl-ch{grid-area:c;position:relative;z-index:2;min-width:0;display:flex;flex-direction:column;gap:6px}
+html.big .pl-ch{padding-left:26px;gap:8px}
+html.big .pl-ch::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;background:linear-gradient(180deg,transparent,var(--line2),transparent);transform:skewX(-14deg)}
+.pl-lbl{display:none;align-items:center;gap:8px;font:800 italic 11.5px/1 var(--fd);letter-spacing:.2em;color:var(--a2)}
+.pl-lbl::before{content:"";width:22px;height:3px;background:var(--grad);transform:skewX(-30deg)}
+html.big .pl-lbl{display:flex}
+.flap{position:relative;min-height:46px;display:flex;align-items:center;padding:5px 14px;border-radius:10px;overflow:hidden;perspective:700px;
+  background:linear-gradient(180deg,#1f1f2b 0,#1a1a24 50%,#14141c 50%,#111118 100%);border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 2px 10px rgba(0,0,0,.4)}
+html.big .flap{min-height:76px;padding:8px 22px;border-radius:12px}
+.flap::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.65);box-shadow:0 1px 0 rgba(255,255,255,.05);z-index:3}
+.flap .txt{position:relative;z-index:2;font:800 italic 15.5px/1.18 var(--fd);letter-spacing:-.015em;transform-origin:50% 0;backface-visibility:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+html.big .flap .txt{font-size:24px}
+.flap.rolling .txt{color:#b4b4c6}
+.flap .sweep{position:absolute;top:-20%;bottom:-20%;left:0;width:40%;z-index:4;opacity:0;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);transform:translateX(-160%) skewX(-22deg)}
+.flap.final{border-color:rgba(255,138,61,.55);box-shadow:0 0 0 1px rgba(255,61,90,.35),0 0 30px rgba(255,61,90,.25),inset 0 2px 10px rgba(0,0,0,.4)}
+.flap.final.fx{animation:land .75s cubic-bezier(.2,1.7,.35,1) both}
+.flap.final .txt{color:#fff;text-shadow:0 0 22px rgba(255,138,61,.55)}
+.flap.final.fx .sweep{animation:sweep 1s .12s var(--out) both}
+@keyframes land{0%{transform:scale(1.1)}35%{transform:scale(.96)}100%{transform:scale(1)}}
+@keyframes sweep{0%{opacity:1;transform:translateX(-160%) skewX(-22deg)}100%{opacity:1;transform:translateX(330%) skewX(-22deg)}}
+
+/* живой статус и итог проверки */
+.live{display:flex;align-items:center;gap:10px;min-height:22px;min-width:0}
+.live:empty{display:none}
+.st{display:inline-flex;align-items:center;gap:7px;height:22px;padding:0 10px;border-radius:5px;transform:skewX(-12deg);flex:0 0 auto;
+  font:900 italic 11.5px/1 var(--fd);letter-spacing:.08em;white-space:nowrap}
+.st>span{display:inline-flex;align-items:center;gap:6px;transform:skewX(12deg)}
+.st i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.st-pending{background:rgba(255,138,61,.14);color:#ffb38a;box-shadow:inset 0 0 0 1px rgba(255,138,61,.45)}
+.st-pending i{box-shadow:0 0 10px currentColor;animation:live 1.4s ease-in-out infinite}
+.st-ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c}
+.st-fail{background:linear-gradient(100deg,var(--fail2),var(--fail));color:#fff}
+.st-ambiguous{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600}
+.st-cancelled{background:var(--s3);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line2)}
+.rt{min-width:0;font:700 13px/1.2 var(--fu);color:#d9d9e6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rt b{font-weight:800;color:#fff}
+html.big .live{min-height:26px}
+html.big .st{height:26px;font-size:13px;padding:0 12px}
+html.big .rt{font-size:16px}
+.live.pop .st{animation:stPop .6s cubic-bezier(.2,1.6,.4,1) both}
+.live.pop .rt{animation:rtIn .6s .12s var(--out) both}
+@keyframes stPop{0%{opacity:0;transform:skewX(-12deg) scale(1.6)}100%{opacity:1;transform:skewX(-12deg) scale(1)}}
+@keyframes rtIn{from{opacity:0;transform:translateX(-14px)}}
+
+.plate.in .pl-clip{animation:ltIn .7s var(--out) both}
+.plate.in .pl-wipe{animation:ltWipe .85s .05s var(--out) both}
+.plate.in .pl-stripe{animation:ltStripe .6s .1s var(--spring) both}
+.plate.in .pl-tank{animation:ltTank .8s .18s cubic-bezier(.2,1.5,.4,1) both}
+.plate.in .pl-id{animation:ltUp .6s .26s var(--out) both}
+.plate.in .pl-ch{animation:ltUp .6s .34s var(--out) both}
+.plate.in .pl-water{animation:ltWater 1.2s .2s var(--out) both}
+@keyframes ltIn{from{opacity:0;transform:translateX(-46%) skewX(-10deg)}}
+@keyframes ltWipe{0%{opacity:1;transform:translateX(-150%) skewX(-24deg)}100%{opacity:0;transform:translateX(260%) skewX(-24deg)}}
+@keyframes ltStripe{from{transform:scaleY(0)}}
+@keyframes ltTank{from{opacity:0;transform:translateX(-50px) scale(.7)}}
+@keyframes ltUp{from{opacity:0;transform:translateY(14px)}}
+@keyframes ltWater{from{opacity:0;transform:translateY(-52%) translateX(100px) scale(1.3)}}
+
+/* штамп итога поверх плашки */
+.pl-stamp{position:absolute;right:16px;top:-14px;z-index:9}
+html.big .pl-stamp{right:30px;top:-30px}
+.stamp{position:relative;display:inline-flex;align-items:center;padding:8px 18px;border-radius:6px;overflow:hidden;transform:skewX(-14deg);
+  font:900 italic 20px/1 var(--fd);letter-spacing:.01em}
+html.big .stamp{padding:12px 30px;font-size:32px}
+.stamp>span{display:inline-flex;align-items:center;gap:9px;transform:skewX(14deg)}
+.stamp svg{width:20px;height:20px}
+html.big .stamp svg{width:30px;height:30px}
+.stamp.fx{animation:stampIn .8s cubic-bezier(.16,1.25,.3,1) both}
+.stamp.ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c;box-shadow:0 10px 30px rgba(46,229,157,.45)}
+.stamp.fail{background:linear-gradient(100deg,var(--fail2),var(--fail));color:#fff;box-shadow:0 10px 30px rgba(255,61,90,.5)}
+.stamp.ambiguous{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600;box-shadow:0 10px 30px rgba(255,182,39,.4)}
+.stamp.cancelled{background:var(--s3);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line2)}
+.stamp .streak{position:absolute;top:-30%;bottom:-30%;left:0;width:30%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent);transform:translateX(-200%)}
+.stamp.fx .streak{animation:stampStreak .9s .45s var(--out) both}
+@keyframes stampIn{0%{opacity:0;transform:translateX(-700px) skewX(-14deg) scaleX(1.5)}60%{opacity:1}100%{transform:translateX(0) skewX(-14deg) scaleX(1)}}
+@keyframes stampStreak{to{transform:translateX(480%)}}
+/* ---------- Заголовок ленты и таблицы ---------- */
+.whead{display:flex;align-items:center;gap:10px;height:30px;margin-bottom:8px;padding-left:2px}
+.whead h1{margin:0;display:flex;align-items:center;gap:9px;font:900 italic 15px/1 var(--fd);letter-spacing:.14em;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.8)}
+.whead h1::before{content:"";width:18px;height:13px;background:var(--grad);transform:skewX(-22deg);border-radius:2px;box-shadow:0 0 14px var(--a-glow)}
+.whead .sub{padding:4px 9px;border-radius:5px;transform:skewX(-12deg);background:rgba(18,18,25,.9);box-shadow:inset 0 0 0 1px var(--line2);color:#ffb38a;font:800 italic 10.5px/1 var(--fd);letter-spacing:.14em}
+.whead .sub span{display:inline-block;transform:skewX(12deg)}
+.whead .dot{width:7px;height:7px;border-radius:50%;background:var(--a1);box-shadow:0 0 10px var(--a1);animation:live 1.6s ease-in-out infinite}
+
+/* ---------- Лента друзей ---------- */
+#feed{width:480px;max-width:100vw;padding:4px 4px 0}
+#feed .whead{opacity:0;transition:opacity .5s}
+#feed.has .whead{opacity:1}
+.fd-list{position:relative;display:flex;flex-direction:column;gap:8px}
+.fcard{position:relative;height:132px;display:grid;grid-template-columns:128px minmax(0,1fr);column-gap:12px;padding:10px 14px 10px 12px}
+.fc-clip{position:absolute;inset:0;border-radius:6px 14px 14px 6px;overflow:hidden;
+  background:linear-gradient(90deg,rgba(24,24,34,.97),rgba(15,15,22,.96) 60%,rgba(20,14,20,.96));box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(0,0,0,.35)}
+.fc-clip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--rc2),var(--rc));box-shadow:0 0 14px var(--rcg)}
+.fc-clip::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--rc),transparent 55%)}
+.fc-img{position:relative;z-index:2;height:112px;border-radius:10px;overflow:hidden;
+  background:radial-gradient(120% 80% at 50% 110%,var(--rcs),transparent 70%),linear-gradient(180deg,#1b1b26,#111118);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.fc-img::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--rc)}
+.mr-strip{position:absolute;left:0;top:0;width:100%;will-change:transform}
+.mr-item{position:relative;height:112px}
+.mr-item img{position:absolute;left:50%;top:22px;width:112px;height:70px;margin-left:-56px;object-fit:contain;filter:drop-shadow(0 6px 8px rgba(0,0,0,.6))}
+.mr-item b{position:absolute;top:6px;left:8px;font:900 italic 17px/1 var(--fd);letter-spacing:-.03em;color:var(--rc2);text-shadow:0 0 12px var(--rcg)}
+.mr-item.rar-r1 b,.mr-item.rar-r2 b,.mr-item.rar-r3 b,.mr-item.rar-r4 b{color:var(--rc2)}
+.fc-img .mflash{position:absolute;inset:0;z-index:3;opacity:0;background:radial-gradient(closest-side,rgba(255,255,255,.7),transparent)}
+.fc-body{position:relative;z-index:2;min-width:0;display:flex;flex-direction:column;gap:4px}
+.fc-nick{display:flex;align-items:center;gap:7px;min-width:0;font:900 italic 14px/20px var(--fd);letter-spacing:.02em;text-transform:uppercase}
+.fc-nick span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:3px}
+.fc-nick time{margin-left:auto;flex:0 0 auto;font:600 11px/1 var(--fu);color:var(--dim);text-transform:none}
+.fc-tank{display:flex;align-items:center;gap:6px;min-width:0;height:20px}
+.fc-tank .tierpill{height:18px;padding:0 7px;font-size:10.5px}
+.fc-tank .ctag{height:18px;padding:0 5px;font-size:9.5px}
+.fc-tank .nm{min-width:0;font:800 italic 13.5px/1.1 var(--fd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-tank .premtag{height:18px;padding:0 6px;font-size:9px}
+.fcard.has-stamp .fc-nick time{visibility:hidden}
+.fc-ch{min-height:34px;font:700 13px/1.3 var(--fu);color:#e6e6f0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fc-body .live{margin-top:auto}
+.fcard .rt{font-size:12px}
+.fcard.done .fc-clip{background:linear-gradient(90deg,rgba(20,20,28,.94),rgba(13,13,19,.93))}
+.fcard.st-cancelled{opacity:.6}
+.fc-stamp{position:absolute;right:10px;top:8px;z-index:5}
+.fc-stamp .stamp{padding:5px 11px;font-size:13px}
+.fc-stamp .stamp svg{width:14px;height:14px}
+.fcard.enter{animation:fcIn .7s cubic-bezier(.2,1.3,.4,1) both}
+.fcard.leave{animation:fcOut .45s var(--out) forwards}
+@keyframes fcIn{from{opacity:0;transform:translateX(-60px) skewX(-8deg) scale(.96)}}
+@keyframes fcOut{to{opacity:0;transform:translateX(70px) scale(.96)}}
+.fcard.flash .fc-clip{animation:fcFlash .9s var(--out)}
+@keyframes fcFlash{0%{box-shadow:inset 0 0 0 2px var(--rc2),0 0 40px var(--rcg)}100%{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 10px 24px rgba(0,0,0,.35)}}
+
+/* ---------- Таблица ---------- */
+#board{width:480px;max-width:100vw;padding:4px 4px 0}
+.bd{position:relative;border-radius:6px 14px 14px 6px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(24,24,34,.96),rgba(14,14,20,.95));box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 12px 30px rgba(0,0,0,.4)}
+.bd::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--a1),var(--a2) 40%,transparent 80%)}
+.bd-row{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr) 44px 44px 54px 58px;align-items:center;column-gap:6px;height:50px;padding:0 12px 0 10px}
+.bd-row+.bd-row,#bdRows>*{border-top:1px solid var(--line)}
+.bd-hd{height:30px;font:800 italic 10.5px/1 var(--fd);letter-spacing:.14em;color:var(--muted)}
+.bd-hd>*{text-align:center}.bd-hd>:nth-child(2){text-align:left}
+.bd-rank{font:900 italic 20px/1 var(--fd);color:var(--dim);text-align:center;letter-spacing:-.03em}
+.bd-row.r1 .bd-rank{color:#ffe49e;text-shadow:0 0 14px rgba(255,182,39,.6)}
+.bd-row.r1::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:4px;background:linear-gradient(180deg,#ffe49e,#ffb627);box-shadow:0 0 12px rgba(255,182,39,.6);border-radius:0 3px 3px 0}
+.bd-who{min-width:0}
+.bd-nick{display:flex;align-items:center;gap:6px;min-width:0;font:900 italic 15px/1.1 var(--fd);letter-spacing:.01em}
+.bd-nick span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-nick em{flex:0 0 auto;padding:2px 5px;border-radius:4px;background:var(--a-soft);color:#ffb38a;font:800 normal 8.5px/1 var(--fu);letter-spacing:.1em}
+.bd-bar{height:4px;margin-top:6px;border-radius:3px;background:var(--s3);overflow:hidden}
+.bd-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok2),var(--ok));transition:width .9s var(--out)}
+.bd-n{text-align:center;font:900 italic 19px/1 var(--fd);letter-spacing:-.02em}
+.bd-n.ok{color:var(--ok)}.bd-n.fail{color:#ff6f86}.bd-n.pct{font-size:16px;color:#fff}
+.bd-n.zero{color:var(--dim)}
+.bd-n.bump{animation:bump .6s cubic-bezier(.2,1.6,.4,1)}
+@keyframes bump{0%{transform:scale(1.55)}100%{transform:scale(1)}}
+.sk{display:inline-flex;align-items:center;justify-content:center;gap:3px;min-width:44px;height:22px;padding:0 6px;border-radius:5px;transform:skewX(-12deg);font:900 italic 12px/1 var(--fd)}
+.sk>span{transform:skewX(12deg)}
+.sk.ok{background:rgba(46,229,157,.14);color:var(--ok);box-shadow:inset 0 0 0 1px rgba(46,229,157,.4)}
+.sk.fail{background:rgba(255,61,90,.14);color:#ff6f86;box-shadow:inset 0 0 0 1px rgba(255,61,90,.4)}
+.sk.none{color:var(--dim)}
+.bd-empty{padding:26px 16px;text-align:center;color:var(--muted);font:800 italic 14px/1.4 var(--fd)}
+
+/* ---------- Команда: три колонки ---------- */
+.w-team #main,.w-team #feed,.w-team #board,.w-team #series,.w-series #main,.w-series #feed,.w-series #board,.w-series #team{display:none!important}
+html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
+#team{position:relative;width:960px;height:320px;max-width:100vw;display:flex;align-items:center;justify-content:center}
+#tmCols{display:flex;align-items:stretch;justify-content:center;gap:14px;height:312px}
+.tm-col{position:relative;flex:0 0 300px;width:300px;display:flex;flex-direction:column;gap:6px;padding:10px 12px 12px}
+.tm-col.is-owner{flex-basis:330px;width:330px}
+.tm-bg{position:absolute;inset:0;z-index:0;border-radius:14px;overflow:hidden;
+  background:radial-gradient(90% 55% at 50% 38%,var(--rcs),transparent 75%),linear-gradient(180deg,rgba(24,24,34,.96),rgba(13,13,19,.95));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 12px 30px rgba(0,0,0,.4);transition:box-shadow .5s}
+.tm-bg::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--rc) 30%,var(--rc2) 50%,var(--rc) 70%,transparent)}
+.tm-col.is-owner .tm-bg{box-shadow:inset 0 0 0 1.5px rgba(255,138,61,.55),0 0 34px rgba(255,61,90,.24),0 12px 30px rgba(0,0,0,.4)}
+.tm-col.is-owner .tm-bg::before{height:3px;background:var(--grad)}
+.tm-col.is-ok .tm-bg{box-shadow:inset 0 0 0 1.5px rgba(46,229,157,.6),0 0 30px rgba(46,229,157,.2),0 12px 30px rgba(0,0,0,.4)}
+.tm-col.is-fail .tm-bg{box-shadow:inset 0 0 0 1.5px rgba(255,61,90,.65),0 0 30px rgba(255,61,90,.22),0 12px 30px rgba(0,0,0,.4)}
+.tm-col.is-ambiguous .tm-bg{box-shadow:inset 0 0 0 1.5px rgba(255,182,39,.6),0 0 26px rgba(255,182,39,.18),0 12px 30px rgba(0,0,0,.4)}
+.tm-col.flash .tm-bg{animation:fcFlash .9s var(--out)}
+.tm-col>*{position:relative;z-index:1}
+.tm-col>.tm-bg{position:absolute;z-index:0}
+.tm-nick{display:flex;align-items:center;justify-content:center;gap:8px;height:22px;min-width:0;font:900 italic 15px/22px var(--fd);letter-spacing:.04em;text-transform:uppercase}
+.tm-nick span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:3px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tm-nick em{display:none;flex:0 0 auto;align-items:center;height:18px;padding:0 7px;border-radius:4px;transform:skewX(-12deg);background:var(--grad);color:#fff;
+  font:900 italic 9.5px/1 var(--fd);letter-spacing:.12em;box-shadow:0 0 14px var(--a-glow)}
+.tm-nick em b{font:inherit;transform:skewX(12deg)}
+.tm-col.is-owner .tm-nick em{display:inline-flex}
+.tm-col.is-owner .tm-nick{font-size:16px}
+.tm-stage{position:relative;height:128px;margin:0 -12px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)}
+.tm-water{position:absolute;left:0;right:0;top:50%;transform:translateY(-54%);text-align:center;font:900 italic 112px/1 var(--fd);letter-spacing:-.06em;
+  color:transparent;-webkit-text-stroke:1.5px var(--rcg);opacity:.45;white-space:nowrap;transition:opacity .4s}
+.tm-glow{position:absolute;left:50%;bottom:4px;width:230px;height:38px;margin-left:-115px;border-radius:50%;background:radial-gradient(closest-side,var(--rcg),transparent);transition:opacity .4s}
+.tm-glow::after{content:"";position:absolute;top:9px;bottom:9px;left:28px;right:28px;border-radius:50%;border:1.5px solid var(--rc);opacity:.55;box-shadow:0 0 14px var(--rcg),inset 0 0 10px var(--rcg)}
+.tm-reel{position:absolute;inset:0}
+.tm-reel.mb1{filter:url(#mb1)}.tm-reel.mb2{filter:url(#mb2)}
+.tm-strip{position:absolute;left:50%;top:0;height:100%;display:flex;align-items:center;gap:16px;will-change:transform}
+.tm-it{position:relative;flex:0 0 200px;width:200px;height:125px;margin-top:-6px;transition:opacity .45s}
+.tm-it img{display:block;width:200px;height:125px;object-fit:contain;filter:drop-shadow(0 10px 12px rgba(0,0,0,.7))}
+.tm-strip.landed .tm-it:not(.win){opacity:0}
+.tm-flash{position:absolute;inset:0;opacity:0;pointer-events:none;background:radial-gradient(45% 60% at 50% 55%,rgba(255,255,255,.75),rgba(255,180,150,.15) 60%,transparent)}
+.tm-col.spinning .tm-water{opacity:0}
+.tm-col.spinning .tm-glow{opacity:.35}
+.tm-empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.tm-empty svg{width:170px;height:76px;animation:tmBreath 3s ease-in-out infinite}
+.tm-empty span{font:800 italic 11.5px/1 var(--fd);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+@keyframes tmBreath{50%{opacity:.55}}
+.tm-col.empty .tm-empty{display:flex}
+.tm-col.empty .tm-water,.tm-col.empty .tm-reel{display:none}
+.tm-col.empty .tm-glow{opacity:.25}
+.tm-col.empty .tm-meta,.tm-col.empty .tm-ch,.tm-col.empty .tm-live{visibility:hidden}
+.tm-meta{display:flex;align-items:center;justify-content:center;gap:6px;height:22px;min-width:0}
+.tm-meta .tierpill{height:20px;padding:0 8px;font-size:11px;flex:0 0 auto}
+.tm-meta .ctag{height:20px;padding:0 6px;font-size:10px;flex:0 0 auto}
+.tm-meta .premtag{height:20px;padding:0 6px;font-size:9px;flex:0 0 auto}
+.tm-meta .nm{min-width:0;font:900 italic 15px/1.15 var(--fd);letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-ch{position:relative;height:60px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:4px 12px;border-radius:9px;overflow:hidden;perspective:600px;text-align:center;
+  background:linear-gradient(180deg,#1f1f2b 0,#1a1a24 50%,#14141c 50%,#111118 100%);border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 2px 10px rgba(0,0,0,.4)}
+.tm-ch .txt{min-width:0;font:800 italic 13.5px/1.22 var(--fd);letter-spacing:-.01em;transform-origin:50% 0;backface-visibility:hidden;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.tm-ch.rolling .txt{color:#b4b4c6}
+.tm-ch.final{border-color:rgba(255,138,61,.5);box-shadow:0 0 0 1px rgba(255,61,90,.3),0 0 22px rgba(255,61,90,.2),inset 0 2px 10px rgba(0,0,0,.4)}
+.tm-ch.final .txt{color:#fff;text-shadow:0 0 18px rgba(255,138,61,.45)}
+.tm-ch.fx{animation:land .75s cubic-bezier(.2,1.7,.35,1) both}
+.tm-live{display:flex;align-items:center;justify-content:center;gap:7px;height:24px;min-width:0;margin-top:auto}
+.tl{display:inline-flex;align-items:center;flex:0 0 auto;height:22px;padding:0 9px;border-radius:5px;transform:skewX(-12deg);
+  font:900 italic 11px/1 var(--fd);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.tl>span{display:inline-block;transform:skewX(12deg)}
+.tl-pending{background:rgba(255,138,61,.14);color:#ffb38a;box-shadow:inset 0 0 0 1px rgba(255,138,61,.45)}
+.tl-pending>span{animation:tlPulse 1.6s ease-in-out infinite}
+@keyframes tlPulse{50%{opacity:.55}}
+.tl-ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c;box-shadow:0 4px 16px rgba(46,229,157,.3)}
+.tl-fail{background:linear-gradient(100deg,var(--fail2),var(--fail));color:#fff;box-shadow:0 4px 16px rgba(255,61,90,.3)}
+.tl-ambiguous{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600}
+.tl-cancelled{background:var(--s3);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line2)}
+.tl-rt{min-width:0;font:700 12.5px/1.2 var(--fu);color:#d9d9e6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-live.pop .tl{animation:stPop .6s cubic-bezier(.2,1.6,.4,1) both}
+.tm-live.pop .tl-rt{animation:rtIn .6s .12s var(--out) both}
+.tm-stamp{position:absolute;right:8px;top:40px;z-index:5}
+.tm-stamp .stamp{padding:5px 12px;font-size:14px;transform:skewX(-14deg) rotate(-6deg)}
+.tm-stamp .stamp svg{width:15px;height:15px}
+.tm-stamp .stamp.fx{animation:tmStamp .6s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes tmStamp{0%{opacity:0;transform:skewX(-14deg) rotate(-14deg) scale(2.6)}55%{opacity:1}100%{opacity:1;transform:skewX(-14deg) rotate(-6deg) scale(1)}}
+
+/* ---------- Серия ---------- */
+#series{width:560px;max-width:100vw;padding:4px 4px 0}
+.sr-row{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n t" "p k";align-items:center;column-gap:10px;row-gap:5px;padding:7px 14px 7px 16px}
+#srRows>*+*{border-top:1px solid var(--line)}
+.sr-row.own::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:4px;background:var(--grad);box-shadow:0 0 12px var(--a-glow);border-radius:0 3px 3px 0}
+.sr-nick{grid-area:n;display:flex;align-items:center;gap:7px;min-width:0;font:900 italic 15px/20px var(--fd);letter-spacing:.01em}
+.sr-nick span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-nick em{flex:0 0 auto;padding:2px 5px;border-radius:4px;background:var(--a-soft);color:#ffb38a;font:800 normal 8.5px/1 var(--fu);letter-spacing:.1em}
+.sr-tot{grid-area:t;display:flex;align-items:center;gap:12px;font:900 italic 15px/20px var(--fd);white-space:nowrap}
+.sr-t{display:inline-flex;align-items:center;gap:4px}
+.sr-t b{display:inline-block;font:inherit}
+.sr-t.ok b{color:var(--ok)}.sr-t.fail b{color:#ff6f86}.sr-t.pct b{color:#fff;font-size:14px}
+.sr-t.zero b{color:var(--dim)}
+.sr-t b.bump{animation:bump .6s cubic-bezier(.2,1.6,.4,1)}
+.sr-pips{grid-area:p;display:flex;align-items:center;gap:5px;width:245px;height:22px;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 20px,transparent 20px 25px) left center/245px 20px no-repeat}
+.pip{flex:0 0 20px;width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center}
+.pip svg{width:13px;height:13px}
+.pip.ok{background:linear-gradient(135deg,var(--ok),var(--ok2));color:#03150c;box-shadow:0 0 10px rgba(46,229,157,.35)}
+.pip.fail{background:linear-gradient(135deg,var(--fail),var(--fail2));color:#fff;box-shadow:0 0 10px rgba(255,61,90,.35)}
+.pip.ambiguous{background:linear-gradient(135deg,var(--amb),var(--amb2));color:#241600;font:900 13px/1 var(--fd)}
+.pip.pending{background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35);animation:pipPulse 1.4s ease-in-out infinite}
+.pip.in{animation:pipIn .55s cubic-bezier(.2,1.6,.4,1) both}
+.pip.pending.in{animation:pipIn .55s cubic-bezier(.2,1.6,.4,1) both,pipPulse 1.4s .55s ease-in-out infinite}
+@keyframes pipIn{0%{opacity:0;transform:scale(0) rotate(-35deg)}100%{opacity:1;transform:none}}
+@keyframes pipPulse{50%{opacity:.6;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.8),0 0 12px rgba(255,255,255,.3)}}
+.sr-sk{grid-area:k;justify-self:end}
+.sr-sk .sk{height:22px;padding:0 9px;font-size:11.5px;white-space:nowrap}
+.sr-sk .sk.fail{color:#ff8fa2}
+@media (prefers-reduced-motion:reduce){.foil,.glint,.reel.won .rays{animation:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="mb1" x="-5%" y="0" width="110%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="3 0"/></filter>
+    <filter id="mb2" x="-5%" y="0" width="110%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="7 0"/></filter>
+    <filter id="mb3" x="-5%" y="0" width="110%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="13 0"/></filter>
+  </defs>
+</svg>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<!-- основной: рулетка + плашка -->
+<section id="main" hidden>
+  <div class="reel-wrap" id="reelWrap">
+    <div class="reel" id="reel">
+      <div class="rays" aria-hidden="true"></div>
+      <div class="track" id="track"><div class="strip" id="strip"></div></div>
+      <div class="speedfx" id="speedfx"></div>
+      <div class="fade l"></div><div class="fade r"></div>
+      <div class="vig"></div>
+      <div class="marker" aria-hidden="true">
+        <i class="halo"></i><i class="mflash" id="mflash"></i><i class="beam"></i>
+        <span class="glint t"><i></i></span><span class="glint b"><i></i></span>
+      </div>
+      <div class="flash" id="flash"></div>
+    </div>
+  </div>
+  <div class="plate" id="plate" hidden>
+    <div class="pl-clip"><div class="pl-water" id="plWater"></div><div class="pl-wipe"></div></div>
+    <div class="pl-stripe"></div>
+    <div class="pl-tank" id="plTank"><img id="plImg" alt=""></div>
+    <div class="pl-id"><div class="pl-meta" id="plMeta"></div><div class="pl-name" id="plName"></div></div>
+    <div class="pl-ch">
+      <div class="pl-lbl">ЧЕЛЛЕНДЖ НА БОЙ</div>
+      <div class="flap" id="chBox"><div class="txt" id="chText"></div><i class="sweep"></i></div>
+      <div class="live" id="plLive"></div>
+    </div>
+    <div class="pl-stamp" id="plStamp"></div>
+  </div>
+</section>
+
+<!-- лента друзей -->
+<section id="feed" hidden>
+  <div class="whead"><h1>Друзья в бою</h1><i class="dot"></i></div>
+  <div class="fd-list" id="fdList"></div>
+</section>
+
+<!-- таблица -->
+<section id="board" hidden>
+  <div class="whead"><h1 id="bdTitle">Таблица</h1><span class="sub"><span id="bdPeriod">СЕГОДНЯ</span></span></div>
+  <div class="bd" id="bd">
+    <div class="bd-row bd-hd"><span>#</span><span>ИГРОК</span><span>✅</span><span>❌</span><span>%</span><span>СЕРИЯ</span></div>
+    <div id="bdRows"></div>
+  </div>
+</section>
+
+<!-- команда: стример в центре, друзья по бокам -->
+<section id="team" hidden>
+  <div id="tmCols"></div>
+</section>
+
+<!-- серия выполнений/провалов -->
+<section id="series" hidden>
+  <div class="whead"><h1>Серия</h1><span class="sub"><span id="srPeriod">СЕГОДНЯ</span></span></div>
+  <div class="bd"><div id="srRows"></div></div>
+</section>
+
+<script>
+'use strict';
+// Виджеты читают комнату без входа: правила разрешают чтение rooms/{id} всем.
+// js/room.js тут не подключаем: его init() всегда делает signInAnonymously (нужен auth SDK, и каждый
+// перезапуск источника OBS плодил бы анонимных пользователей), а виджетам запись не нужна.
+// Поэтому читаем базу напрямую через firebase.database() с тем же конфигом.
+const $ = s => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const W = (function () { const w = (params.get('w') || params.get('obs') || 'main').toLowerCase(); return ['feed', 'board', 'team', 'series'].indexOf(w) >= 0 ? w : 'main'; })();
+const ROOM = (function () { const r = (params.get('room') || '').trim().toLowerCase(); return /^[a-z0-9]{10}$/.test(r) ? r : null; })();
+const BIG = params.get('size') === 'big';
+const PERIOD_ALL = params.get('period') === 'all';
+const HAS_SERVER = location.protocol.indexOf('http') === 0;
+
+const FB_CONFIG = {
+  apiKey: 'AIzaSyA2QzcnPMFE5GBiIItm1M1L0trRimFsfu8',
+  authDomain: 'wotbase-311fc.firebaseapp.com',
+  databaseURL: 'https://wotbase-311fc-default-rtdb.europe-west1.firebasedatabase.app',
+  projectId: 'wotbase-311fc',
+  storageBucket: 'wotbase-311fc.firebasestorage.app',
+  messagingSenderId: '259612791074',
+  appId: '1:259612791074:web:2fbcb943094e8c30be957b',
+};
+const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
+
+const TYPES = { lightTank: 'ЛТ', mediumTank: 'СТ', heavyTank: 'ТТ', 'AT-SPG': 'ПТ', SPG: 'САУ' };
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+const STATUSES = ['pending', 'ok', 'fail', 'ambiguous', 'cancelled'];
+
+// ---------- Утилиты ----------
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const num = (x, d) => (typeof x === 'number' && isFinite(x) ? x : d);
+const str = x => (x == null ? '' : typeof x === 'string' ? x : typeof x === 'number' ? String(x) : '');
+const RAR = tier => tier >= 10 ? 'r4' : tier >= 8 ? 'r3' : tier >= 5 ? 'r2' : 'r1';
+const RAR_COLORS = {
+  r1: ['#5f93d6', '#b6d3f8', '#ffffff', '#3d6fb8'],
+  r2: ['#9b5cff', '#d4b9ff', '#ffffff', '#ff8a3d'],
+  r3: ['#ff2d6f', '#ffa3c1', '#ffffff', '#ff8a3d'],
+  r4: ['#ffb627', '#ffe49e', '#ffffff', '#ff5ab4'],
+};
+function setRar(el, tier) {
+  el.classList.remove('rar-r1', 'rar-r2', 'rar-r3', 'rar-r4');
+  el.classList.add('rar-' + RAR(tier));
+}
+function anim(el, kf, opt) { try { return el && el.animate ? el.animate(kf, opt) : null; } catch (e) { return null; } }
+const IMG_ERR = 'onerror="this.style.visibility=\'hidden\'"';
+
+// Танк из базы/payload -> безопасный объект
+function normTank(t) {
+  t = t && typeof t === 'object' ? t : {};
+  const tier = Math.max(1, Math.min(11, Math.round(num(+t.tier, 1)) || 1));
+  return { id: t.id, name: str(t.name) || 'Танк', tier, type: TYPES[t.type] ? t.type : '', prem: !!t.prem, img: str(t.img) };
+}
+// Спин (запись комнаты или payload /api/state) -> объект, с которым можно работать без проверок
+function norm(raw) {
+  raw = raw && typeof raw === 'object' ? raw : {};
+  let items = Array.isArray(raw.items) ? raw.items.filter(x => x && typeof x === 'object').map(normTank) : [];
+  let wi = Math.round(num(+raw.winIndex, 0));
+  if (!items.length) { items = [normTank(raw.tank)]; wi = 0; }
+  wi = Math.max(0, Math.min(items.length - 1, wi));
+  const tank = raw.tank && typeof raw.tank === 'object' ? normTank(raw.tank) : items[wi];
+  const chObj = raw.challenge && typeof raw.challenge === 'object' ? raw.challenge : null;
+  let ch = Array.isArray(raw.ch) ? raw.ch.map(str).filter(Boolean) : [];
+  const chText = str(chObj && chObj.text);
+  if (chText && ch[ch.length - 1] !== chText) ch.push(chText); // итог — всегда текст челленджа
+  if (!ch.length) ch = [''];
+  const res = raw.result && typeof raw.result === 'object' ? raw.result : null;
+  let resultText = str(res && res.text) || str(raw.resultText);
+  const status = STATUSES.indexOf(raw.status) >= 0 ? raw.status : null;
+  if (!resultText && res && res.by === 'manual' && (status === 'ok' || status === 'fail')) resultText = 'решение стримера';
+  return {
+    id: str(raw.id), acc: str(raw.acc), nick: str(raw.nick) || 'Игрок', owner: raw.owner === true,
+    ts: num(+raw.ts, 0), kind: raw.kind === 'challenge' ? 'challenge' : 'full',
+    items, winIndex: wi, jitter: Math.max(-0.5, Math.min(0.5, num(+raw.jitter, 0))),
+    dur: Math.max(1500, Math.min(20000, num(+raw.dur, 7000))),
+    ch, chFinal: ch[ch.length - 1], tank, status, resultText, auto: !!(chObj && chObj.auto),
+    rerolls: num(+raw.rerolls, 0), checkedAt: num(+(res && res.checkedAt), 0),
+  };
+}
+const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
+const ICON_FAIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const ICON_AMB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg>';
+const ST_LABEL = { pending: 'ЖДЁМ БОЙ', ok: 'ВЫПОЛНЕНО', fail: 'ПРОВАЛ', ambiguous: 'НА ПРОВЕРКЕ', cancelled: 'ОТМЕНЁН' };
+// строка статуса: плашка + итог проверки
+function liveHTML(sp) {
+  if (!sp.status) return '';
+  const lbl = sp.status === 'pending' && !sp.auto && sp.owner ? 'ЖДЁМ ИТОГ' : ST_LABEL[sp.status];
+  return `<span class="st st-${sp.status}"><span>${sp.status === 'pending' ? '<i></i>' : ''}${lbl}</span></span>`
+    + (sp.resultText ? `<span class="rt">${esc(sp.resultText)}</span>` : '');
+}
+function stampHTML(st, fx) {
+  if (st !== 'ok' && st !== 'fail' && st !== 'ambiguous' && st !== 'cancelled') return '';
+  const icon = st === 'ok' ? ICON_OK : st === 'fail' ? ICON_FAIL : st === 'ambiguous' ? ICON_AMB : '';
+  const txt = st === 'ok' ? 'ВЫПОЛНЕНО' : st === 'fail' ? 'ПРОВАЛ' : st === 'ambiguous' ? 'ПРОВЕРКА' : 'ОТМЕНЁН';
+  return `<div class="stamp ${st}${fx ? ' fx' : ''}"><span>${icon}${txt}</span><i class="streak"></i></div>`;
+}
+function metaHTML(t) {
+  return `<span class="tierpill"><span>${ROMAN[t.tier]}<em class="lv"> уровень</em></span></span>`
+    + (t.type ? `<span class="ctag ct-${t.type}">${TYPES[t.type]}</span>` : '')
+    + (t.prem ? '<span class="premtag">ПРЕМ<i class="foil"></i></span>' : '');
+}
+// ---------- Звук (только WebAudio) ----------
+const SOUND = !params.has('mute') && (W === 'main' || W === 'team' || params.get('sound') === '1');
+let ac = null, noiseBuf = null;
+function audio() {
+  if (!SOUND) return null;
+  try { ac = ac || new AudioContext(); if (ac.state === 'suspended') ac.resume(); return ac; } catch (e) { return null; }
+}
+function beep(freq, dur, vol, type, delay) {
+  const a = audio(); if (!a) return;
+  try {
+    const t = a.currentTime + (delay || 0);
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+function sweep(f0, f1, dur, vol, type, delay) {
+  const a = audio(); if (!a) return;
+  try {
+    const t = a.currentTime + (delay || 0);
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.03);
+  } catch (e) {}
+}
+function noise(dur, f0, f1, vol, delay, q) {
+  const a = audio(); if (!a) return;
+  try {
+    if (!noiseBuf) {
+      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = a.currentTime + (delay || 0);
+    const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = noiseBuf; src.loop = true;
+    bp.type = 'bandpass'; bp.Q.value = q || 1.2;
+    bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.08, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp).connect(g).connect(a.destination); src.start(t); src.stop(t + dur + 0.03);
+  } catch (e) {}
+}
+const sfx = {
+  whoosh() { noise(0.9, 300, 4200, 0.13); sweep(70, 240, 0.7, 0.07, 'sawtooth'); },
+  tick() { beep(2300, 0.014, 0.035, 'square'); beep(160, 0.035, 0.06, 'sine'); },
+  impact() {
+    sweep(170, 38, 0.6, 0.3, 'sine'); noise(0.45, 2600, 250, 0.16);
+    [392, 494, 587, 784].forEach((f, i) => beep(f, 0.55, 0.035, 'sawtooth', 0.02 + i * 0.015));
+  },
+  flap(i) { beep(1500 - i * 25, 0.016, 0.04, 'square'); beep(320, 0.02, 0.03, 'triangle'); },
+  land() {
+    sweep(240, 50, 0.45, 0.22, 'sine');
+    [523, 659, 784, 1047, 1319].forEach((f, i) => beep(f, 0.32, 0.055, 'triangle', i * 0.075));
+    noise(0.7, 5000, 9500, 0.045, 0.12, 0.8);
+  },
+  ok() { [659, 880, 1175, 1568].forEach((f, i) => beep(f, 0.3, 0.06, 'triangle', i * 0.08)); noise(0.5, 3000, 9000, 0.05, 0.05); },
+  fail() { sweep(320, 80, 0.7, 0.1, 'sawtooth'); beep(98, 0.5, 0.09, 'square', 0.06); noise(0.4, 900, 200, 0.08); },
+  amb() { [523, 440].forEach((f, i) => beep(f, 0.22, 0.05, 'triangle', i * 0.12)); },
+};
+const statusSound = st => { const f = st === 'ok' ? sfx.ok : st === 'fail' ? sfx.fail : st === 'ambiguous' ? sfx.amb : null; if (f) f(); };
+
+// ---------- Firebase: только чтение, без входа ----------
+const FB = { db: null, offset: 0 };
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = false;
+    s.onload = () => res();
+    s.onerror = () => { s.remove(); rej(new Error('не загрузился ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+// грузим SDK сами: если интернета нет при старте источника — пробуем снова, пока не получится
+let fbP = null;
+function fbConnect() {
+  if (fbP) return fbP;
+  fbP = (async () => {
+    for (let n = 0; ; n++) {
+      try {
+        if (!window.firebase || !window.firebase.initializeApp) await loadScript(SDK + 'firebase-app-compat.js');
+        if (!window.firebase.database) await loadScript(SDK + 'firebase-database-compat.js');
+        const fb = window.firebase;
+        const app = fb.apps.length ? fb.app() : fb.initializeApp(FB_CONFIG);
+        FB.db = app.database();
+        FB.db.ref('.info/serverTimeOffset').on('value', s => { FB.offset = num(s.val(), 0); });
+        return FB.db;
+      } catch (e) {
+        console.warn('[obs] Firebase недоступен, повтор позже:', e && e.message);
+        await sleep(Math.min(60000, 10000 + n * 5000));
+      }
+    }
+  })();
+  return fbP;
+}
+const serverNow = () => Date.now() + FB.offset;
+// начало сегодняшнего дня (по часам этого компьютера) в серверном времени
+function dayStart() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() + FB.offset; }
+
+// Последние limit спинов комнаты. on(event, spin, initial):
+//   'reset' — (пере)подписка, 'added' | 'changed' | 'removed', 'ready' — начальная загрузка пришла.
+// Обрыв связи SDK переживает сам; отказ (правила) — переподписка через 30 с.
+// since(): с какого момента (серверное время) брать спины — вместо limit, чтобы не тянуть лишнее
+// (в каждом спине лента из ~64 танков, это несколько КБ).
+function watchSpins(limit, on, since) {
+  const call = (ev, sp, initial) => { try { on(ev, sp, initial); } catch (e) { console.error(e); } };
+  const start = () => {
+    let initial = true, failed = false;
+    let q = FB.db.ref('rooms/' + ROOM + '/spins').orderByChild('ts');
+    q = since ? q.startAt(since()) : q.limitToLast(limit);
+    const fail = e => {
+      if (failed) return;
+      failed = true;
+      console.warn('[obs] нет доступа к спинам комнаты:', e && e.message);
+      try { q.off(); } catch (x) {}
+      setTimeout(start, 30000);
+    };
+    const h = ev => s => { const v = s.val(); call(ev, Object.assign({}, v && typeof v === 'object' ? v : {}, { id: s.key }), initial); };
+    call('reset', null, true);
+    q.on('child_added', h('added'), fail);
+    q.on('child_changed', h('changed'), fail);
+    q.on('child_removed', h('removed'), fail);
+    q.once('value', () => { initial = false; call('ready', null, false); }, () => {});
+  };
+  fbConnect().then(start);
+}
+// значение по пути комнаты: cb(val | null)
+function watchValue(path, cb) {
+  const start = () => {
+    let failed = false;
+    const r = FB.db.ref('rooms/' + ROOM + '/' + path);
+    r.on('value', s => { try { cb(s.val()); } catch (e) { console.error(e); } }, e => {
+      if (failed) return;
+      failed = true;
+      console.warn('[obs] нет доступа к ' + path + ':', e && e.message);
+      try { r.off(); } catch (x) {}
+      setTimeout(start, 30000);
+    });
+  };
+  fbConnect().then(start);
+}
+
+// Очередь анимаций виджета: одна за раз, остальные ждут
+function makeRunner(task) {
+  let busy = false, again = false;
+  return function run() {
+    if (busy) { again = true; return; }
+    busy = true;
+    (async () => {
+      do {
+        again = false;
+        try { await task(); } catch (e) { console.error(e); }
+      } while (again);
+      busy = false;
+    })();
+  };
+}
+// ---------- Конфетти (canvas на весь источник) ----------
+const FX = { ctx: null, parts: [], raf: 0, dpr: 1, w: 0, h: 0, last: 0 };
+function confettiAt(el, tier, count) {
+  try {
+    const cv = $('#fx');
+    const ctx = cv && cv.getContext ? cv.getContext('2d') : null;
+    if (!ctx || !el) return;
+    const r = cv.getBoundingClientRect(), cr = el.getBoundingClientRect();
+    FX.dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (!FX.raf || FX.w !== r.width || FX.h !== r.height) {
+      cv.width = Math.round(r.width * FX.dpr); cv.height = Math.round(r.height * FX.dpr);
+    }
+    FX.ctx = ctx; FX.w = r.width; FX.h = r.height;
+    const cx = cr.left + cr.width / 2 - r.left, cy = cr.top + cr.height / 2 - r.top;
+    const cols = RAR_COLORS[RAR(tier)];
+    const k = BIG ? 1 : 0.7;
+    for (let i = 0; i < (count || 140); i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.6;
+      const sp = (4 + Math.random() * 12) * k;
+      const spark = i % 4 === 0;
+      FX.parts.push({
+        x: cx + (Math.random() - 0.5) * cr.width * 0.7, y: cy + (Math.random() - 0.5) * 40,
+        vx: Math.cos(a) * sp * 1.35, vy: Math.sin(a) * sp - 2,
+        rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45,
+        w: spark ? 2 : (6 + Math.random() * 8) * k, h: spark ? 2 : (3 + Math.random() * 4) * k,
+        c: spark ? '#ffffff' : cols[i % cols.length], life: 0, max: 70 + Math.random() * 70, spark, fl: Math.random() * 6.28,
+      });
+    }
+    if (!FX.raf) { FX.last = performance.now(); FX.raf = requestAnimationFrame(fxStep); }
+  } catch (e) {}
+}
+function fxStep(now) {
+  const ctx = FX.ctx;
+  const k = Math.min(3, Math.max(0.2, (now - FX.last) / 16.67)); FX.last = now;
+  ctx.setTransform(FX.dpr, 0, 0, FX.dpr, 0, 0);
+  ctx.clearRect(0, 0, FX.w, FX.h);
+  FX.parts = FX.parts.filter(p => {
+    p.life += k; p.vy += 0.3 * k; p.vx *= Math.pow(0.975, k); p.vy *= Math.pow(0.985, k);
+    p.x += p.vx * k; p.y += p.vy * k; p.rot += p.vr * k; p.fl += 0.22 * k;
+    const a = 1 - p.life / p.max;
+    if (a <= 0 || p.y > FX.h + 30) return false;
+    ctx.globalAlpha = Math.min(1, a * 1.8);
+    ctx.fillStyle = p.c;
+    if (p.spark) { ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+    else {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.cos(p.fl));
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+    }
+    return true;
+  });
+  ctx.globalAlpha = 1;
+  if (FX.parts.length) FX.raf = requestAnimationFrame(fxStep);
+  else { FX.raf = 0; ctx.clearRect(0, 0, FX.w, FX.h); }
+}
+
+// ---------- Основной виджет: лента ----------
+function cardHTML(t) {
+  return `<div class="tcard rar-${RAR(t.tier)} ${t.type ? 'ct-' + t.type : ''} ${t.prem ? 'prem' : ''}"><div class="tc-in">
+    <span class="tc-tier">${ROMAN[t.tier]}${t.prem ? '<i class="gem"></i>' : ''}</span>
+    ${t.type ? `<span class="ctag">${TYPES[t.type]}</span>` : ''}
+    ${t.img ? `<img src="${esc(t.img)}" alt="" decoding="async" ${IMG_ERR}>` : ''}
+    <div class="tc-nm">${esc(t.name)}</div>${t.prem ? '<i class="foil"></i>' : ''}
+  </div></div>`;
+}
+const R = { cards: [], reelW: 0, cw: 0, step: 0, key: '' };
+const stripKey = sp => sp.items.length + ':' + sp.winIndex + ':' + sp.jitter + ':' + sp.items.map(t => t.id).join(',');
+function renderStrip(sp) {
+  $('#reel').classList.remove('won');
+  $('#strip').innerHTML = sp.items.map(cardHTML).join('');
+  R.cards = Array.from($('#strip').children);
+  R.key = stripKey(sp);
+}
+// позиция ленты, при которой победитель (со сдвигом jitter) стоит под маркером — меряем по DOM
+function reelTarget(sp) {
+  const reelW = $('#reel').clientWidth;
+  const card = $('#strip').firstElementChild;
+  const cw = card ? card.offsetWidth : 1;
+  const step = cw + (parseFloat(getComputedStyle($('#strip')).columnGap || getComputedStyle($('#strip')).gap) || 10);
+  return { reelW, cw, step, x: reelW / 2 - (sp.winIndex * step + cw / 2 + sp.jitter * cw) };
+}
+// 3D-дорожка: наклон/масштаб видимых карточек по расстоянию до центра
+function setX(x) {
+  $('#strip').style.transform = `translate3d(${x.toFixed(2)}px,0,0)`;
+  const n = R.cards.length;
+  if (!n || !R.step) return;
+  const c = R.reelW / 2;
+  const lo = Math.max(0, Math.floor((-x - R.cw) / R.step) - 1);
+  const hi = Math.min(n - 1, Math.ceil((R.reelW - x) / R.step) + 1);
+  for (let i = lo; i <= hi; i++) {
+    const d = (x + i * R.step + R.cw / 2 - c) / R.step;
+    const ad = Math.abs(d);
+    const rot = Math.max(-48, Math.min(48, d * 10.5));
+    const pop = ad < 0.6 ? 1 + 0.09 * Math.pow(1 - ad / 0.6, 2) : 1;
+    const s = Math.max(0.7, 1 - ad * 0.05) * pop;
+    const z = -Math.min(280, ad * ad * 9);
+    R.cards[i].style.transform = `perspective(${BIG ? 900 : 700}px) translateZ(${z.toFixed(1)}px) rotateY(${rot.toFixed(2)}deg) scale(${s.toFixed(4)})`;
+  }
+}
+function animateReel(sp, animate) {
+  const track = $('#track'), reel = $('#reel'), spd = $('#speedfx');
+  return new Promise(resolve => {
+    const m = reelTarget(sp);
+    R.cards = Array.from($('#strip').children); R.reelW = m.reelW; R.cw = m.cw; R.step = m.step;
+    if (!animate) { setX(m.x); return resolve(); }
+    const x0 = m.reelW / 2 - m.cw / 2 - m.step * 2;
+    const os = m.cw * 0.1, T1 = 0.9, xa = m.x - os;   // небольшой перелёт и возврат в конце
+    let done = false, prevX = x0, prevT = performance.now(), lastIdx = null, lastTick = 0, lvl = 0, safety = 0;
+    const setLvl = l => {
+      if (l === lvl) return;
+      lvl = l; track.classList.remove('mb1', 'mb2', 'mb3');
+      if (l) track.classList.add('mb' + l);
+    };
+    const finish = () => {
+      if (done) return;
+      done = true; clearTimeout(safety);
+      setLvl(0); spd.style.opacity = '0'; reel.classList.remove('spinning');
+      setX(m.x);
+      resolve();
+    };
+    reel.classList.add('spinning');
+    setX(x0);
+    const t0 = performance.now();
+    const frame = now => {
+      if (done) return;
+      const t = Math.min(1, Math.max(0, (now - t0) / sp.dur));
+      let x;
+      if (t < T1) { const u = t / T1; x = x0 + (xa - x0) * (1 - Math.pow(1 - u, 3.4)); }
+      else { const u = (t - T1) / (1 - T1); x = xa + os * (u * u * (3 - 2 * u)); }
+      setX(x);
+      const v = Math.abs(x - prevX) / Math.max(1, now - prevT);
+      prevX = x; prevT = now;
+      const sc = BIG ? 1 : 0.7; // в маленьком виджете скорость в пикселях ниже
+      setLvl(v > 3.2 * sc ? 3 : v > 1.7 * sc ? 2 : v > 0.7 * sc ? 1 : 0);
+      spd.style.opacity = Math.min(1, v / (4 * sc)).toFixed(3);
+      const idx = Math.floor((m.reelW / 2 - x) / m.step);
+      if (idx !== lastIdx) {
+        if (lastIdx !== null && now - lastTick > 38) {
+          lastTick = now; sfx.tick();
+          anim($('#mflash'), [{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        }
+        lastIdx = idx;
+      }
+      if (t >= 1) finish(); else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+    safety = setTimeout(finish, sp.dur + 700); // rAF заморожен (скрытый источник) — всё равно завершаем
+  });
+}
+function markWinner(sp, fx) {
+  const reel = $('#reel'), card = $('#strip').children[sp.winIndex];
+  if (!card) return;
+  const win = sp.items[sp.winIndex];
+  reel.style.setProperty('--wx', (R.reelW / 2 - sp.jitter * R.cw) + 'px');
+  setRar(reel, win.tier);
+  reel.classList.add('won');
+  card.classList.toggle('nofx', !fx);
+  card.classList.add('win');
+  if (!fx) return;
+  anim($('#reelWrap'), [{ transform: 'scale(1)' }, { transform: 'scale(1.03)', offset: 0.28 }, { transform: 'scale(1)' }],
+    { duration: 950, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  anim($('#flash'), [{ opacity: 0.95 }, { opacity: 0 }], { duration: 700, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  sfx.impact();
+  confettiAt(card, win.tier, BIG ? 180 : 110);
+}
+// ---------- Основной виджет: плашка ----------
+const M = { spins: new Map(), queue: [], ready: !ROOM, local: null, shown: null, st: undefined, rt: '', ch: '' };
+let typeTok = 0;
+function showTank(t, fx) {
+  setRar($('#plate'), t.tier);
+  $('#plTank').className = 'pl-tank' + (t.type ? ' ct-' + t.type : '');
+  const img = $('#plImg');
+  img.style.visibility = '';
+  img.onerror = () => { img.style.visibility = 'hidden'; };
+  if (t.img) img.src = t.img; else img.removeAttribute('src');
+  $('#plWater').textContent = ROMAN[t.tier];
+  $('#plMeta').innerHTML = metaHTML(t);
+  const nm = $('#plName'), tok = ++typeTok;
+  if (!fx) { nm.classList.remove('typing'); nm.textContent = t.name; return; }
+  const chars = Array.from(t.name);
+  let i = 0;
+  nm.textContent = ''; nm.classList.add('typing');
+  const step = () => {
+    if (tok !== typeTok) return;
+    nm.textContent = chars.slice(0, ++i).join('');
+    if (i < chars.length) setTimeout(step, 40);
+    else setTimeout(() => { if (tok === typeTok) nm.classList.remove('typing'); }, 600);
+  };
+  setTimeout(step, 330);
+}
+// табло челленджа: перелистывание вариантов, последний — итоговый
+async function animateChallenge(seq, animate) {
+  const box = $('#chBox'), el = $('#chText');
+  box.classList.remove('final', 'rolling', 'fx');
+  if (animate && seq.length > 1) {
+    box.classList.add('rolling');
+    for (let i = 0; i < seq.length - 1; i++) {
+      el.textContent = seq[i];
+      const wait = 55 + i * i * 1.6;
+      anim(el, [{ transform: 'rotateX(-84deg)', opacity: 0.15 }, { transform: 'rotateX(0deg)', opacity: 1 }],
+        { duration: Math.min(260, Math.max(70, wait * 0.85)), easing: 'cubic-bezier(.3,1.45,.5,1)' });
+      sfx.flap(i);
+      await sleep(wait);
+    }
+  }
+  box.classList.remove('rolling');
+  el.textContent = seq[seq.length - 1];
+  void box.offsetWidth;
+  box.classList.add('final');
+  if (animate) { box.classList.add('fx'); sfx.land(); }
+}
+// статус и итог; fx — анимировать смену
+function renderStatus(sp, fx) {
+  const changed = sp.status !== M.st;
+  const live = $('#plLive');
+  live.innerHTML = liveHTML(sp);
+  live.classList.remove('pop');
+  if (fx && (changed || sp.resultText !== M.rt)) { void live.offsetWidth; live.classList.add('pop'); }
+  if (changed || !fx) {
+    const box = $('#plStamp');
+    box.innerHTML = stampHTML(sp.status, fx && changed);
+    if (fx && changed) {
+      statusSound(sp.status);
+      if (sp.status === 'ok') setTimeout(() => confettiAt(box.firstElementChild || box, sp.tank.tier, BIG ? 140 : 90), 450);
+    }
+  }
+  M.st = sp.status; M.rt = sp.resultText; M.shown = sp;
+}
+
+// mode: 'full' — крутим ленту, 'challenge' — только табло челленджа, 'static' — сразу итог
+async function play(sp, mode) {
+  const animate = mode !== 'static', reelOnly = mode === 'full';
+  const plate = $('#plate');
+  $('#main').hidden = false;
+  M.shown = sp; M.ch = sp.chFinal;
+  if (reelOnly) { plate.hidden = true; plate.classList.remove('in'); }
+  if (mode !== 'challenge' || R.key !== stripKey(sp)) renderStrip(sp);
+  if (reelOnly) {
+    sfx.whoosh();
+    anim($('#reelWrap'), [{ transform: 'scale(.955)' }, { transform: 'scale(1)' }], { duration: 650, easing: 'cubic-bezier(.2,1.5,.4,1)' });
+  }
+  await animateReel(sp, reelOnly);
+  if (!$('#reel').classList.contains('won') || mode !== 'challenge') markWinner(sp, reelOnly);
+  showTank(sp.tank, reelOnly);
+  $('#plStamp').innerHTML = ''; $('#plLive').innerHTML = ''; M.st = undefined; M.rt = '';
+  if (animate) { $('#chText').textContent = ''; $('#chBox').classList.remove('final', 'rolling', 'fx'); }
+  const wasHidden = plate.hidden;
+  plate.hidden = false;
+  if (wasHidden) { plate.classList.remove('in'); void plate.offsetWidth; if (animate) plate.classList.add('in'); }
+  if (reelOnly) await sleep(420);
+  await animateChallenge(sp.ch, animate);
+  // статус берём свежий: за время анимации он мог измениться
+  const fresh = M.spins.get(sp.id);
+  const now = fresh ? norm(fresh) : sp;
+  renderStatus(now, false);
+  if (animate) { const live = $('#plLive'); live.classList.remove('pop'); void live.offsetWidth; live.classList.add('pop'); await sleep(500); }
+}
+// перекрут челленджа в том же спине
+async function rerollShown(sp) {
+  M.shown = sp; M.ch = sp.chFinal;
+  $('#plStamp').innerHTML = ''; $('#plLive').innerHTML = ''; M.st = undefined; M.rt = '';
+  await animateChallenge(sp.ch, true);
+  renderStatus(sp, true);
+  await sleep(500);
+}
+
+function latestOwner() {
+  if (!ROOM) return M.local ? norm(M.local) : null;
+  let best = null;
+  M.spins.forEach(v => { if (v.owner === true && (!best || num(+v.ts, 0) >= num(+best.ts, 0))) best = v; });
+  return best ? norm(best) : null;
+}
+
+const runMain = makeRunner(async () => {
+  if (!M.ready) return;
+  // новые спины — по очереди; если отстали (переподключение), только последние два
+  while (M.queue.length) {
+    if (M.queue.length > 2) M.queue.splice(0, M.queue.length - 2);
+    const id = M.queue.shift();
+    const raw = M.spins.get(id);
+    if (!raw) continue;
+    const sp = norm(raw);
+    await play(sp, sp.kind === 'challenge' ? 'challenge' : 'full');
+  }
+  const latest = latestOwner();
+  if (!latest) return;
+  if (!M.shown || M.shown.id !== latest.id) { await play(latest, 'static'); return; }
+  if (latest.chFinal !== M.ch) { await rerollShown(latest); return; }
+  if (latest.status !== M.st || latest.resultText !== M.rt) {
+    const big = latest.status !== M.st;
+    renderStatus(latest, true);
+    if (big) await sleep(1000);
+  } else M.shown = latest;
+});
+
+function startMainRoom() {
+  watchSpins(40, (ev, raw, initial) => {
+    if (ev === 'reset') { M.spins.clear(); M.ready = false; return; }
+    if (ev === 'ready') { M.ready = true; runMain(); return; }
+    if (ev === 'removed') { M.spins.delete(raw.id); return; } // экран не трогаем
+    if (raw.owner !== true) return;
+    const isNew = !M.spins.has(raw.id);
+    M.spins.set(raw.id, raw);
+    if (ev === 'added' && isNew && !initial && M.ready) M.queue.push(raw.id);
+    if (M.ready) runMain();
+  });
+}
+// без комнаты: как раньше, опрос /api/state локального сервера
+function startMainLocal() {
+  if (!HAS_SERVER) return;
+  let lastId = null, first = true, inflight = false;
+  setInterval(async () => {
+    if (inflight) return;
+    inflight = true;
+    try {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      if (r.status !== 200) return;
+      const p = await r.json();
+      if (!p || typeof p !== 'object' || p.id == null) return;
+      const id = String(p.id);
+      M.local = Object.assign({}, p, { id });
+      M.spins.set(id, M.local);
+      if (M.spins.size > 20) M.spins.delete(M.spins.keys().next().value);
+      if (id !== lastId) {
+        lastId = id;
+        // при первой загрузке источника не крутим заново — просто показываем результат
+        if (!first) M.queue.push(id);
+      }
+      runMain();
+    } catch (e) {} finally { first = false; inflight = false; }
+  }, 400);
+}
+// ---------- Лента друзей ----------
+const F = { spins: new Map(), cards: new Map(), live: new Set(), ready: false };
+const FEED_MAX = 4, RECENT = 15 * 60 * 1000, STALE = 24 * 3600 * 1000, MR_H = 112;
+const fmtTime = ts => { if (!ts) return ''; const d = new Date(ts - FB.offset); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+// последний активный челлендж каждого друга + решённые за 15 минут, новые сверху
+function computeFeed() {
+  const now = serverNow(), active = {}, done = [];
+  F.spins.forEach(raw => {
+    if (raw.owner === true) return;
+    const sp = norm(raw);
+    if (!sp.status || sp.status === 'pending' || sp.status === 'ambiguous') {
+      if (now - sp.ts > STALE) return;
+      const cur = active[sp.acc];
+      if (!cur || sp.ts > cur.ts) active[sp.acc] = sp;
+    } else if (sp.status === 'ok' || sp.status === 'fail') {
+      if (now - (sp.checkedAt || sp.ts) < RECENT) done.push(sp);
+    }
+  });
+  const byTs = (a, b) => b.ts - a.ts;
+  const act = Object.keys(active).map(k => active[k]).sort(byTs).slice(0, FEED_MAX);
+  done.sort(byTs);
+  return act.concat(done.slice(0, FEED_MAX - act.length)).sort(byTs);
+}
+
+function mrItem(t) {
+  return `<div class="mr-item rar-${RAR(t.tier)}"><b>${ROMAN[t.tier]}</b>${t.img ? `<img src="${esc(t.img)}" alt="" decoding="async" ${IMG_ERR}>` : ''}</div>`;
+}
+function createCard(sp, reveal) {
+  const t = sp.tank;
+  const el = document.createElement('div');
+  el.className = `fcard rar-${RAR(t.tier)}` + (t.type ? ' ct-' + t.type : '');
+  // для мини-рулетки — кусок ленты спина до победителя (+1 после него)
+  let strip = [t], wi = 0;
+  if (reveal && sp.kind === 'full' && sp.items.length > 1) {
+    const from = Math.max(0, sp.winIndex - 18), to = Math.min(sp.items.length, sp.winIndex + 2);
+    strip = sp.items.slice(from, to); wi = sp.winIndex - from;
+  }
+  el.innerHTML = `<div class="fc-clip"></div>
+    <div class="fc-img"><div class="mr-strip">${strip.map(mrItem).join('')}</div><i class="mflash"></i></div>
+    <div class="fc-body">
+      <div class="fc-nick"><span>${esc(sp.nick)}</span><time>${fmtTime(sp.ts)}</time></div>
+      <div class="fc-tank">${metaHTML(t)}<span class="nm">${esc(t.name)}</span></div>
+      <div class="fc-ch">${esc(sp.chFinal)}</div>
+      <div class="live"></div>
+    </div>
+    <div class="fc-stamp"></div>`;
+  const c = { el, st: undefined, rt: '', ch: sp.chFinal, wi };
+  if (reveal) ['.fc-tank', '.fc-ch', '.live'].forEach(s => { el.querySelector(s).style.visibility = 'hidden'; });
+  return c;
+}
+function updateCard(c, sp, fx) {
+  const changed = sp.status !== c.st;
+  const live = c.el.querySelector('.live');
+  live.innerHTML = liveHTML(sp);
+  live.classList.remove('pop');
+  if (fx && (changed || sp.resultText !== c.rt)) { void live.offsetWidth; live.classList.add('pop'); }
+  if (changed) {
+    const st = sp.status === 'ok' || sp.status === 'fail' || sp.status === 'ambiguous' ? sp.status : null;
+    const box = c.el.querySelector('.fc-stamp');
+    box.innerHTML = st ? stampHTML(st, fx) : '';
+    c.el.classList.toggle('has-stamp', !!st);
+    c.el.classList.toggle('done', sp.status === 'ok' || sp.status === 'fail');
+    if (fx) {
+      c.el.classList.remove('flash'); void c.el.offsetWidth; c.el.classList.add('flash');
+      statusSound(sp.status);
+      if (sp.status === 'ok') setTimeout(() => confettiAt(box.firstElementChild || box, sp.tank.tier, 60), 400);
+    }
+  }
+  c.st = sp.status; c.rt = sp.resultText;
+}
+const showEl = (el, kf, dur) => { el.style.visibility = ''; anim(el, kf, { duration: dur || 500, easing: 'cubic-bezier(.16,1,.3,1)' }); };
+const FLIP_CH = [{ transform: 'rotateX(-90deg)', opacity: 0 }, { transform: 'rotateX(0)', opacity: 1 }];
+// появление новой карточки: выезд, мини-рулетка, танк, челлендж, статус (~3 с)
+async function revealCard(c, sp) {
+  const el = c.el;
+  el.classList.add('enter');
+  await sleep(300);
+  const strip = el.querySelector('.mr-strip');
+  if (c.wi > 0) {
+    const y = -c.wi * MR_H;
+    strip.style.transform = `translateY(${y}px)`;
+    anim(strip, [{ transform: 'translateY(0)', filter: 'blur(3px)' }, { transform: `translateY(${y * 0.85}px)`, filter: 'blur(1px)', offset: 0.6 },
+      { transform: `translateY(${y}px)`, filter: 'blur(0)' }], { duration: 1900, easing: 'cubic-bezier(.2,.7,.25,1)' });
+    sfx.whoosh();
+    await sleep(1900);
+  }
+  anim(el.querySelector('.mflash'), [{ opacity: 1 }, { opacity: 0 }], { duration: 500 });
+  sfx.impact();
+  showEl(el.querySelector('.fc-tank'), [{ opacity: 0, transform: 'translateX(-14px)' }, { opacity: 1, transform: 'none' }]);
+  await sleep(250);
+  showEl(el.querySelector('.fc-ch'), FLIP_CH, 450);
+  sfx.land();
+  await sleep(350);
+  el.querySelector('.live').style.visibility = '';
+  updateCard(c, sp, true);
+  await sleep(400);
+}
+async function flipChallenge(c, sp) {
+  const ch = c.el.querySelector('.fc-ch');
+  ch.textContent = sp.chFinal;
+  anim(ch, FLIP_CH, { duration: 450, easing: 'cubic-bezier(.3,1.45,.5,1)' });
+  sfx.land();
+  c.ch = sp.chFinal; c.st = undefined;
+  updateCard(c, sp, true);
+  await sleep(600);
+}
+
+// FLIP: запомнить положения -> поменять DOM -> анимировать сдвиг
+function measure(map) {
+  const pos = {};
+  map.forEach((c, id) => { pos[id] = c.el.getBoundingClientRect().top; });
+  return pos;
+}
+function flip(map, first) {
+  map.forEach((c, id) => {
+    if (!(id in first)) return;
+    const d = first[id] - c.el.getBoundingClientRect().top;
+    if (Math.abs(d) > 0.5) anim(c.el, [{ transform: `translateY(${d}px)` }, { transform: 'none' }], { duration: 500, easing: 'cubic-bezier(.2,.9,.25,1)' });
+  });
+}
+// расставить карточки в DOM по порядку keys; true — что-то сдвинулось
+function placeCards(list, map, keys) {
+  let idx = 0, moved = false;
+  keys.forEach(k => {
+    const c = map.get(k);
+    if (!c) return;
+    if (list.children[idx] !== c.el) { list.insertBefore(c.el, list.children[idx] || null); moved = true; }
+    idx++;
+  });
+  return moved;
+}
+
+const runFeed = makeRunner(async () => {
+  if (!F.ready) return;
+  const list = $('#fdList');
+  $('#feed').hidden = false;
+  const want = computeFeed(), ids = want.map(s => s.id);
+  // 1) уходящие
+  const leaving = [];
+  F.cards.forEach((c, id) => { if (ids.indexOf(id) < 0) leaving.push(id); });
+  if (leaving.length) {
+    leaving.forEach(id => F.cards.get(id).el.classList.add('leave'));
+    await sleep(450);
+    const first = measure(F.cards);
+    leaving.forEach(id => { const c = F.cards.get(id); if (c) c.el.remove(); F.cards.delete(id); });
+    flip(F.cards, first);
+  }
+  // 2) обновления на месте
+  for (const sp of want) {
+    const c = F.cards.get(sp.id);
+    if (!c) continue;
+    if (sp.chFinal !== c.ch) { await flipChallenge(c, sp); continue; }
+    if (sp.status !== c.st || sp.resultText !== c.rt) {
+      const big = sp.status !== c.st;
+      updateCard(c, sp, true);
+      if (big) await sleep(900);
+    }
+  }
+  // 3) новые: от старых к свежим, свежий окажется сверху
+  const fresh = want.filter(sp => !F.cards.has(sp.id)).reverse();
+  for (const sp of fresh) {
+    const live = F.live.has(sp.id) && serverNow() - sp.ts < 5 * 60 * 1000;
+    F.live.delete(sp.id);
+    const first = measure(F.cards);
+    const c = createCard(sp, live);
+    F.cards.set(sp.id, c);
+    placeCards(list, F.cards, ids);
+    flip(F.cards, first);
+    $('#feed').classList.add('has');
+    if (live) await revealCard(c, sp);
+    else updateCard(c, sp, false);
+  }
+  // 4) порядок
+  const first = measure(F.cards);
+  if (placeCards(list, F.cards, ids)) flip(F.cards, first);
+  $('#feed').classList.toggle('has', F.cards.size > 0);
+});
+
+function startFeed() {
+  watchSpins(60, (ev, raw, initial) => {
+    if (ev === 'reset') { F.spins.clear(); F.ready = false; return; }
+    if (ev === 'ready') { F.ready = true; runFeed(); return; }
+    if (ev === 'removed') { F.spins.delete(raw.id); runFeed(); return; }
+    if (raw.owner === true) return;
+    if (ev === 'added' && !initial && F.ready && !F.spins.has(raw.id)) F.live.add(raw.id);
+    F.spins.set(raw.id, raw);
+    if (F.ready) runFeed();
+  });
+  setInterval(runFeed, 30000); // решённые уходят через 15 минут и без событий
+}
+// ---------- Таблица ----------
+const B = { spins: new Map(), players: {}, whitelist: {}, rows: new Map(), ready: false, shown: false };
+const BOARD_MAX = 6;
+function computeBoard() {
+  const from = PERIOD_ALL ? 0 : dayStart(), stats = {};
+  const get = (acc, nick, owner) => {
+    const s = stats[acc] || (stats[acc] = { acc, nick, owner, ok: 0, fail: 0, res: [] });
+    if (owner) s.owner = true; // owner: true пишет только владелец (правила)
+    return s;
+  };
+  Object.keys(B.players || {}).forEach(acc => {
+    const p = B.players[acc] && typeof B.players[acc] === 'object' ? B.players[acc] : {};
+    get(acc, str(p.nick) || 'Игрок', p.owner === true);
+  });
+  // друзья из списка видны сразу, даже если ещё не заходили в комнату
+  Object.keys(B.whitelist || {}).forEach(acc => {
+    const p = B.whitelist[acc] && typeof B.whitelist[acc] === 'object' ? B.whitelist[acc] : {};
+    get(acc, str(p.nick) || 'Игрок', false);
+  });
+  B.spins.forEach(raw => {
+    const sp = norm(raw);
+    if (!sp.acc || sp.ts < from) return;
+    const s = get(sp.acc, sp.nick, sp.owner);
+    if (sp.status === 'ok') s.ok++; else if (sp.status === 'fail') s.fail++; else return;
+    s.res.push({ t: sp.checkedAt || sp.ts, st: sp.status });
+  });
+  return Object.keys(stats).map(k => {
+    const s = stats[k];
+    s.res.sort((a, b) => a.t - b.t);
+    let streak = 0, kind = null;
+    for (let i = s.res.length - 1; i >= 0; i--) {
+      if (kind === null) kind = s.res[i].st;
+      if (s.res[i].st !== kind) break;
+      streak++;
+    }
+    s.streak = streak; s.skind = kind;
+    s.pct = s.ok + s.fail ? Math.round(s.ok * 100 / (s.ok + s.fail)) : -1;
+    return s;
+  }).sort((a, b) => b.ok - a.ok || b.pct - a.pct || a.fail - b.fail || (b.owner ? 1 : 0) - (a.owner ? 1 : 0) || a.nick.localeCompare(b.nick));
+}
+
+// число плавно доезжает до нового значения (таймер страхует замороженный rAF)
+function setNum(el, to, fmt) {
+  const from = typeof el._v === 'number' ? el._v : null;
+  el._v = to;
+  el._tok = (el._tok || 0) + 1;
+  const tok = el._tok;
+  if (from === null || from === to || to < 0 || from < 0) { el.textContent = fmt(to); return; }
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  const t0 = performance.now(), dur = 700;
+  const step = now => {
+    if (tok !== el._tok) return;
+    const u = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - u, 3);
+    el.textContent = fmt(Math.round(from + (to - from) * e));
+    if (u < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  setTimeout(() => { if (tok === el._tok) el.textContent = fmt(to); }, dur + 100);
+}
+const fmtN = n => String(n), fmtP = n => (n < 0 ? '—' : n + '%');
+function streakHTML(s) {
+  if (!s.streak || !s.skind) return '<span class="sk none"><span>—</span></span>';
+  return s.skind === 'ok' ? `<span class="sk ok"><span>🔥 ${s.streak}</span></span>` : `<span class="sk fail"><span>❄ ${s.streak}</span></span>`;
+}
+function createRow(s) {
+  const el = document.createElement('div');
+  el.className = 'bd-row';
+  el.innerHTML = `<span class="bd-rank"></span>
+    <div class="bd-who"><div class="bd-nick"><span></span><em${s.owner ? '' : ' hidden'}>СТРИМЕР</em></div><div class="bd-bar"><i></i></div></div>
+    <span class="bd-n ok"></span><span class="bd-n fail"></span><span class="bd-n pct"></span><span class="bd-sk"></span>`;
+  return { el, sk: '' };
+}
+
+const runBoard = makeRunner(async () => {
+  if (!B.ready) return;
+  $('#board').hidden = false;
+  const list = $('#bdRows');
+  const rows = computeBoard().slice(0, BOARD_MAX), keys = rows.map(s => s.acc);
+  const first = measure(B.rows);
+  B.rows.forEach((r, acc) => { if (keys.indexOf(acc) < 0) { r.el.remove(); B.rows.delete(acc); } });
+  rows.forEach((s, i) => {
+    let r = B.rows.get(s.acc);
+    const isNew = !r;
+    if (isNew) { r = createRow(s); B.rows.set(s.acc, r); }
+    const el = r.el;
+    el.classList.toggle('r1', i === 0 && s.ok > 0);
+    el.querySelector('.bd-rank').textContent = i + 1;
+    el.querySelector('.bd-nick span').textContent = s.nick;
+    el.querySelector('.bd-nick em').hidden = !s.owner;
+    const ok = el.querySelector('.bd-n.ok'), fail = el.querySelector('.bd-n.fail'), pct = el.querySelector('.bd-n.pct');
+    setNum(ok, s.ok, fmtN); ok.classList.toggle('zero', !s.ok);
+    setNum(fail, s.fail, fmtN); fail.classList.toggle('zero', !s.fail);
+    setNum(pct, s.pct, fmtP); pct.classList.toggle('zero', s.pct < 0);
+    el.querySelector('.bd-bar i').style.width = Math.max(0, s.pct) + '%';
+    const sk = streakHTML(s);
+    if (sk !== r.sk) {
+      const box = el.querySelector('.bd-sk');
+      box.innerHTML = sk;
+      if (!isNew && box.firstElementChild) anim(box.firstElementChild, [{ transform: 'skewX(-12deg) scale(1.5)', opacity: 0 }, { transform: 'skewX(-12deg) scale(1)', opacity: 1 }], { duration: 500, easing: 'cubic-bezier(.2,1.6,.4,1)' });
+      r.sk = sk;
+    }
+    if (isNew && B.shown) anim(el, [{ opacity: 0, transform: 'translateX(-30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, easing: 'cubic-bezier(.16,1,.3,1)' });
+  });
+  placeCards(list, B.rows, keys);
+  flip(B.rows, first);
+  let empty = $('#bdEmpty');
+  if (!rows.length && !empty) {
+    empty = document.createElement('div'); empty.id = 'bdEmpty'; empty.className = 'bd-empty';
+    empty.textContent = PERIOD_ALL ? 'Пока никто не крутил' : 'Сегодня ещё никто не крутил';
+    list.appendChild(empty);
+  } else if (rows.length && empty) empty.remove();
+  B.shown = true;
+});
+
+function startBoard() {
+  $('#bdPeriod').textContent = PERIOD_ALL ? 'ЗА ВСЁ ВРЕМЯ' : 'СЕГОДНЯ';
+  watchValue('players', v => { B.players = v && typeof v === 'object' ? v : {}; runBoard(); });
+  watchValue('whitelist', v => { B.whitelist = v && typeof v === 'object' ? v : {}; runBoard(); });
+  // «сегодня» — спины с начала дня (смена дня отфильтруется в computeBoard);
+  // «за всё время» — последние 500 спинов
+  watchSpins(500, (ev, raw) => {
+    if (ev === 'reset') { B.spins.clear(); B.ready = false; return; }
+    if (ev === 'ready') { B.ready = true; runBoard(); return; }
+    if (ev === 'removed') B.spins.delete(raw.id); else B.spins.set(raw.id, raw);
+    if (B.ready) runBoard();
+  }, PERIOD_ALL ? null : () => dayStart() - 60000);
+  setInterval(runBoard, 60000); // смена дня
+}
+
+// ---------- Состав: стример + друзья из белого списка ----------
+// Спины одного игрока (индекс acc): занятые друзья не вытесняют спины стримера из общего окна.
+// on(event, spin, initial) — те же события, что у watchSpins. Возвращает stop().
+function watchAcc(acc, limit, on) {
+  let stopped = false, q = null, timer = 0;
+  const call = (ev, sp, initial) => { if (stopped) return; try { on(ev, sp, initial); } catch (e) { console.error(e); } };
+  const start = () => {
+    if (stopped) return;
+    let initial = true, failed = false;
+    const my = FB.db.ref('rooms/' + ROOM + '/spins').orderByChild('acc').equalTo(acc).limitToLast(limit);
+    q = my;
+    const fail = e => {
+      if (failed) return;
+      failed = true;
+      console.warn('[obs] нет доступа к спинам игрока:', e && e.message);
+      try { my.off(); } catch (x) {}
+      if (!stopped) timer = setTimeout(start, 30000);
+    };
+    const h = ev => s => { const v = s.val(); call(ev, Object.assign({}, v && typeof v === 'object' ? v : {}, { id: s.key }), initial); };
+    call('reset', null, true);
+    my.on('child_added', h('added'), fail);
+    my.on('child_changed', h('changed'), fail);
+    my.on('child_removed', h('removed'), fail);
+    my.once('value', () => { initial = false; call('ready', null, false); }, () => {});
+  };
+  fbConnect().then(start);
+  return () => { stopped = true; clearTimeout(timer); if (q) { try { q.off(); } catch (e) {} } };
+}
+const stOf = sp => sp.status || 'pending';
+const RS = { players: {}, whitelist: {}, pl: false, wl: false, guess: '', guessing: false, gt: 0, cb: null };
+const LATE = Number.MAX_SAFE_INTEGER;
+function rosterCompute() {
+  const pl = RS.players, wl = RS.whitelist;
+  const obj = (m, k) => (m[k] && typeof m[k] === 'object' ? m[k] : {});
+  let owner = '';
+  Object.keys(pl).forEach(acc => { if (!owner && obj(pl, acc).owner === true) owner = acc; });
+  if (!owner) owner = RS.guess;
+  const nickOf = acc => str(obj(pl, acc).nick) || str(obj(wl, acc).nick);
+  let friends = Object.keys(wl).filter(acc => acc !== owner)
+    .map(acc => ({ acc, nick: nickOf(acc) || 'Игрок', owner: false, t: num(+obj(wl, acc).addedAt, LATE) }));
+  // старые комнаты без белого списка — берём вошедших игроков
+  if (!friends.length) friends = Object.keys(pl).filter(acc => acc !== owner)
+    .map(acc => ({ acc, nick: nickOf(acc) || 'Игрок', owner: false, t: num(+obj(pl, acc).joinedAt, LATE) }));
+  friends.sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : a.nick.localeCompare(b.nick)));
+  return { owner: owner ? { acc: owner, nick: nickOf(owner) || 'Стример', owner: true } : null, friends };
+}
+// владельца нет в players — ищем его по последним спинам (owner === true)
+function guessOwner() {
+  if (RS.guessing || !FB.db) return;
+  RS.guessing = true;
+  const retry = () => { clearTimeout(RS.gt); RS.gt = setTimeout(rosterChanged, 60000); };
+  FB.db.ref('rooms/' + ROOM + '/spins').orderByChild('ts').limitToLast(30).once('value', s => {
+    let best = '', bt = -1;
+    s.forEach(ch => {
+      const v = ch.val();
+      if (v && typeof v === 'object' && v.owner === true && str(v.acc) && num(+v.ts, 0) >= bt) { best = str(v.acc); bt = num(+v.ts, 0); }
+    });
+    RS.guessing = false;
+    if (best && best !== RS.guess) { RS.guess = best; rosterChanged(); } else if (!best) retry();
+  }, () => { RS.guessing = false; retry(); });
+}
+function rosterChanged() {
+  if (!RS.pl || !RS.wl || !RS.cb) return;
+  const r = rosterCompute();
+  if (!r.owner) guessOwner();
+  try { RS.cb(r); } catch (e) { console.error(e); }
+}
+function startRoster(cb) {
+  RS.cb = cb;
+  watchValue('players', v => { RS.players = v && typeof v === 'object' ? v : {}; RS.pl = true; rosterChanged(); });
+  watchValue('whitelist', v => { RS.whitelist = v && typeof v === 'object' ? v : {}; RS.wl = true; rosterChanged(); });
+}
+
+// ---------- Команда: три колонки ----------
+const T = { cols: new Map(), shown: false };
+const TM_IW = 200, TM_STEP = 216, TM_LIMIT = 10, TM_REEL = 3200, TM_FRESH = 10 * 60 * 1000;
+const TANK_SIL = '<svg viewBox="0 0 170 76" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.18)" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M58 22h44l10 12H52z"/><path d="M105 25.5h57v5h-57z"/><path d="M18 36h134l-8 14H26z"/>'
+  + '<path d="M22 52h126a10 10 0 0 1 0 20H22a10 10 0 0 1 0-20z"/>'
+  + '<g fill="rgba(255,255,255,.1)" stroke="none"><circle cx="34" cy="62" r="5"/><circle cx="58" cy="62" r="5"/><circle cx="82" cy="62" r="5"/><circle cx="106" cy="62" r="5"/><circle cx="130" cy="62" r="5"/></g></svg>';
+const tmItem = t => `<div class="tm-it">${t.img ? `<img src="${esc(t.img)}" alt="" decoding="async" ${IMG_ERR}>` : ''}</div>`;
+const tmMeta = t => metaHTML(t) + `<span class="nm">${esc(t.name)}</span>`;
+const tmX = i => -(i * TM_STEP + TM_IW / 2); // лента стоит от центра сцены (left:50%)
+const tankKey = sp => str(sp.tank.id) + '|' + sp.tank.name + '|' + sp.tank.tier;
+function setStrip(c, x) { c.strip.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`; }
+
+function createCol(p) {
+  const el = document.createElement('div');
+  el.className = 'tm-col empty';
+  el.innerHTML = `<div class="tm-bg"></div>
+    <div class="tm-nick"><span></span><em><b>СТРИМЕР</b></em></div>
+    <div class="tm-stage"><b class="tm-water"></b><i class="tm-glow"></i>
+      <div class="tm-reel"><div class="tm-strip"></div></div>
+      <div class="tm-empty">${TANK_SIL}<span>ждёт спина</span></div><i class="tm-flash"></i></div>
+    <div class="tm-meta"></div>
+    <div class="tm-ch"><div class="txt"></div></div>
+    <div class="tm-live"></div>
+    <div class="tm-stamp"></div>`;
+  const q = s => el.querySelector(s);
+  const c = { acc: p.acc, el, spins: new Map(), ready: false, queue: [], shownId: null, ch: '', st: undefined, rt: '', tk: '',
+    nickEl: q('.tm-nick span'), reel: q('.tm-reel'), strip: q('.tm-strip'), water: q('.tm-water'), flash: q('.tm-flash'),
+    meta: q('.tm-meta'), chBox: q('.tm-ch'), chTxt: q('.tm-ch .txt'), live: q('.tm-live'), stamp: q('.tm-stamp') };
+  c.run = makeRunner(() => runCol(c));
+  c.stop = watchAcc(p.acc, TM_LIMIT, (ev, raw, initial) => colEvent(c, ev, raw, initial));
+  return c;
+}
+function colEvent(c, ev, raw, initial) {
+  if (ev === 'reset') { c.spins.clear(); c.ready = false; c.queue.length = 0; return; }
+  if (ev === 'ready') { c.ready = true; c.run(); return; }
+  if (ev === 'removed') { c.spins.delete(raw.id); if (c.ready) c.run(); return; }
+  const isNew = !c.spins.has(raw.id), ts = num(+raw.ts, 0);
+  // окно limitToLast может «подтянуть» старый спин (если свежий удалили) — его не крутим
+  let newest = true;
+  c.spins.forEach(v => { if (num(+v.ts, 0) > ts) newest = false; });
+  c.spins.set(raw.id, raw);
+  // новый спин в эфире — крутим; при первой загрузке и после долгого обрыва — нет
+  if (ev === 'added' && isNew && newest && !initial && c.ready && raw.status !== 'cancelled' && serverNow() - ts < TM_FRESH) c.queue.push(raw.id);
+  if (c.ready) c.run();
+}
+// последний не отменённый спин игрока
+function colLatest(c) {
+  let best = null, bt = -1;
+  c.spins.forEach(raw => {
+    if (!raw || raw.status === 'cancelled') return;
+    const t = num(+raw.ts, 0);
+    if (!best || t > bt || (t === bt && String(raw.id) > String(best.id))) { best = raw; bt = t; }
+  });
+  return best ? norm(best) : null;
+}
+function teamLiveHTML(sp) {
+  const st = stOf(sp);
+  const L = {
+    ok: '✅ ВЫПОЛНЕНО', fail: '❌ ПРОВАЛ', ambiguous: '⚠️ отметь вручную', cancelled: '✖ отменён',
+    pending: sp.owner && !sp.auto ? '⏳ ждём итог' : '⏳ ждём бой',
+  };
+  const rt = st !== 'pending' && sp.resultText ? `<span class="tl-rt">· ${esc(sp.resultText)}</span>` : '';
+  return `<span class="tl tl-${st}"><span>${L[st]}</span></span>${rt}`;
+}
+function colStatus(c, sp, fx) {
+  const st = stOf(sp), changed = st !== c.st;
+  c.live.innerHTML = teamLiveHTML(sp);
+  c.live.classList.remove('pop');
+  if (fx && (changed || sp.resultText !== c.rt)) { void c.live.offsetWidth; c.live.classList.add('pop'); }
+  if (changed || !fx) {
+    const big = st === 'ok' || st === 'fail' || st === 'ambiguous';
+    c.el.classList.remove('is-ok', 'is-fail', 'is-ambiguous');
+    if (big) c.el.classList.add('is-' + st);
+    c.stamp.innerHTML = big ? stampHTML(st, fx && changed) : '';
+    if (fx && changed && big) {
+      c.el.classList.remove('flash'); void c.el.offsetWidth; c.el.classList.add('flash');
+      statusSound(st);
+      if (st === 'ok') setTimeout(() => confettiAt(c.stamp.firstElementChild || c.el, sp.tank.tier, 70), 300);
+    }
+  }
+  c.st = st; c.rt = sp.resultText;
+}
+function colEmpty(c) {
+  c.shownId = ''; c.ch = ''; c.st = undefined; c.rt = ''; c.tk = '';
+  c.el.classList.remove('is-ok', 'is-fail', 'is-ambiguous', 'spinning', 'flash', 'rar-r1', 'rar-r2', 'rar-r3', 'rar-r4');
+  c.el.classList.add('empty');
+  c.strip.innerHTML = ''; c.meta.innerHTML = ''; c.chTxt.textContent = ''; c.live.innerHTML = ''; c.stamp.innerHTML = '';
+  c.chBox.classList.remove('final', 'rolling', 'fx');
+}
+// табло челленджа колонки: несколько вариантов из ch, последний — итог
+async function colRollCh(c, seq, animate) {
+  const box = c.chBox, el = c.chTxt;
+  box.classList.remove('final', 'rolling', 'fx');
+  if (animate && seq.length > 1) {
+    const s = seq.slice(-8);
+    box.classList.add('rolling');
+    for (let i = 0; i < s.length - 1; i++) {
+      el.textContent = s[i];
+      const wait = 75 + i * i * 7;
+      anim(el, [{ transform: 'rotateX(-84deg)', opacity: 0.15 }, { transform: 'rotateX(0deg)', opacity: 1 }],
+        { duration: Math.min(260, Math.max(80, wait * 0.85)), easing: 'cubic-bezier(.3,1.45,.5,1)' });
+      sfx.flap(i);
+      await sleep(wait);
+    }
+  }
+  box.classList.remove('rolling');
+  el.textContent = seq[seq.length - 1];
+  void box.offsetWidth;
+  box.classList.add('final');
+  if (animate) {
+    box.classList.add('fx');
+    anim(el, FLIP_CH, { duration: 420, easing: 'cubic-bezier(.3,1.45,.5,1)' });
+    sfx.land();
+  }
+}
+// мини-рулетка: лента замедляется и встаёт ровно на элемент wi
+function colReel(c, wi, dur) {
+  return new Promise(resolve => {
+    const x0 = tmX(0), x1 = tmX(wi);
+    let done = false, prevX = x0, prevT = performance.now(), lastIdx = 0, lastTick = 0, lvl = 0, safety = 0;
+    const setLvl = l => {
+      if (l === lvl) return;
+      lvl = l; c.reel.classList.remove('mb1', 'mb2');
+      if (l) c.reel.classList.add('mb' + l);
+    };
+    const finish = () => {
+      if (done) return;
+      done = true; clearTimeout(safety);
+      setLvl(0); setStrip(c, x1);
+      resolve();
+    };
+    setStrip(c, x0);
+    const t0 = performance.now();
+    const frame = now => {
+      if (done) return;
+      const t = Math.min(1, Math.max(0, (now - t0) / dur));
+      const x = x0 + (x1 - x0) * (1 - Math.pow(1 - t, 3.4));
+      setStrip(c, x);
+      const v = Math.abs(x - prevX) / Math.max(1, now - prevT);
+      prevX = x; prevT = now;
+      setLvl(v > 2.4 ? 2 : v > 0.9 ? 1 : 0);
+      const idx = Math.round((-x - TM_IW / 2) / TM_STEP);
+      if (idx !== lastIdx) { lastIdx = idx; if (now - lastTick > 45) { lastTick = now; sfx.tick(); } }
+      if (t >= 1) finish(); else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+    safety = setTimeout(finish, dur + 700); // rAF заморожен (скрытый источник) — всё равно завершаем
+  });
+}
+// показать спин в колонке: animate — мини-рулетка и табло, иначе сразу итог
+async function colPlay(c, sp, animate) {
+  const t = sp.tank;
+  c.shownId = sp.id; c.ch = sp.chFinal; c.tk = tankKey(sp); c.st = undefined; c.rt = '';
+  c.el.classList.remove('empty', 'is-ok', 'is-fail', 'is-ambiguous', 'flash');
+  c.stamp.innerHTML = '';
+  c.reel.classList.remove('mb1', 'mb2');
+  if (!animate) {
+    c.el.classList.remove('spinning');
+    setRar(c.el, t.tier);
+    c.strip.className = 'tm-strip landed';
+    c.strip.innerHTML = tmItem(t);
+    c.strip.firstElementChild.classList.add('win');
+    setStrip(c, tmX(0));
+    c.water.textContent = ROMAN[t.tier];
+    c.meta.innerHTML = tmMeta(t);
+    [c.meta, c.chBox, c.live].forEach(e => { e.style.visibility = ''; });
+    await colRollCh(c, sp.ch, false);
+    colStatus(c, sp, false);
+    return;
+  }
+  // кусок ленты спина до победителя (+2 после него): победитель — items[winIndex]
+  let list = [t], wi = 0;
+  if (sp.items.length > 1) {
+    const from = Math.max(0, sp.winIndex - 22), to = Math.min(sp.items.length, sp.winIndex + 3);
+    list = sp.items.slice(from, to); wi = sp.winIndex - from;
+  }
+  [c.meta, c.chBox, c.live].forEach(e => { e.style.visibility = 'hidden'; });
+  c.live.innerHTML = '';
+  c.chBox.classList.remove('final', 'rolling', 'fx');
+  c.strip.className = 'tm-strip';
+  c.strip.innerHTML = list.map(tmItem).join('');
+  c.el.classList.add('spinning');
+  anim(c.el, [{ transform: 'scale(.96)' }, { transform: 'scale(1)' }], { duration: 550, easing: 'cubic-bezier(.2,1.5,.4,1)' });
+  sfx.whoosh();
+  if (wi > 0) await colReel(c, wi, TM_REEL);
+  else { setStrip(c, tmX(0)); await sleep(450); }
+  // посадка
+  c.el.classList.remove('spinning');
+  setRar(c.el, t.tier);
+  c.water.textContent = ROMAN[t.tier];
+  const win = c.strip.children[wi];
+  if (win) {
+    win.classList.add('win');
+    anim(win, [{ transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 650, easing: 'cubic-bezier(.2,1.6,.4,1)' });
+  }
+  c.strip.classList.add('landed');
+  anim(c.flash, [{ opacity: 1 }, { opacity: 0 }], { duration: 650, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  sfx.impact();
+  await sleep(300);
+  showEl(c.meta, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }]);
+  await sleep(180);
+  c.chBox.style.visibility = '';
+  await colRollCh(c, sp.ch, true);
+  await sleep(250);
+  // статус берём свежий: за время анимации он мог измениться
+  c.live.style.visibility = '';
+  const fresh = c.spins.get(sp.id);
+  colStatus(c, fresh ? norm(fresh) : sp, false);
+  c.live.classList.remove('pop'); void c.live.offsetWidth; c.live.classList.add('pop');
+  await sleep(450);
+}
+// перекрут челленджа в том же спине
+async function colReroll(c, sp) {
+  c.ch = sp.chFinal; c.st = undefined; c.rt = '';
+  c.live.innerHTML = ''; c.stamp.innerHTML = '';
+  c.el.classList.remove('is-ok', 'is-fail', 'is-ambiguous');
+  await colRollCh(c, sp.ch, true);
+  const fresh = c.spins.get(sp.id);
+  colStatus(c, fresh ? norm(fresh) : sp, true);
+  await sleep(500);
+}
+async function runCol(c) {
+  if (!c.ready) return;
+  // новые спины: если накопилось несколько — только самый свежий
+  while (c.queue.length) {
+    const id = c.queue.pop();
+    c.queue.length = 0;
+    const raw = c.spins.get(id);
+    if (!raw || raw.status === 'cancelled') continue;
+    await colPlay(c, norm(raw), true);
+  }
+  const sp = colLatest(c);
+  if (!sp) { if (c.shownId !== '') colEmpty(c); return; }
+  if (c.shownId !== sp.id || c.tk !== tankKey(sp)) { await colPlay(c, sp, false); return; }
+  if (sp.chFinal !== c.ch) { await colReroll(c, sp); return; }
+  const st = stOf(sp);
+  if (st !== c.st || sp.resultText !== c.rt) {
+    const big = st !== c.st;
+    colStatus(c, sp, true);
+    if (big) await sleep(900);
+  }
+}
+// раскладка: друг 1 — стример — друг 2
+function teamRoster(r) {
+  const f = r.friends.slice(0, 2), want = [];
+  if (f[0]) want.push(f[0]);
+  if (r.owner) want.push(r.owner);
+  if (f[1]) want.push(f[1]);
+  const keys = want.map(p => p.acc);
+  T.cols.forEach((c, acc) => { if (keys.indexOf(acc) < 0) { c.stop(); c.el.remove(); T.cols.delete(acc); } });
+  const wrap = $('#tmCols');
+  want.forEach((p, i) => {
+    let c = T.cols.get(p.acc);
+    const isNew = !c;
+    if (isNew) { c = createCol(p); T.cols.set(p.acc, c); }
+    c.nickEl.textContent = p.nick;
+    c.el.classList.toggle('is-owner', p.owner);
+    if (wrap.children[i] !== c.el) wrap.insertBefore(c.el, wrap.children[i] || null);
+    if (isNew && T.shown) anim(c.el, [{ opacity: 0, transform: 'translateY(20px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 600, easing: 'cubic-bezier(.16,1,.3,1)' });
+  });
+  $('#team').hidden = false;
+  T.shown = true;
+}
+function startTeam() { startRoster(teamRoster); }
+
+// ---------- Серия: цепочка выполнений/провалов ----------
+const S = { rows: new Map(), order: [], shown: false };
+const SR_ROWS = 4, SR_PIPS = 10, SR_LIMIT = PERIOD_ALL ? 150 : 60;
+function plural(n, a, b, c) {
+  const m10 = n % 10, m100 = n % 100;
+  return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c;
+}
+function srCreate(p) {
+  const el = document.createElement('div');
+  el.className = 'sr-row';
+  el.innerHTML = `<div class="sr-nick"><span></span><em hidden>СТРИМЕР</em></div>
+    <div class="sr-tot"><span class="sr-t ok zero">✅ <b>0</b></span><span class="sr-t fail zero">❌ <b>0</b></span><span class="sr-t pct zero"><b>—</b></span></div>
+    <div class="sr-pips"></div><div class="sr-sk"><span class="sk none"><span>—</span></span></div>`;
+  const q = s => el.querySelector(s);
+  const r = { acc: p.acc, el, spins: new Map(), ready: false, primed: false, pips: new Map(), sk: '',
+    nick: q('.sr-nick span'), badge: q('.sr-nick em'), ok: q('.sr-t.ok b'), fail: q('.sr-t.fail b'), pct: q('.sr-t.pct b'),
+    pipBox: q('.sr-pips'), skBox: q('.sr-sk') };
+  r.stop = watchAcc(p.acc, SR_LIMIT, (ev, raw) => {
+    if (ev === 'reset') { r.spins.clear(); r.ready = false; return; }
+    if (ev === 'ready') { r.ready = true; runSeries(); return; }
+    if (ev === 'removed') r.spins.delete(raw.id); else r.spins.set(raw.id, raw);
+    if (r.ready) runSeries();
+  });
+  return r;
+}
+function srStats(r) {
+  const from = PERIOD_ALL ? 0 : dayStart(), list = [];
+  r.spins.forEach(raw => {
+    const sp = norm(raw);
+    if (sp.status === 'cancelled' || sp.ts < from) return;
+    list.push(sp);
+  });
+  list.sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  let ok = 0, fail = 0;
+  list.forEach(sp => { if (sp.status === 'ok') ok++; else if (sp.status === 'fail') fail++; });
+  // незакрытые старые спины в цепочку не берём, текущий (последний) ожидающий — берём
+  const seq = list.filter((sp, i) => stOf(sp) !== 'pending' || i === list.length - 1);
+  let streak = 0, kind = null;
+  for (let i = seq.length - 1; i >= 0; i--) {
+    const st = seq[i].status;
+    if (st !== 'ok' && st !== 'fail') continue;
+    if (kind === null) kind = st;
+    if (st !== kind) break;
+    streak++;
+  }
+  return {
+    ok, fail, streak, kind, pct: ok + fail ? Math.round(ok * 100 / (ok + fail)) : -1,
+    pips: seq.slice(-SR_PIPS).map(sp => ({ id: sp.id, st: stOf(sp) })),
+  };
+}
+function srStreakHTML(s) {
+  if (!s.streak) return '<span class="sk none"><span>—</span></span>';
+  return s.kind === 'ok'
+    ? `<span class="sk ok"><span>🔥 ${s.streak} подряд</span></span>`
+    : `<span class="sk fail"><span>${s.streak} ${plural(s.streak, 'провал', 'провала', 'провалов')} подряд</span></span>`;
+}
+function srPips(r, pips, fx) {
+  const keep = pips.map(p => p.id);
+  r.pips.forEach((o, id) => { if (keep.indexOf(id) < 0) { o.el.remove(); r.pips.delete(id); } });
+  pips.forEach((p, i) => {
+    let o = r.pips.get(p.id);
+    if (!o) { o = { el: document.createElement('i'), st: '' }; r.pips.set(p.id, o); }
+    if (o.st !== p.st) {
+      o.st = p.st;
+      o.el.className = 'pip ' + p.st;
+      o.el.innerHTML = p.st === 'ok' ? ICON_OK : p.st === 'fail' ? ICON_FAIL : p.st === 'ambiguous' ? '?' : '';
+      if (fx) {
+        void o.el.offsetWidth;
+        o.el.classList.add('in');
+        if (p.st !== 'pending') statusSound(p.st);
+      }
+    }
+    if (r.pipBox.children[i] !== o.el) r.pipBox.insertBefore(o.el, r.pipBox.children[i] || null);
+  });
+}
+const runSeries = makeRunner(async () => {
+  S.order.forEach(acc => {
+    const r = S.rows.get(acc);
+    if (!r || !r.ready) return;
+    const s = srStats(r), fx = r.primed;
+    setNum(r.ok, s.ok, fmtN); r.ok.parentNode.classList.toggle('zero', !s.ok);
+    setNum(r.fail, s.fail, fmtN); r.fail.parentNode.classList.toggle('zero', !s.fail);
+    setNum(r.pct, s.pct, fmtP); r.pct.parentNode.classList.toggle('zero', s.pct < 0);
+    srPips(r, s.pips, fx);
+    const sk = srStreakHTML(s);
+    if (sk !== r.sk) {
+      r.skBox.innerHTML = sk;
+      if (fx && r.skBox.firstElementChild) anim(r.skBox.firstElementChild, [{ transform: 'skewX(-12deg) scale(1.5)', opacity: 0 }, { transform: 'skewX(-12deg) scale(1)', opacity: 1 }], { duration: 500, easing: 'cubic-bezier(.2,1.6,.4,1)' });
+      r.sk = sk;
+    }
+    r.primed = true;
+  });
+});
+// строки: стример первым, дальше друзья по порядку добавления
+function seriesRoster(rs) {
+  const want = (rs.owner ? [rs.owner] : []).concat(rs.friends).slice(0, SR_ROWS);
+  const keys = want.map(p => p.acc), list = $('#srRows');
+  S.rows.forEach((r, acc) => { if (keys.indexOf(acc) < 0) { r.stop(); r.el.remove(); S.rows.delete(acc); } });
+  const fresh = [];
+  want.forEach(p => {
+    let r = S.rows.get(p.acc);
+    if (!r) { r = srCreate(p); S.rows.set(p.acc, r); fresh.push(r); }
+    r.nick.textContent = p.nick;
+    r.badge.hidden = !p.owner;
+    r.el.classList.toggle('own', p.owner);
+  });
+  S.order = keys;
+  placeCards(list, S.rows, keys);
+  if (S.shown) fresh.forEach(r => anim(r.el, [{ opacity: 0, transform: 'translateX(-30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, easing: 'cubic-bezier(.16,1,.3,1)' }));
+  let empty = $('#srEmpty');
+  if (!keys.length && !empty) {
+    empty = document.createElement('div'); empty.id = 'srEmpty'; empty.className = 'bd-empty';
+    empty.textContent = 'В комнате пока нет игроков';
+    list.appendChild(empty);
+  } else if (keys.length && empty) empty.remove();
+  $('#series').hidden = false;
+  S.shown = true;
+  runSeries();
+}
+function startSeries() {
+  $('#srPeriod').textContent = PERIOD_ALL ? 'ЗА ВСЁ ВРЕМЯ' : 'СЕГОДНЯ';
+  startRoster(seriesRoster);
+  setInterval(runSeries, 60000); // смена дня
+}
+
+// ---------- Запуск ----------
+(function boot() {
+  if (W === 'main') { if (ROOM) startMainRoom(); else startMainLocal(); return; }
+  if (!ROOM) { console.warn('[obs] для этого виджета нужен параметр ?room=ID'); return; }
+  if (W === 'feed') startFeed();
+  else if (W === 'team') startTeam();
+  else if (W === 'series') startSeries();
+  else startBoard();
+})();
+</script>
+</body>
+</html>
