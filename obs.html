@@ -8,9 +8,9 @@
   Виджеты для OBS (Источник → Браузер). Фон прозрачный, кликать нечего.
     obs.html?room=ID                 основной: спины стримера, 760x320 (&size=big — 1920x460)
     obs.html?room=ID&w=feed          лента друзей, 480x600
-    obs.html?room=ID&w=board         таблица, 480x420 (&period=all — за всё время)
+    obs.html?room=ID&w=board         таблица, 480x420 (всё с последнего «Обнулить»; &period=today — только сегодня)
     obs.html?room=ID&w=team          команда: стример в центре, два друга по бокам, 960x320
-    obs.html?room=ID&w=series        серия выполнений/провалов, 560x300 (&period=all — за всё время)
+    obs.html?room=ID&w=series        серия выполнений/провалов, 560x300 (всё с последнего «Обнулить»; &period=today — только сегодня)
     obs.html                         основной без комнаты: опрос /api/state локального сервера
   Звук: основной и команда — WebAudio (&mute выключает), лента, таблица и серия молчат (&sound=1 включает).
 -->
@@ -508,7 +508,7 @@ html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
 
 <!-- таблица -->
 <section id="board" hidden>
-  <div class="whead"><h1 id="bdTitle">Таблица</h1><span class="sub"><span id="bdPeriod">СЕГОДНЯ</span></span></div>
+  <div class="whead"><h1 id="bdTitle">Таблица</h1><span class="sub"><span id="bdPeriod">ЗА СТРИМ</span></span></div>
   <div class="bd" id="bd">
     <div class="bd-row bd-hd"><span>#</span><span>ИГРОК</span><span>✅</span><span>❌</span><span>%</span><span>СЕРИЯ</span></div>
     <div id="bdRows"></div>
@@ -522,7 +522,7 @@ html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
 
 <!-- серия выполнений/провалов -->
 <section id="series" hidden>
-  <div class="whead"><h1>Серия</h1><span class="sub"><span id="srPeriod">СЕГОДНЯ</span></span></div>
+  <div class="whead"><h1>Серия</h1><span class="sub"><span id="srPeriod">ЗА СТРИМ</span></span></div>
   <div class="bd"><div id="srRows"></div></div>
 </section>
 
@@ -537,7 +537,9 @@ const params = new URLSearchParams(location.search);
 const W = (function () { const w = (params.get('w') || params.get('obs') || 'main').toLowerCase(); return ['feed', 'board', 'team', 'series'].indexOf(w) >= 0 ? w : 'main'; })();
 const ROOM = (function () { const r = (params.get('room') || '').trim().toLowerCase(); return /^[a-z0-9]{10}$/.test(r) ? r : null; })();
 const BIG = params.get('size') === 'big';
-const PERIOD_ALL = params.get('period') === 'all';
+// По умолчанию считаем всё с последнего «Обнулить» в панели (стрим часто идёт за полночь);
+// &period=today — только сегодняшние бои, с нуля в полночь
+const PERIOD_ALL = params.get('period') !== 'today';
 const HAS_SERVER = location.protocol.indexOf('http') === 0;
 
 const FB_CONFIG = {
@@ -1423,7 +1425,7 @@ const runBoard = makeRunner(async () => {
 });
 
 function startBoard() {
-  $('#bdPeriod').textContent = PERIOD_ALL ? 'ЗА ВСЁ ВРЕМЯ' : 'СЕГОДНЯ';
+  $('#bdPeriod').textContent = PERIOD_ALL ? 'ЗА СТРИМ' : 'СЕГОДНЯ';
   watchValue('players', v => { B.players = v && typeof v === 'object' ? v : {}; runBoard(); });
   watchValue('whitelist', v => { B.whitelist = v && typeof v === 'object' ? v : {}; runBoard(); });
   // «сегодня» — спины с начала дня (смена дня отфильтруется в computeBoard);
@@ -1936,7 +1938,7 @@ function seriesRoster(rs) {
   runSeries();
 }
 function startSeries() {
-  $('#srPeriod').textContent = PERIOD_ALL ? 'ЗА ВСЁ ВРЕМЯ' : 'СЕГОДНЯ';
+  $('#srPeriod').textContent = PERIOD_ALL ? 'ЗА СТРИМ' : 'СЕГОДНЯ';
   startRoster(seriesRoster);
   setInterval(runSeries, 60000); // смена дня
 }
