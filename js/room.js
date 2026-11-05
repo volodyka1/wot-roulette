@@ -426,11 +426,26 @@
     await op(() => roomRef(roomId, 'meta').update(data), 'Менять настройки комнаты может только владелец.');
   }
 
+  // Обнулить комнату (только владелец): удалить все спины — серии и виджеты начнутся с нуля.
+  // Список игроков и ссылки не трогаем. -> сколько спинов удалено
+  async function clearSpins(roomId) {
+    roomId = checkRoomId(roomId);
+    const snap = await op(() => roomRef(roomId, 'spins').get(), 'Не удалось прочитать спины комнаты.');
+    const ids = [];
+    snap.forEach(ch => { ids.push(ch.key); });
+    for (let i = 0; i < ids.length; i += 200) {
+      const upd = {};
+      ids.slice(i, i + 200).forEach(id => { upd['spins/' + id] = null; });
+      await op(() => roomRef(roomId).update(upd), 'Обнулять комнату может только владелец.');
+    }
+    return ids.length;
+  }
+
   WR.room = {
     init, serverNow, create, claimOwner, addToWhitelist, removeFromWhitelist, join,
     publishSpin, updateSpin, resolveSpin, rerollSpin, onSpins, onPlayers, onWhitelist, onMeta, links,
     // сверх спецификации: проверка правил, состояние связи, текущий uid
-    diagnose, onConnection, updateMeta,
+    diagnose, onConnection, updateMeta, clearSpins,
     get uid() { return uid; },
     STATUSES,
   };

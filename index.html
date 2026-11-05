@@ -639,6 +639,8 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
             <div><label class="f" for="rmMax">Челленджей сразу</label><select id="rmMax"></select></div>
             <div><label class="f" for="rmRerolls">Перекруток у друга</label><select id="rmRerolls"></select></div>
           </div>
+          <button class="btn wide fail" id="roomReset"><span class="bi">Обнулить челленджи и серии</span></button>
+          <div class="hint">Удалит все спины комнаты — твои и друзей. Виджеты «Команда» и «Серия» начнут с нуля, список друзей и ссылки останутся.</div>
           <button class="btn wide" id="roomLeave"><span class="bi">Выйти из комнаты</span></button>
         </div>
         <div id="roomFriend" hidden>
@@ -2068,6 +2070,24 @@ function leaveRoom() {
   renderAll(); scheduleTrack();
 }
 
+// Стример: удалить все спины комнаты — серии и виджеты с нуля (список друзей и ссылки остаются)
+async function resetRoomSpins() {
+  if (!inRoom() || !RM.owner) return;
+  if (!confirm('Обнулить комнату? Удалятся все спины — твои и друзей, вместе с активными челленджами. Серии и виджеты начнутся с нуля, список друзей и ссылки останутся.')) return;
+  const btn = $('#roomReset');
+  btn.disabled = true;
+  roomSay('Обнуляю…');
+  try {
+    const n = await WR.room.clearSpins(RM.id);
+    curEntry = null;
+    roomSay('');
+    toast(n ? `Готово: удалено спинов — ${n}` : 'В комнате и так пусто');
+    renderAll();
+  } catch (e) {
+    roomErr(e, true);
+  } finally { btn.disabled = false; }
+}
+
 // Строка «подпись + адрес + Копировать»
 function linkRow(label, url, note = '') {
   return `<label class="f">${label}</label>`
@@ -2234,6 +2254,7 @@ function initRoomUI() {
   $('#rmRerolls').innerHTML = [0, 1, 2, 3].map(n => `<option value="${n}">${n ? n : 'нельзя'}</option>`).join('');
   $('#roomCreate').onclick = createRoom;
   $('#roomLeave').onclick = leaveRoom;
+  $('#roomReset').onclick = resetRoomSpins;
   $('#rfLeave').onclick = leaveRoom;
   $('#rfLogin').onclick = login;
   $('#rfJoin').onclick = joinRoom;

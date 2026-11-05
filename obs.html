@@ -1907,6 +1907,25 @@ function startSeries() {
   else startBoard();
 })();
 
+// «Команда» и «Серия» вписываются в любой размер источника OBS: целиком, по центру, без обрезки
+(function autoFit() {
+  const base = { team: [960, 320], series: [560, 300] }[W];
+  const el = base && document.getElementById(W);
+  if (!el) return;
+  el.style.maxWidth = 'none';
+  el.style.transformOrigin = '0 0';
+  const fit = () => {
+    if (!innerWidth || !innerHeight) return;
+    const s = Math.min(innerWidth / base[0], innerHeight / base[1], 2);
+    el.style.transform = Math.abs(s - 1) < 0.005 ? '' : `scale(${s})`;
+    el.style.marginLeft = Math.max(0, Math.round((innerWidth - base[0] * s) / 2)) + 'px';
+  };
+  addEventListener('resize', fit);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(document.documentElement);
+  setInterval(fit, 2000); // подстраховка: размер источника в OBS меняют на ходу
+  fit();
+})();
+
 // Автообновление: на сайте вышла новая версия — перезагружаемся сами (OBS иначе держит старую копию в кэше)
 (function autoUpdate() {
   if (!/^https?:$/.test(location.protocol)) return;
