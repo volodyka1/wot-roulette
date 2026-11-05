@@ -47,7 +47,10 @@
     },
   });
   const lived = d => num(d.survived_battles) >= 1;
+  const won = d => num(d.wins) >= 1;
   const assistOf = d => num(d.radio_assisted_damage) + num(d.track_assisted_damage);
+  const fragsV = (t, d) => Math.max(1, (t.tier <= 4 ? 4 : 3) + (d === 'hard' ? 1 : d === 'easy' ? -1 : 0));
+  const halfHp = t => Math.max(50, round50(hpOf(t) * 0.5));
 
   const NOT_SPG = ['lightTank', 'mediumTank', 'heavyTank', 'AT-SPG'];
 
@@ -56,8 +59,7 @@
     { id: 'dmg', text: 'Нанести {v} урона', classes: null, v: dmgV, ...ge('damage_dealt', 'Урон') },
     {
       id: 'frags', text: 'Уничтожить {v:противника|противника|противников}', classes: null,
-      v: (t, d) => Math.max(1, (t.tier <= 4 ? 4 : 3) + (d === 'hard' ? 1 : d === 'easy' ? -1 : 0)),
-      ...ge('frags', 'Фраги'),
+      v: fragsV, ...ge('frags', 'Фраги'),
     },
     {
       id: 'win_survive', text: 'Победить и выжить', classes: null, v: null,
@@ -159,6 +161,67 @@
       v: (t, d) => Math.max(1, (t.tier <= 4 ? 3 : 2) + (d === 'hard' ? 1 : d === 'easy' ? -1 : 0)),
       test: (d, v) => num(d.frags) >= v && lived(d),
       show: (d, v) => `Фраги: ${num(d.frags)} / ${v}, выжил: ${yn(lived(d))}`,
+    },
+
+    {
+      id: 'dmg_big', text: 'Мощный бой: нанести {v} урона', classes: null,
+      v: (t, d) => round50(dmgV(t, d) * 1.5), ...ge('damage_dealt', 'Урон'),
+    },
+    {
+      id: 'dmg_3hp', text: 'Нанести {v} урона — три своих запаса прочности', classes: null, hp: true,
+      v: t => 3 * hpOf(t), ...ge('damage_dealt', 'Урон'),
+    },
+    {
+      id: 'dmg_win', text: 'Нанести {v} урона и победить', classes: null,
+      v: (t, d) => round50(dmgV(t, d) * 0.8),
+      test: (d, v) => num(d.damage_dealt) >= v && won(d),
+      show: (d, v) => `Урон: ${num(d.damage_dealt)} / ${v}, победа: ${yn(won(d))}`,
+    },
+    {
+      id: 'dmg_low_taken', text: 'Нанести {v} урона, получив меньше {w}', classes: null, hp: true,
+      v: dmgV, w: halfHp,
+      test: (d, v, w) => num(d.damage_dealt) >= v && num(d.damage_received) < w,
+      show: (d, v, w) => `Урон: ${num(d.damage_dealt)} / ${v}, получено: ${num(d.damage_received)} (нужно меньше ${w})`,
+    },
+    {
+      id: 'dmg_or_frags', text: 'Нанести {v} урона или уничтожить {w:противника|противника|противников}', classes: null,
+      v: (t, d) => round50(dmgV(t, d) * 1.2), w: (t, d) => fragsV(t, d) + 1,
+      test: (d, v, w) => num(d.damage_dealt) >= v || num(d.frags) >= w,
+      show: (d, v, w) => `Урон: ${num(d.damage_dealt)} / ${v} или фраги: ${num(d.frags)} / ${w}`,
+    },
+    {
+      id: 'frags_big', text: 'Мясорубка: уничтожить {v:противника|противника|противников}', classes: null,
+      v: (t, d) => (t.tier <= 4 ? 4 : 3) + byDiff({ easy: 1, normal: 2, hard: 3 }, d), ...ge('frags', 'Фраги'),
+    },
+    {
+      id: 'frags_win', text: 'Уничтожить {v:противника|противника|противников} и победить', classes: null,
+      v: fragsV,
+      test: (d, v) => num(d.frags) >= v && won(d),
+      show: (d, v) => `Фраги: ${num(d.frags)} / ${v}, победа: ${yn(won(d))}`,
+    },
+    {
+      id: 'frags_spot', text: 'Уничтожить и засветить по {v:противнику|противника|противников}', classes: null,
+      v: (t, d) => byDiff({ easy: 1, normal: 2, hard: 3 }, d),
+      test: (d, v) => num(d.frags) >= v && num(d.spotted) >= v,
+      show: (d, v) => `Фраги: ${num(d.frags)} / ${v}, засвечено: ${num(d.spotted)} / ${v}`,
+    },
+    {
+      id: 'frags_dmg', text: 'Уничтожить {v:противника|противника|противников} и нанести {w} урона', classes: null,
+      v: (t, d) => Math.max(1, fragsV(t, d) - 1), w: (t, d) => round50(dmgV(t, d) * 0.8),
+      test: (d, v, w) => num(d.frags) >= v && num(d.damage_dealt) >= w,
+      show: (d, v, w) => `Фраги: ${num(d.frags)} / ${v}, урон: ${num(d.damage_dealt)} / ${w}`,
+    },
+    {
+      id: 'frags_low_taken', text: 'Уничтожить {v:противника|противника|противников}, получив меньше {w} урона', classes: null, hp: true,
+      v: (t, d) => Math.max(1, fragsV(t, d) - 1), w: halfHp,
+      test: (d, v, w) => num(d.frags) >= v && num(d.damage_received) < w,
+      show: (d, v, w) => `Фраги: ${num(d.frags)} / ${v}, получено: ${num(d.damage_received)} (нужно меньше ${w})`,
+    },
+    {
+      id: 'frags_untouched', text: 'Уничтожить {v:противника|противника|противников}, не дав пробить себя ни разу', classes: NOT_SPG,
+      v: (t, d) => byDiff({ easy: 1, normal: 2, hard: 3 }, d),
+      test: (d, v) => num(d.frags) >= v && num(d.piercings_received) === 0,
+      show: (d, v) => `Фраги: ${num(d.frags)} / ${v}, пробитий по тебе: ${num(d.piercings_received)}`,
     },
 
     // ---------- засвет и помощь ----------
@@ -265,9 +328,11 @@
     const m10 = n % 10, m100 = n % 100;
     return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
   };
-  // {v} — число; {v:раз|раза|раз} — число со словом в нужной форме
-  const fill = (text, v) => (v == null ? text : text.replace(/\{v(?::([^|}]+)\|([^|}]+)\|([^}]+))?\}/,
-    (m, one, few, many) => (one ? `${v} ${plural(Math.abs(Math.round(v)), one, few, many)}` : String(v))));
+  // {v}/{w} — числа челленджа; {v:раз|раза|раз} — число со словом в нужной форме
+  const put = (text, key, val) => (val == null ? text : text.replace(new RegExp('\\{' + key + '(?::([^|}]+)\\|([^|}]+)\\|([^}]+))?\\}'),
+    (m, one, few, many) => (one ? `${val} ${plural(Math.abs(Math.round(val)), one, few, many)}` : String(val))));
+  const fill = (text, v, w) => put(put(text, 'v', v), 'w', w);
+  const valOf = (def, key, tank, d) => (typeof def[key] === 'function' ? def[key](tank, d) : null);
   const fits = (def, tank) => !def.classes || def.classes.includes(tank.type);
 
   // Свои строки стримера: «[ЛТ,СТ] текст». Подстановки как в index.html: {dmg} {frags} {assist} {block} {spots} {stuns} {tier}
@@ -297,7 +362,7 @@
       const tank = { tier: 8, type: def.classes ? def.classes[0] : 'mediumTank', hp: 1500 };
       return {
         id: def.id,
-        sample: fill(def.text, typeof def.v === 'function' ? def.v(tank, 'normal') : null),
+        sample: fill(def.text, valOf(def, 'v', tank, 'normal'), valOf(def, 'w', tank, 'normal')),
         auto: def.auto,
         classes: def.classes ? def.classes.slice() : null,
         hp: !!def.hp,
@@ -316,8 +381,10 @@
       if (opts.autoOnly && !def.auto) continue;
       if (!fits(def, tank)) continue;
       if (def.hp && !(hpOf(tank) > 0)) continue;
-      const v = typeof def.v === 'function' ? def.v(tank, d) : null;
-      out.push({ id: def.id, text: fill(def.text, v), auto: def.auto, v });
+      const v = valOf(def, 'v', tank, d), w = valOf(def, 'w', tank, d);
+      const inst = { id: def.id, text: fill(def.text, v, w), auto: def.auto, v };
+      if (w != null) inst.w = w; // второе число (урон к фрагам, порог полученного урона)
+      out.push(inst);
     }
     // Свои строки не зависят от enabledIds
     if (!opts.autoOnly) out.push(...parseCustom(opts.customManual, tank, d));
@@ -330,15 +397,15 @@
   function evaluate(instance, delta) {
     const def = defOf(instance);
     if (!def || !def.auto) return null;
-    return !!def.test(delta || {}, num(instance.v));
+    return !!def.test(delta || {}, num(instance.v), num(instance.w));
   }
 
   // Короткая строка для стрима
   function describe(instance, delta) {
     const def = defOf(instance);
     if (!def || !def.auto) return (instance && instance.text) || 'Ручная проверка';
-    if (!delta) return instance.text || fill(def.text, instance.v);
-    return def.show(delta, num(instance.v));
+    if (!delta) return instance.text || fill(def.text, instance.v, instance.w);
+    return def.show(delta, num(instance.v), num(instance.w));
   }
 
   const needsAchievements = instance => !!(defOf(instance) || {}).ach;
