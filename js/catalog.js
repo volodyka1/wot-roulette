@@ -23,12 +23,31 @@
     ['warrior', 'Воин'], ['steelwall', 'Стальная стена'], ['invader', 'Захватчик'],
     ['defender', 'Защитник'], ['scout', 'Разведчик'], ['supporter', 'Поддержка'],
   ];
+  // Эпические медали за один бой (названия из энциклопедии WG)
+  const MEDALS_EPIC = [
+    ['medalRadleyWalters', 'Рэдли-Уолтерса'], ['medalKolobanov', 'Колобанова'], ['medalLafayettePool', 'Пула'],
+    ['medalNikolas', 'Николса'], ['medalPascucci', 'Паскуччи'], ['medalHalonen', 'Халонена'], ['medalFadin', 'Фадина'],
+    ['medalOrlik', 'Орлика'], ['medalBurda', 'Бурды'], ['medalBillotte', 'Бийота'], ['medalDeLanglade', 'де Ланглада'],
+    ['medalGore', 'Гора'], ['medalTarczay', 'Тарцая'], ['medalBrunoPietro', 'Бруно'], ['medalTamadaYoshio', 'Йошио Тамада'],
+    ['huntsman', 'Найдина'], ['medalLehvaslaiho', 'Лехвеслайхо'], ['medalStark', 'Старка'], ['medalOskin', 'Оськина'],
+    ['heroesOfRassenay', 'героев Расейняя'],
+  ];
 
   // Простой челлендж «поле >= v»
   const ge = (field, label) => ({
     test: (d, v) => num(d[field]) >= v,
     show: (d, v) => `${label}: ${num(d[field])} / ${v}`,
   });
+  // Любая медаль из списка за бой
+  const anyMedal = (list, prefix) => ({
+    test: d => list.some(([k]) => ach(d, k) >= 1),
+    show: d => {
+      const got = list.filter(([k]) => ach(d, k) >= 1).map(([, n]) => n);
+      return got.length ? `${prefix}: ${got.join(', ')}` : `${prefix}: нет`;
+    },
+  });
+  const lived = d => num(d.survived_battles) >= 1;
+  const assistOf = d => num(d.radio_assisted_damage) + num(d.track_assisted_damage);
 
   const NOT_SPG = ['lightTank', 'mediumTank', 'heavyTank', 'AT-SPG'];
 
@@ -36,7 +55,7 @@
   const AUTO = [
     { id: 'dmg', text: 'Нанести {v} урона', classes: null, v: dmgV, ...ge('damage_dealt', 'Урон') },
     {
-      id: 'frags', text: 'Уничтожить {v} противников', classes: null,
+      id: 'frags', text: 'Уничтожить {v:противника|противника|противников}', classes: null,
       v: (t, d) => Math.max(1, (t.tier <= 4 ? 4 : 3) + (d === 'hard' ? 1 : d === 'easy' ? -1 : 0)),
       ...ge('frags', 'Фраги'),
     },
@@ -58,7 +77,7 @@
       v: (t, d) => round50(dmgV(t, d) * 0.4), ...ge('track_assisted_damage', 'По гусле'),
     },
     {
-      id: 'spot', text: 'Засветить {v} противников', classes: ['lightTank'],
+      id: 'spot', text: 'Засветить {v:противника|противника|противников}', classes: ['lightTank'],
       v: (t, d) => byDiff({ easy: 4, normal: 6, hard: 8 }, d), ...ge('spotted', 'Засвечено'),
     },
     {
@@ -66,7 +85,7 @@
       v: (t, d) => round50(dmgV(t, d) * 0.9), ...ge('blocked', 'Заблокировано'),
     },
     {
-      id: 'stun', text: 'Оглушить противников {v} раз', classes: ['SPG'],
+      id: 'stun', text: 'Оглушить противников {v:раз|раза|раз}', classes: ['SPG'],
       v: (t, d) => byDiff({ easy: 6, normal: 10, hard: 15 }, d), ...ge('stun_number', 'Оглушений'),
     },
     {
@@ -79,7 +98,7 @@
       v: (t, d) => round50((XP[t.tier] || 1000) * DIFF[diffKey(d)]), ...ge('xp', 'Опыт'),
     },
     {
-      id: 'pierce', text: 'Пробить броню противника {v} раз', classes: NOT_SPG,
+      id: 'pierce', text: 'Пробить броню противника {v:раз|раза|раз}', classes: NOT_SPG,
       v: (t, d) => byDiff({ easy: 4, normal: 6, hard: 9 }, d), ...ge('piercings', 'Пробитий'),
     },
     {
@@ -92,7 +111,7 @@
       },
     },
     {
-      id: 'bounce', text: 'Получить {v} непробитий', classes: ['heavyTank'],
+      id: 'bounce', text: 'Получить {v:непробитие|непробития|непробитий}', classes: ['heavyTank'],
       v: (t, d) => byDiff({ easy: 3, normal: 5, hard: 8 }, d), ...ge('no_damage_direct_hits_received', 'Непробитий'),
     },
     {
@@ -115,6 +134,116 @@
         return got.length ? `Медали: ${got.join(', ')}` : 'Медалей нет';
       },
     },
+
+    // ---------- урон и размен ----------
+    {
+      id: 'dmg_hp_live', text: 'Нанести {v} урона (свой запас прочности) и выжить', classes: null, hp: true,
+      v: t => hpOf(t),
+      test: (d, v) => num(d.damage_dealt) >= v && lived(d),
+      show: (d, v) => `Урон: ${num(d.damage_dealt)} / ${v}, выжил: ${yn(lived(d))}`,
+    },
+    {
+      id: 'trade', text: 'Нанести вдвое больше урона, чем получил (и не меньше {v})', classes: NOT_SPG,
+      v: (t, d) => round50(dmgV(t, d) * 0.5),
+      test: (d, v) => num(d.damage_dealt) >= v && num(d.damage_dealt) >= 2 * num(d.damage_received),
+      show: (d, v) => `Нанёс ${num(d.damage_dealt)}, получил ${num(d.damage_received)} (нужно вдвое больше и от ${v})`,
+    },
+    {
+      id: 'combo', text: 'Суммарный вклад {v}: свой урон + урон по засвету и гусле', classes: null,
+      v: (t, d) => round50(dmgV(t, d) * 1.5),
+      test: (d, v) => num(d.damage_dealt) + assistOf(d) >= v,
+      show: (d, v) => `Вклад: ${num(d.damage_dealt) + assistOf(d)} / ${v}`,
+    },
+    {
+      id: 'frags_live', text: 'Уничтожить {v:противника|противника|противников} и выжить', classes: null,
+      v: (t, d) => Math.max(1, (t.tier <= 4 ? 3 : 2) + (d === 'hard' ? 1 : d === 'easy' ? -1 : 0)),
+      test: (d, v) => num(d.frags) >= v && lived(d),
+      show: (d, v) => `Фраги: ${num(d.frags)} / ${v}, выжил: ${yn(lived(d))}`,
+    },
+
+    // ---------- засвет и помощь ----------
+    {
+      id: 'spot_team', text: 'Засветить {v:противника|противника|противников}', classes: ['mediumTank', 'heavyTank', 'AT-SPG'],
+      v: (t, d) => byDiff({ easy: 2, normal: 3, hard: 5 }, d), ...ge('spotted', 'Засвечено'),
+    },
+    {
+      id: 'assist_all', text: 'Набрать {v} урона по засвету и сбитой гусле вместе', classes: ['lightTank', 'mediumTank'],
+      v: (t, d) => dmgV(t, d),
+      test: (d, v) => assistOf(d) >= v,
+      show: (d, v) => `Помощь: ${assistOf(d)} / ${v}`,
+    },
+
+    // ---------- стрельба ----------
+    {
+      id: 'no_miss', text: 'Ни одного промаха (минимум {v:выстрел|выстрела|выстрелов})', classes: NOT_SPG,
+      v: (t, d) => byDiff({ easy: 3, normal: 5, hard: 8 }, d),
+      test: (d, v) => num(d.shots) >= v && num(d.hits) >= num(d.shots),
+      show: (d, v) => `Попал ${num(d.hits)} из ${num(d.shots)} (нужно все, минимум ${v})`,
+    },
+    {
+      id: 'hits', text: 'Попасть по противникам {v:раз|раза|раз}', classes: null,
+      v: (t, d) => (t.type === 'SPG' ? byDiff({ easy: 3, normal: 5, hard: 7 }, d) : byDiff({ easy: 6, normal: 9, hard: 13 }, d)),
+      ...ge('hits', 'Попаданий'),
+    },
+    {
+      id: 'he_hits', text: 'Попасть фугасами {v:раз|раза|раз}', classes: NOT_SPG,
+      v: (t, d) => byDiff({ easy: 2, normal: 3, hard: 5 }, d), ...ge('explosion_hits', 'Попаданий фугасами'),
+    },
+
+    // ---------- броня и выживание ----------
+    {
+      id: 'untouchable', text: 'Выжить, не дав пробить себя ни разу', classes: NOT_SPG, v: null,
+      test: d => lived(d) && num(d.piercings_received) === 0,
+      show: d => `Пробитий по тебе: ${num(d.piercings_received)}, выжил: ${yn(lived(d))}`,
+    },
+    {
+      id: 'bounce_mt', text: 'Получить {v:непробитие|непробития|непробитий}', classes: ['mediumTank', 'AT-SPG'],
+      v: (t, d) => byDiff({ easy: 2, normal: 3, hard: 5 }, d), ...ge('no_damage_direct_hits_received', 'Непробитий'),
+    },
+    {
+      id: 'block_more', text: 'Заблокировать бронёй больше урона, чем получил (и не меньше {v})', classes: ['heavyTank', 'mediumTank', 'AT-SPG'],
+      v: (t, d) => round50(dmgV(t, d) * 0.4),
+      test: (d, v) => num(d.blocked) >= v && num(d.blocked) > num(d.damage_received),
+      show: (d, v) => `Заблокировано ${num(d.blocked)}, получено ${num(d.damage_received)} (нужно больше и от ${v})`,
+    },
+
+    // ---------- база ----------
+    {
+      id: 'cap_points', text: 'Набрать {v:очко|очка|очков} захвата базы', classes: NOT_SPG,
+      v: (t, d) => byDiff({ easy: 20, normal: 40, hard: 70 }, d), ...ge('capture_points', 'Очки захвата'),
+    },
+    {
+      id: 'defend', text: 'Сбить {v:очко|очка|очков} захвата своей базы', classes: NOT_SPG,
+      v: (t, d) => byDiff({ easy: 10, normal: 25, hard: 50 }, d), ...ge('dropped_capture_points', 'Сбито'),
+    },
+
+    // ---------- САУ ----------
+    {
+      id: 'stun_dmg', text: 'Набрать {v} урона по оглушённым тобой противникам', classes: ['SPG'],
+      v: (t, d) => round50(dmgV(t, d) * 0.6), ...ge('stun_assisted_damage', 'Урон по оглушению'),
+    },
+
+    // ---------- медали ----------
+    {
+      id: 'medal_warrior', text: 'Получить медаль «Воин» (6 фрагов)', classes: null, v: null, ach: true,
+      ...anyMedal([['warrior', 'Воин']], 'Медаль'),
+    },
+    {
+      id: 'medal_team', text: 'Получить «Поддержку», «Дозорного» или «Разведчика»', classes: ['lightTank', 'mediumTank'], v: null, ach: true,
+      ...anyMedal([['supporter', 'Поддержка'], ['evileye', 'Дозорный'], ['scout', 'Разведчик']], 'Медали'),
+    },
+    {
+      id: 'medal_sniper', text: 'Получить медаль «Танкист-снайпер» (больше всех урона с 300+ м)', classes: ['AT-SPG', 'mediumTank', 'heavyTank'], v: null, ach: true,
+      ...anyMedal([['sniper2', 'Танкист-снайпер']], 'Медаль'),
+    },
+    {
+      id: 'medal_wall', text: 'Получить медаль «Стальная стена»', classes: ['heavyTank'], v: null, ach: true,
+      ...anyMedal([['steelwall', 'Стальная стена']], 'Медаль'),
+    },
+    {
+      id: 'medal_epic', text: 'Получить эпическую медаль (Рэдли-Уолтерса, Колобанова, Пула и другие)', classes: null, v: null, ach: true,
+      ...anyMedal(MEDALS_EPIC, 'Эпическая медаль'),
+    },
   ];
 
   // Ручные — подтверждает стример
@@ -131,7 +260,14 @@
   AUTO.forEach(d => { d.auto = true; DEFS[d.id] = d; });
   MANUAL.forEach(d => { d.auto = false; d.v = null; DEFS[d.id] = d; });
 
-  const fill = (text, v) => (v == null ? text : text.replace('{v}', v));
+  // 1 противника, 2 противника, 5 противников — окончание после числа
+  const plural = (n, one, few, many) => {
+    const m10 = n % 10, m100 = n % 100;
+    return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+  };
+  // {v} — число; {v:раз|раза|раз} — число со словом в нужной форме
+  const fill = (text, v) => (v == null ? text : text.replace(/\{v(?::([^|}]+)\|([^|}]+)\|([^}]+))?\}/,
+    (m, one, few, many) => (one ? `${v} ${plural(Math.abs(Math.round(v)), one, few, many)}` : String(v))));
   const fits = (def, tank) => !def.classes || def.classes.includes(tank.type);
 
   // Свои строки стримера: «[ЛТ,СТ] текст». Подстановки как в index.html: {dmg} {frags} {assist} {block} {spots} {stuns} {tier}

@@ -701,12 +701,12 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 <div class="toasts" id="toasts"></div>
 
 <!-- ?v= — номер версии, чтобы браузер не держал старые скрипты из кэша после обновления -->
-<script src="js/catalog.js?v=7"></script>
-<script src="js/tracker.js?v=7"></script>
+<script src="js/catalog.js?v=8"></script>
+<script src="js/tracker.js?v=8"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="js/room.js?v=7"></script>
+<script src="js/room.js?v=8"></script>
 <script>
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -761,7 +761,7 @@ const S = Object.assign({
   accountId: null, token: null, tokenExp: 0,
   tiers: [...TIERS], types: Object.keys(TYPES), onlyPrem: false,
   diff: 'normal', sound: true, excluded: [], history: [],
-  challengeIds: null,      // включённые челленджи каталога; null — все
+  challengeOff: [],        // выключенные челленджи каталога (новые из обновлений включены сразу)
   customManual: '',        // свои ручные строки
   maxActive: 3,            // сколько челленджей одновременно ждут боя
 }, loadJSON(KEY, {}));
@@ -774,6 +774,14 @@ if (typeof S.challenges === 'string') {
   delete S.challenges;
   save();
 }
+// Раньше хранили список включённых — переводим в список выключенных (ids каталога на тот момент)
+if (Array.isArray(S.challengeIds)) {
+  const V1 = ['dmg', 'frags', 'win_survive', 'dmg_2hp', 'assist', 'track', 'spot', 'block', 'stun', 'cap', 'xp', 'pierce',
+    'accuracy', 'bounce', 'careful', 'medal_main', 'medal_any', 'he_only', 'no_gold', 'no_shoot_2min', 'top1_dmg', 'top3_xp', 'chat'];
+  S.challengeOff = V1.filter(id => !S.challengeIds.includes(id));
+}
+if ('challengeIds' in S) { delete S.challengeIds; save(); }
+if (!Array.isArray(S.challengeOff)) S.challengeOff = [];
 if (!Array.isArray(S.history)) S.history = [];
 let hangar = loadJSON(HANGAR_KEY, []);
 let current = null;      // последний результат (payload)
@@ -1025,7 +1033,9 @@ const pool = () => {
 const FREE_CH = { id: 'free', text: 'Просто победить 🙂', auto: false, v: null };
 // opts.autoOnly — для друзей (только автоматические)
 function challengeOpts(autoOnly = false) {
-  return { difficulty: S.diff, enabledIds: S.challengeIds, customManual: S.customManual, autoOnly };
+  const off = S.challengeOff || [];
+  const enabledIds = off.length ? WR.catalog.list().map(d => d.id).filter(id => !off.includes(id)) : null;
+  return { difficulty: S.diff, enabledIds, customManual: S.customManual, autoOnly };
 }
 function instancesOf(tank, autoOnly = false) {
   let list = WR.catalog.instancesFor(tank, challengeOpts(autoOnly));
@@ -1752,7 +1762,7 @@ function updateButtons() {
 // ---------- Настройки челленджей ----------
 function renderChallengeSettings() {
   const defs = WR.catalog.list();
-  const on = id => !Array.isArray(S.challengeIds) || S.challengeIds.includes(id);
+  const on = id => !S.challengeOff.includes(id);
   const row = d => `<label class="check"><input type="checkbox" data-ch="${esc(d.id)}" ${on(d.id) ? 'checked' : ''}>`
     + `<span>${esc(d.sample)}${d.classes ? `<i class="cls">${d.classes.map(c => TYPES[c]).join(', ')}</i>` : ''}</span></label>`;
   $('#chAuto').innerHTML = defs.filter(d => d.auto).map(row).join('');
@@ -1762,14 +1772,13 @@ function renderChallengeSettings() {
 }
 function updateChCount() {
   const defs = WR.catalog.list();
-  const n = defs.filter(d => !Array.isArray(S.challengeIds) || S.challengeIds.includes(d.id)).length;
+  const n = defs.filter(d => !S.challengeOff.includes(d.id)).length;
   const own = String(S.customManual || '').split('\n').filter(l => l.trim()).length;
   $('#chCount').textContent = `${n} из ${defs.length}${own ? ` + свои ${own}` : ''}`;
 }
 function onChallengeToggle() {
   const boxes = Array.from(document.querySelectorAll('#chAuto [data-ch], #chManual [data-ch]'));
-  const ids = boxes.filter(b => b.checked).map(b => b.dataset.ch);
-  S.challengeIds = ids.length === boxes.length ? null : ids;
+  S.challengeOff = boxes.filter(b => !b.checked).map(b => b.dataset.ch);
   save(); updateChCount();
 }
 
@@ -2298,7 +2307,7 @@ function initPanel() {
   $('#chCustom').oninput = e => { S.customManual = e.target.value; save(); updateChCount(); };
   $('#chReset').onclick = () => {
     if (String(S.customManual || '').trim() && !confirm('Включить все челленджи и удалить свои строки?')) return;
-    S.challengeIds = null; S.customManual = ''; save(); renderChallengeSettings();
+    S.challengeOff = []; S.customManual = ''; save(); renderChallengeSettings();
     toast('Челленджи сброшены');
   };
   $('#copyObs').onclick = () => { navigator.clipboard?.writeText($('#obsUrl').value).then(() => toast('Ссылка скопирована'), () => $('#obsUrl').select()); };

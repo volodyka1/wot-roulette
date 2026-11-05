@@ -7,7 +7,7 @@
     'battles', 'wins', 'survived_battles', 'damage_dealt', 'damage_received', 'frags', 'spotted', 'xp',
     'capture_points', 'dropped_capture_points', 'hits', 'shots', 'piercings', 'explosion_hits',
     'no_damage_direct_hits_received', 'radio_assisted_damage', 'track_assisted_damage', 'stun_number',
-    'avg_damage_blocked',
+    'avg_damage_blocked', 'piercings_received', 'stun_assisted_damage',
   ];
   const STATS_FIELDS = 'tank_id,' + FIELDS.map(f => 'all.' + f).join(',');
   const DEFAULT_APP = '1e984dbbdf7b1c1fbd284d4cadc0b17f';
@@ -72,7 +72,8 @@
     const keys = new Set(Object.keys(a).concat(Object.keys(b)));
     for (const k of keys) {
       if (k === 'avg_damage_blocked') continue;
-      if (typeof a[k] !== 'number' && typeof b[k] !== 'number') continue;
+      // поля нет в слепке (спин сделан до того, как трекер стал его снимать) — разницу не выдумываем
+      if (typeof a[k] !== 'number' || typeof b[k] !== 'number') continue;
       delta[k] = num(b[k]) - num(a[k]);
     }
     if (snapAch || curAch) {
