@@ -1540,19 +1540,20 @@ function colEvent(c, ev, raw, initial) {
   if (ev === 'added' && isNew && newest && !initial && c.ready && raw.status !== 'cancelled' && serverNow() - ts < TM_FRESH) c.queue.push(raw.id);
   if (c.ready) c.run();
 }
-// последний не отменённый спин игрока; итоги старше TM_OLD (прошлые сессии) не показываем, pending — всегда
+// самый свежий спин игрока. Отменён или итог старше TM_OLD (прошлая сессия) — колонка пустая:
+// к старым спинам не откатываемся, иначе после отмены всплывает прошлый «выполнено»
 const TM_OLD = 6 * 3600 * 1000;
 function colLatest(c) {
   let best = null, bt = -1;
-  const now = serverNow();
   c.spins.forEach(raw => {
-    if (!raw || raw.status === 'cancelled') return;
+    if (!raw) return;
     const t = num(+raw.ts, 0);
-    const done = raw.status === 'ok' || raw.status === 'fail' || raw.status === 'ambiguous';
-    if (done && now - (num(+(raw.result && raw.result.checkedAt), 0) || t) > TM_OLD) return;
     if (!best || t > bt || (t === bt && String(raw.id) > String(best.id))) { best = raw; bt = t; }
   });
-  return best ? norm(best) : null;
+  if (!best || best.status === 'cancelled') return null;
+  const done = best.status === 'ok' || best.status === 'fail' || best.status === 'ambiguous';
+  if (done && serverNow() - (num(+(best.result && best.result.checkedAt), 0) || bt) > TM_OLD) return null;
+  return norm(best);
 }
 function teamLiveHTML(sp) {
   const st = stOf(sp);
@@ -1904,6 +1905,26 @@ function startSeries() {
   else if (W === 'team') startTeam();
   else if (W === 'series') startSeries();
   else startBoard();
+})();
+
+// Автообновление: на сайте вышла новая версия — перезагружаемся сами (OBS иначе держит старую копию в кэше)
+(function autoUpdate() {
+  if (!/^https?:$/.test(location.protocol)) return;
+  const probe = () => fetch(location.pathname + '?_probe=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+    .then(r => (r.ok && (r.headers.get('etag') || r.headers.get('last-modified'))) || '')
+    .catch(() => '');
+  let base = '';
+  probe().then(v => { base = v; });
+  setInterval(() => {
+    probe().then(v => {
+      if (!v) return;
+      if (!base) { base = v; return; }
+      if (v === base) return;
+      const u = new URL(location.href);
+      u.searchParams.set('_v', String(Date.now())); // мимо кэша CDN
+      location.replace(u.toString());
+    });
+  }, 120000);
 })();
 </script>
 </body>
