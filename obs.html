@@ -1617,6 +1617,7 @@ function colEmpty(c) {
 }
 // табло челленджа колонки: несколько вариантов из ch, последний — итог
 const TM_LONG = 58; // длиннее — шрифт помельче, чтобы влезть в две строки плашки
+const TM_NAME_MIN = 11; // название танка мельче не делаем — дальше многоточие
 async function colRollCh(c, seq, animate) {
   const box = c.chBox, el = c.chTxt;
   box.classList.remove('final', 'rolling', 'fx');
@@ -1693,7 +1694,7 @@ async function colPlay(c, sp, animate) {
     c.strip.firstElementChild.classList.add('win');
     setStrip(c, tmX(0));
     c.water.textContent = ROMAN[t.tier];
-    c.meta.innerHTML = tmMeta(t);
+    colMeta(c, t);
     [c.meta, c.chBox, c.live].forEach(e => { e.style.visibility = ''; });
     await colRollCh(c, sp.ch, false);
     colStatus(c, sp, false);
@@ -1706,6 +1707,8 @@ async function colPlay(c, sp, animate) {
     list = sp.items.slice(from, to); wi = sp.winIndex - from;
   }
   [c.meta, c.chBox, c.live].forEach(e => { e.style.visibility = 'hidden'; });
+  // подпись нового танка пишем сразу (пока скрыта), иначе после посадки всплывала подпись прошлого спина
+  colMeta(c, t);
   c.live.innerHTML = '';
   c.chBox.classList.remove('final', 'rolling', 'fx');
   c.strip.className = 'tm-strip';
@@ -1758,7 +1761,8 @@ async function runCol(c) {
     c.queue.length = 0;
     const raw = c.spins.get(id);
     if (!raw || raw.status === 'cancelled') continue;
-    await colPlay(c, norm(raw), true);
+    // анимация упала на полпути — сбрасываем показанный спин, ниже он отрисуется заново без анимации
+    try { await colPlay(c, norm(raw), true); } catch (e) { console.error(e); c.shownId = ''; }
   }
   const sp = colLatest(c);
   if (!sp) { if (c.shownId !== '') colEmpty(c); return; }
@@ -1795,26 +1799,32 @@ function teamRoster(r) {
   });
   $('#team').hidden = false;
   T.shown = true;
-  fitAllNicks();
+  fitAllNames();
 }
-// длинный ник уменьшаем, пока не влезет целиком (многоточие — только у самых длинных)
-function fitNick(el) {
+// длинный ник или название танка уменьшаем, пока не влезет целиком (многоточие — только у самых длинных)
+function fitText(el, min) {
   if (!el) return;
   el.style.fontSize = '';
   if (!el.clientWidth) return;
   let fs = parseFloat(getComputedStyle(el).fontSize) || 16;
-  while (el.scrollWidth > el.clientWidth + 1 && fs > 9.5) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+  const lo = min || 9.5;
+  while (el.scrollWidth > el.clientWidth + 1 && fs > lo) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+}
+// строка «уровень · класс · название» колонки
+function colMeta(c, t) {
+  c.meta.innerHTML = tmMeta(t);
+  fitText(c.meta.querySelector('.nm'), TM_NAME_MIN);
 }
 // меряем после отрисовки и ещё раз, когда догрузятся шрифты
-function fitAllNicks() {
-  const run = () => T.cols.forEach(c => fitNick(c.nickEl));
+function fitAllNames() {
+  const run = () => T.cols.forEach(c => { fitText(c.nickEl); fitText(c.meta.querySelector('.nm'), TM_NAME_MIN); });
   requestAnimationFrame(run);
   setTimeout(run, 400);
   setTimeout(run, 1500);
 }
 function startTeam() {
   startRoster(teamRoster);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAllNicks);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAllNames);
   setInterval(() => T.cols.forEach(c => c.run()), 60000); // устаревшие итоги гаснут и без новых событий
 }
 
