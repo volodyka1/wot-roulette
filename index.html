@@ -200,7 +200,22 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 .glint::after{width:2px;height:52px;margin:-26px 0 0 -1px}
 .glint i{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border-radius:50%;background:radial-gradient(#fff,rgba(255,138,61,.6) 45%,transparent 70%)}
 @keyframes glint{0%,100%{transform:scale(.75) rotate(0);opacity:.75}50%{transform:scale(1.08) rotate(45deg);opacity:1}}
-.reel .empty{position:absolute;inset:0;z-index:8;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);font:800 italic 20px/1.3 var(--fd);letter-spacing:-.01em;background:rgba(11,11,16,.55)}
+.reel .empty{position:absolute;inset:0;z-index:8;display:grid;place-items:center;padding:20px;text-align:center;
+  background:radial-gradient(60% 95% at 50% 50%,rgba(11,11,16,.25),rgba(11,11,16,.72))}
+/* заставка пустого барабана: плотная плашка — луч-указатель уходит за неё и не режет текст */
+.idle{display:flex;flex-direction:column;align-items:center;gap:7px;padding:16px 36px 15px;border-radius:14px;transform:skewX(-8deg);
+  background:linear-gradient(180deg,rgba(24,24,34,.97),rgba(13,13,19,.97));
+  box-shadow:inset 0 0 0 1px rgba(255,138,61,.35),0 0 40px rgba(255,61,90,.18),0 18px 40px rgba(0,0,0,.5);animation:idleGlow 3.2s ease-in-out infinite}
+.idle>*{transform:skewX(8deg)}
+.idle-k{font:800 italic 11px/1 var(--fd);letter-spacing:.3em;text-transform:uppercase;color:var(--a2)}
+.idle-t{font:900 italic 30px/1.05 var(--fd);letter-spacing:-.01em;text-transform:uppercase;
+  background:linear-gradient(100deg,#fff 0%,#fff 42%,#ffb38a 50%,#fff 58%,#fff 100%);background-size:260% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:idleShine 3.8s linear infinite}
+.idle-h{font:600 12.5px/1.4 var(--fu);color:var(--muted)}
+.idle kbd{display:inline-block;padding:2px 8px;margin:0 3px;border-radius:5px;font:800 italic 11px/1.35 var(--fd);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--grad);box-shadow:0 3px 10px rgba(255,61,90,.35)}
+@keyframes idleShine{from{background-position:120% 0}to{background-position:-120% 0}}
+@keyframes idleGlow{50%{box-shadow:inset 0 0 0 1px rgba(255,138,61,.6),0 0 60px rgba(255,61,90,.3),0 18px 40px rgba(0,0,0,.5)}}
+@media (prefers-reduced-motion:reduce){.idle,.idle-t{animation:none}}
 
 /* ---------- Карточка танка в рулетке ---------- */
 .tcard{position:relative;flex:0 0 var(--cw);width:var(--cw);height:var(--chh);will-change:transform;backface-visibility:hidden}
@@ -521,7 +536,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
               <span class="glint t"><i></i></span><span class="glint b"><i></i></span>
             </div>
             <div class="flash" id="flash"></div>
-            <div class="empty" id="reelEmpty">Войди через Wargaming справа →</div>
+            <div class="empty" id="reelEmpty"><div class="idle"><span class="idle-k">Ангар пуст</span><b class="idle-t">Войди через Wargaming</b><span class="idle-h">карточка «Ангар» справа</span></div></div>
           </div>
         </div>
 
@@ -1691,7 +1706,9 @@ function renderPool(animate = false) {
   $('#poolInfo').textContent = poolInfoText();
   if (!current) {
     $('#reelEmpty').hidden = false;
-    $('#reelEmpty').textContent = hangar.length ? 'Жми КРУТИТЬ 🎰' : 'Войди через Wargaming справа →';
+    $('#reelEmpty').innerHTML = hangar.length
+      ? '<div class="idle"><span class="idle-k">Рулетка заряжена</span><b class="idle-t">Кто едет в бой?</b><span class="idle-h">Жми <kbd>Крутить</kbd> или <kbd>Пробел</kbd></span></div>'
+      : '<div class="idle"><span class="idle-k">Ангар пуст</span><b class="idle-t">Войди через Wargaming</b><span class="idle-h">карточка «Ангар» справа</span></div>';
     if (hangar.length) $('#strip').innerHTML = '';
   }
 }
