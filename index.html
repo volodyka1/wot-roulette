@@ -664,12 +664,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 
       <div class="card enter" style="--i:4">
         <h2>Челленджи</h2>
-        <label class="f" for="diff">Сложность</label>
-        <select id="diff">
-          <option value="easy">Лёгкая</option>
-          <option value="normal">Нормальная</option>
-          <option value="hard">Хардкор</option>
-        </select>
+        <div class="hint" style="margin-top:0">Каждый челлендж выпадает нормальным или хардкорным — вперемешку, хардкор помечен 🔥.</div>
         <details>
           <summary>Выбрать челленджи <span id="chCount"></span></summary>
           <label class="f">Проверяются автоматически</label>
@@ -1035,13 +1030,20 @@ const FREE_CH = { id: 'free', text: 'Просто победить 🙂', auto: 
 function challengeOpts(autoOnly = false) {
   const off = S.challengeOff || [];
   const enabledIds = off.length ? WR.catalog.list().map(d => d.id).filter(id => !off.includes(id)) : null;
-  return { difficulty: S.diff, enabledIds, customManual: S.customManual, autoOnly };
+  return { enabledIds, customManual: S.customManual, autoOnly };
 }
+// Сложность не выбирается: каждый челлендж случайно нормальный или хардкорный (хардкор помечен 🔥)
 function instancesOf(tank, autoOnly = false) {
-  let list = WR.catalog.instancesFor(tank, challengeOpts(autoOnly));
+  const get = (difficulty, all) => WR.catalog.instancesFor(tank, { ...challengeOpts(autoOnly), ...(all ? { enabledIds: null } : {}), difficulty });
+  let normal = get('normal'), hard = get('hard');
   // другу ручной «Просто победить» нельзя: если всё автоматическое выключено — берём весь каталог
-  if (!list.length && autoOnly) list = WR.catalog.instancesFor(tank, { ...challengeOpts(true), enabledIds: null });
-  return list.length ? list : [FREE_CH];
+  if (!normal.length && autoOnly) { normal = get('normal', true); hard = get('hard', true); }
+  if (!normal.length) return [FREE_CH];
+  return normal.map(n => {
+    const h = hard.find(x => x.id === n.id);
+    if (!h || h.text === n.text || rnd() < 0.5) return n;
+    return { ...h, text: '🔥 ' + h.text, hard: true };
+  });
 }
 // Случайный экземпляр; avoidId — не повторять текущий при перекрутке
 function pickInstance(tank, avoidId = null, autoOnly = false) {
@@ -2288,7 +2290,6 @@ function initPanel() {
   $('#region').innerHTML = Object.entries(REGIONS).filter(([k]) => k !== 'ru').map(([k, r]) => `<option value="${k}">${r.name}</option>`).join('');
   $('#region').value = S.region;
   $('#onlyPrem').checked = S.onlyPrem;
-  $('#diff').value = S.diff;
   $('#sound').checked = S.sound;
   renderChallengeSettings();
 
@@ -2300,7 +2301,6 @@ function initPanel() {
   $('#loginBtn').onclick = login;
   $('#logoutBtn').onclick = logout;
   $('#onlyPrem').onchange = e => { S.onlyPrem = e.target.checked; save(); renderPool(); };
-  $('#diff').onchange = e => { S.diff = e.target.value; save(); };
   $('#sound').onchange = e => { S.sound = e.target.checked; save(); };
   $('#chAuto').onchange = onChallengeToggle;
   $('#chManual').onchange = onChallengeToggle;
