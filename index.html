@@ -1689,12 +1689,13 @@ function fmtTime(ts) {
 }
 
 const HIST_ICON = { ok: '✅', fail: '❌', pending: '⏳', ambiguous: '⚠️', cancelled: '✖' };
-// Кнопки у активных челленджей: ✅/❌ — если отмечать вручную, ✖ — отменить
+// Кнопки у активных челленджей: ✅/❌ — решить вручную (стример может и за автоматический), ✖ — отменить
 function histActions(h) {
   if (!h.id || !isActive(h) || isFriend()) return ''; // в комнате решает только стример
   const btn = (act, ic, tip) => `<button class="hbtn" data-act="${act}" data-id="${esc(h.id)}" title="${tip}">${ic}</button>`;
-  const manual = !canTrack(h) || h.status === 'ambiguous';
-  return (manual ? btn('ok', '✅', 'Выполнил') + btn('fail', '❌', 'Провал') : '') + btn('cancel', '✖', 'Отменить челлендж');
+  const auto = canTrack(h) && h.status !== 'ambiguous';
+  return btn('ok', '✅', auto ? 'Засчитать вручную (обычно засчитается само после боя)' : 'Выполнил')
+    + btn('fail', '❌', auto ? 'Провалить вручную' : 'Провал') + btn('cancel', '✖', 'Отменить челлендж');
 }
 
 // Текст челленджа: соло хранит строку в ch, комната — массив ch и объект challenge
