@@ -162,7 +162,9 @@
       // Слепок без медалей, а они нужны — боёв не было, можно спокойно заменить
       return it.withAchievements && !base ? { state: 'rebaseline', snapshot: fresh() } : { state: 'waiting' };
     }
-    if (lastBattle * 1000 <= spunAt) return { state: 'rebaseline', snapshot: fresh() };
+    // Время последнего боя из профиля аккаунта здесь не используем: WG обновляет профиль позже статистики
+    // танка (бывает, на минуты), и настоящий бой после спина выглядел бы «боем до спина» и терялся.
+    // Слепок снят в момент спина, поэтому новый бой на этом танке считаем сыгранным после спина.
     const delta = diff(snap.stats, cur, base, it.withAchievements ? curAch : null);
     if (it.withAchievements && !base) return { state: 'ambiguous', delta };
     return { state: db === 1 ? 'done' : 'ambiguous', delta };
