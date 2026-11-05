@@ -685,7 +685,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 
       <div class="card enter" style="--i:5">
         <h2>OBS</h2>
-        <div class="hint" style="margin-top:0">Добавь <b>Источник → Браузер</b> с этим адресом, ширина <b>760</b>, высота <b>320</b> — это маленький виджет. Нужен широкий, как раньше (1920×460), — допиши в конец адреса <code class="k" id="obsBig">&amp;size=big</code>. Фон прозрачный, крутишь отсюда — на стриме анимация повторится.</div>
+        <div class="hint" style="margin-top:0" id="obsHint"></div>
         <div class="hint" id="obsMode"></div>
         <div class="obslink">
           <input type="text" id="obsUrl" readonly>
@@ -2057,11 +2057,16 @@ function copyText(text) {
 function renderObsCard() {
   const dir = HAS_SERVER ? location.origin + location.pathname.replace(/[^/]*$/, '') : 'http://localhost:8080/';
   const own = inRoom() && RM.owner && !!(window.WR && WR.room);
+  const friend = inRoom() && !RM.owner;
   $('#obsUrl').value = own ? WR.room.links(RM.id, RM.key).obsTeam : dir + 'obs.html';
-  $('#obsBig').textContent = own ? '&size=big' : '?size=big';
-  $('#obsMode').innerHTML = own
-    ? 'Виджет читает комнату — <b>start.bat</b> для него не нужен. Лента друзей и таблица — в карточке «Комната».'
-    : 'Без комнаты виджет берёт спины с локального сервера — держи <b>start.bat</b> открытым.';
+  $('#obsUrl').parentElement.hidden = friend;
+  $('#obsHint').innerHTML = own
+    ? 'Добавь <b>Источник → Браузер</b> с этим адресом: виджет <b>«Команда»</b>, ширина <b>960</b>, высота <b>320</b> — твой танк в центре, друзья по бокам. Вторая ссылка, <b>«Серия»</b> (560×300), — в карточке «Комната». Фон прозрачный.'
+    : friend
+      ? 'Тебе OBS не нужен: твои спины и итоги сами появятся на стриме у стримера.'
+      : 'Чтобы на стриме были ты и друзья, создай комнату в карточке <b>«Комната»</b> — здесь появится ссылка на виджет <b>«Команда»</b> (960×320), а там — на <b>«Серию»</b>.';
+  $('#obsMode').innerHTML = own || friend ? ''
+    : 'Пока комнаты нет, этот адрес — одиночный виджет (760×320): он берёт твои спины с локального сервера, держи <b>start.bat</b> открытым.';
 }
 
 function renderRoom() {

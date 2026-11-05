@@ -365,7 +365,8 @@ html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
 .tm-col.spinning .tm-water{opacity:0}
 .tm-col.spinning .tm-glow{opacity:.35}
 .tm-empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px}
-.tm-empty svg{width:170px;height:76px;animation:tmBreath 3s ease-in-out infinite}
+.tm-empty svg{width:100px;height:77px;overflow:visible;filter:drop-shadow(0 8px 18px rgba(255,61,90,.35));animation:tmBreath 3s ease-in-out infinite,mqFloat 3s ease-in-out infinite}
+@keyframes mqFloat{50%{transform:translateY(-5px) rotate(-2deg)}}
 .tm-empty span{font:800 italic 11.5px/1 var(--fd);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
 @keyframes tmBreath{50%{opacity:.55}}
 .tm-col.empty .tm-empty{display:flex}
@@ -1490,10 +1491,15 @@ function startRoster(cb) {
 // ---------- Команда: три колонки ----------
 const T = { cols: new Map(), shown: false };
 const TM_IW = 200, TM_STEP = 216, TM_LIMIT = 10, TM_REEL = 3200, TM_FRESH = 10 * 60 * 1000;
-const TANK_SIL = '<svg viewBox="0 0 170 76" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.18)" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">'
-  + '<path d="M58 22h44l10 12H52z"/><path d="M105 25.5h57v5h-57z"/><path d="M18 36h134l-8 14H26z"/>'
-  + '<path d="M22 52h126a10 10 0 0 1 0 20H22a10 10 0 0 1 0-20z"/>'
-  + '<g fill="rgba(255,255,255,.1)" stroke="none"><circle cx="34" cy="62" r="5"/><circle cx="58" cy="62" r="5"/><circle cx="82" cy="62" r="5"/><circle cx="106" cy="62" r="5"/><circle cx="130" cy="62" r="5"/></g></svg>';
+// пустая колонка: «карточка-загадка» с вопросом вместо танка
+const EMPTY_ICON = '<svg viewBox="0 0 120 92" aria-hidden="true">'
+  + '<defs><linearGradient id="mqG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff3d5a"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs>'
+  + '<g transform="translate(14 0) skewX(-12)">'
+  + '<rect x="22" y="6" width="64" height="80" rx="9" fill="rgba(255,255,255,.04)" stroke="url(#mqG)" stroke-width="2.5"/>'
+  + '<rect x="29" y="13" width="50" height="66" rx="5" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="1.2"/></g>'
+  + '<text x="60" y="64" text-anchor="middle" font-family="Montserrat, Inter, sans-serif" font-weight="900" font-style="italic" font-size="50" fill="url(#mqG)">?</text>'
+  + '<path d="M101 16l2.2 5 5 2.2-5 2.2-2.2 5-2.2-5-5-2.2 5-2.2z" fill="#ffb86b" opacity=".9"/>'
+  + '<path d="M16 64l1.5 3.4 3.4 1.5-3.4 1.5-1.5 3.4-1.5-3.4-3.4-1.5 3.4-1.5z" fill="#ff6b81" opacity=".75"/></svg>';
 const tmItem = t => `<div class="tm-it">${t.img ? `<img src="${esc(t.img)}" alt="" decoding="async" ${IMG_ERR}>` : ''}</div>`;
 const tmMeta = t => metaHTML(t) + `<span class="nm">${esc(t.name)}</span>`;
 const tmX = i => -(i * TM_STEP + TM_IW / 2); // лента стоит от центра сцены (left:50%)
@@ -1507,7 +1513,7 @@ function createCol(p) {
     <div class="tm-nick"><span></span><em><b>СТРИМЕР</b></em></div>
     <div class="tm-stage"><b class="tm-water"></b><i class="tm-glow"></i>
       <div class="tm-reel"><div class="tm-strip"></div></div>
-      <div class="tm-empty">${TANK_SIL}<span>ждёт спина</span></div><i class="tm-flash"></i></div>
+      <div class="tm-empty">${EMPTY_ICON}<span>ждёт спина</span></div><i class="tm-flash"></i></div>
     <div class="tm-meta"></div>
     <div class="tm-ch"><div class="txt"></div></div>
     <div class="tm-live"></div>
