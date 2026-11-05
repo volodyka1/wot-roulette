@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Танковая рулетка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a1016; --panel:#101a23; --panel2:#152330; --line:#22384a;
+  --text:#e8eef3; --muted:#8aa1b3; --gold:#f2b632; --gold2:#ffd56b;
+  --ok:#3ad07a; --fail:#ff5468;
+  --lt:#4fd16b; --mt:#ffd23f; --ht:#ff5a4f; --td:#45a6ff; --spg:#b57bff;
+  --card-w:184px; --gap:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:radial-gradient(1200px 600px at 50% -10%,#18304a 0%,transparent 60%),var(--bg);
+  color:var(--text); font:14px/1.45 Inter,system-ui,sans-serif; min-height:100vh;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,.display{font-family:"Russo One",Inter,sans-serif;font-weight:400;letter-spacing:.02em}
+.wrap{max-width:1500px;margin:0 auto;padding:16px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+header.top h1{margin:0;font-size:26px;color:var(--gold)}
+header.top .sub{color:var(--muted)}
+header.top .sp{flex:1}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+@media (max-width:1100px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h2{margin:0 0 10px;font-size:15px;color:var(--gold);text-transform:uppercase}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--gold);color:var(--gold2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.gold{background:linear-gradient(180deg,#ffc845,#d99500);border-color:#ffd56b;color:#1a1100;font-weight:800}
+.btn.gold:hover{color:#1a1100;filter:brightness(1.08)}
+.btn.big{font-family:"Russo One";font-size:22px;padding:14px 40px;letter-spacing:.06em}
+.btn.ok{border-color:#1f6b42}.btn.ok:hover{color:var(--ok);border-color:var(--ok)}
+.btn.fail{border-color:#6b1f2a}.btn.fail:hover{color:var(--fail);border-color:var(--fail)}
+label.f{display:block;margin:10px 0 4px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],select,textarea{width:100%;background:#0b141c;border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none}
+input[type=text]:focus,select:focus,textarea:focus{border-color:var(--gold)}
+textarea{min-height:200px;resize:vertical;font-size:12.5px;line-height:1.5}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.row>.btn{flex:0 0 auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:#0b141c;cursor:pointer;user-select:none;font-weight:600;font-size:12.5px}
+.chip.on{background:var(--gold);color:#1a1100;border-color:var(--gold)}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}
+.statusline{margin-top:8px;font-size:13px;color:var(--muted);min-height:20px}
+.statusline.err{color:var(--fail)}
+.check{display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer}
+code.k{background:#0b141c;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+.obslink{display:flex;gap:6px;margin-top:6px}
+.obslink input{font-size:12px}
+details summary{cursor:pointer;color:var(--gold);font-weight:600;margin-top:12px}
+
+/* ---------- Рулетка ---------- */
+.stage{display:flex;flex-direction:column;gap:14px}
+.reel{
+  position:relative;height:200px;overflow:hidden;border-radius:14px;
+  background:linear-gradient(180deg,rgba(16,30,44,.92),rgba(8,14,20,.92));
+  border:2px solid rgba(242,182,50,.55);
+  box-shadow:0 0 0 1px rgba(0,0,0,.6) inset,0 10px 40px rgba(0,0,0,.5);
+}
+.strip{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;gap:var(--gap);padding:0;will-change:transform}
+.marker{position:absolute;top:0;bottom:0;left:50%;width:4px;margin-left:-2px;background:var(--gold);box-shadow:0 0 14px var(--gold),0 0 30px rgba(242,182,50,.6);z-index:3}
+.marker::before,.marker::after{content:"";position:absolute;left:50%;margin-left:-10px;border:10px solid transparent}
+.marker::before{top:0;border-top-color:var(--gold)}
+.marker::after{bottom:0;border-bottom-color:var(--gold)}
+.fade{position:absolute;top:0;bottom:0;width:18%;z-index:2;pointer-events:none}
+.fade.l{left:0;background:linear-gradient(90deg,rgba(6,10,14,.95),transparent)}
+.fade.r{right:0;background:linear-gradient(-90deg,rgba(6,10,14,.95),transparent)}
+.reel .empty[hidden]{display:none}
+.reel .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-family:"Russo One";font-size:18px;text-align:center;padding:20px}
+
+.tcard{
+  flex:0 0 var(--card-w);width:var(--card-w);height:170px;border-radius:10px;position:relative;
+  background:linear-gradient(180deg,#1b2c3b,#0f1922);border:1px solid #2a4357;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:8px 6px 10px;
+}
+.tcard::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--tc,#888)}
+.tcard.prem{border-color:#a8822a;background:linear-gradient(180deg,#3a2c12,#17120a)}
+.tcard img{width:160px;height:100px;object-fit:contain;filter:drop-shadow(0 6px 8px rgba(0,0,0,.6))}
+.tcard .nm{font-weight:800;font-size:13.5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tcard .tg{position:absolute;top:6px;left:8px;font-family:"Russo One";font-size:13px;color:var(--tc)}
+.tcard.win{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold),0 0 30px rgba(242,182,50,.7);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 2px var(--gold2),0 0 50px rgba(255,213,107,.9)}}
+.t-lightTank{--tc:var(--lt)}.t-mediumTank{--tc:var(--mt)}.t-heavyTank{--tc:var(--ht)}.t-AT-SPG{--tc:var(--td)}.t-SPG{--tc:var(--spg)}
+
+.result{
+  display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;
+  background:linear-gradient(90deg,rgba(18,32,46,.94),rgba(10,18,26,.94));
+  border:1px solid rgba(242,182,50,.45);border-radius:14px;padding:14px 20px;
+  animation:rise .5s cubic-bezier(.2,.9,.3,1.2);
+}
+.result[hidden]{display:none}
+@keyframes rise{from{opacity:0;transform:translateY(16px) scale(.97)}}
+.result .tank{display:flex;align-items:center;gap:14px}
+.result .tank img{width:200px;height:125px;object-fit:contain;filter:drop-shadow(0 8px 12px rgba(0,0,0,.7))}
+.result .meta{font-family:"Russo One";color:var(--tc);font-size:15px}
+.result .name{font-family:"Russo One";font-size:30px;line-height:1.1}
+.ch{border-left:2px solid rgba(242,182,50,.35);padding-left:18px;min-width:0}
+.ch .lbl{font-family:"Russo One";color:var(--gold);font-size:13px;letter-spacing:.12em}
+.ch .txt{font-family:"Russo One";font-size:28px;line-height:1.2;margin-top:4px;min-height:34px}
+.ch .txt.rolling{color:var(--muted);filter:blur(.4px)}
+.ch .txt.final{color:var(--gold2);text-shadow:0 0 18px rgba(242,182,50,.55);animation:pop .45s cubic-bezier(.2,.9,.3,1.4)}
+@keyframes pop{from{transform:scale(.85)}}
+.badge{display:inline-block;margin-top:8px;font-family:"Russo One";font-size:16px;padding:4px 12px;border-radius:8px}
+.badge.ok{background:rgba(58,208,122,.15);color:var(--ok);border:1px solid var(--ok)}
+.badge.fail{background:rgba(255,84,104,.15);color:var(--fail);border:1px solid var(--fail)}
+@media (max-width:760px){.result{grid-template-columns:1fr}.ch{border-left:0;padding-left:0}.result .tank img{width:150px;height:94px}.result .name{font-size:22px}.ch .txt{font-size:20px}}
+
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center}
+
+/* ---------- Пул и история ---------- */
+.pool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:460px;overflow:auto;padding-right:4px}
+.pcard{background:#0e1820;border:1px solid var(--line);border-radius:8px;padding:6px;cursor:pointer;text-align:center;position:relative;transition:.15s}
+.pcard:hover{border-color:var(--gold)}
+.pcard img{width:100%;height:60px;object-fit:contain}
+.pcard .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .tg{position:absolute;top:4px;left:6px;font-family:"Russo One";font-size:11px;color:var(--tc)}
+.pcard.off{opacity:.28;filter:grayscale(1)}
+.pcard.filtered{display:none}
+.hist{display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto}
+.hitem{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;background:#0e1820;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.hitem img{width:64px;height:40px;object-fit:contain}
+.hitem .c{font-size:12px;color:var(--muted)}
+.hitem .s{font-size:18px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d2f40;border:1px solid var(--gold);padding:10px 16px;border-radius:10px;z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+
+/* ---------- Режим оверлея для OBS ---------- */
+body.obs{background:transparent!important;min-height:0;overflow:hidden}
+body.obs .wrap{max-width:none;padding:10px}
+body.obs .layout{display:block}
+body.obs .no-obs{display:none!important}
+body.obs .reel{height:210px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top no-obs">
+    <h1>🎰 Танковая рулетка</h1>
+    <span class="sub" id="who">ангар не загружен</span>
+    <span class="sp"></span>
+    <span class="hint">Пробел — крутить</span>
+  </header>
+
+  <div class="layout">
+    <div class="stage">
+      <div class="reel" id="reel">
+        <div class="strip" id="strip"></div>
+        <div class="fade l"></div><div class="fade r"></div>
+        <div class="marker"></div>
+        <div class="empty" id="reelEmpty">Загрузи свой ангар справа →</div>
+      </div>
+
+      <div class="result" id="result" hidden>
+        <div class="tank" id="resTank">
+          <img id="resImg" alt="">
+          <div>
+            <div class="meta" id="resMeta"></div>
+            <div class="name" id="resName"></div>
+          </div>
+        </div>
+        <div class="ch">
+          <div class="lbl">ЧЕЛЛЕНДЖ НА БОЙ</div>
+          <div class="txt" id="chText"></div>
+          <div id="resStatus"></div>
+        </div>
+      </div>
+
+      <div class="controls panel no-obs">
+        <button class="btn gold big" id="spinBtn" disabled>КРУТИТЬ</button>
+        <button class="btn" id="rerollBtn" disabled>🎲 Другой челлендж</button>
+        <button class="btn ok" id="okBtn" disabled>✅ Выполнил</button>
+        <button class="btn fail" id="failBtn" disabled>❌ Провал</button>
+      </div>
+
+      <div class="panel no-obs">
+        <div class="row" style="margin-bottom:10px">
+          <h2 style="margin:0">Пул танков</h2>
+          <span class="hint" id="poolInfo" style="margin:0;text-align:right"></span>
+        </div>
+        <div class="hint" style="margin:0 0 8px">Клик по танку — исключить/вернуть его в рулетку.</div>
+        <div class="pool-grid" id="poolGrid"></div>
+      </div>
+
+      <div class="panel no-obs">
+        <div class="row" style="margin-bottom:10px">
+          <h2 style="margin:0">История</h2>
+          <span class="hint" id="histStats" style="margin:0;text-align:right"></span>
+          <button class="btn" id="clearHist">Очистить</button>
+        </div>
+        <div class="hist" id="hist"></div>
+      </div>
+    </div>
+
+    <aside class="no-obs" style="display:flex;flex-direction:column;gap:16px">
+      <div class="panel">
+        <h2>Ангар</h2>
+        <label class="f">Регион</label>
+        <select id="region"></select>
+        <label class="f">Application ID</label>
+        <input type="text" id="appId" spellcheck="false">
+        <label class="f">Ник</label>
+        <div class="row">
+          <input type="text" id="nick" placeholder="Твой ник в игре" spellcheck="false">
+          <button class="btn gold" id="loadBtn">Загрузить</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="loginBtn">🔑 Войти через Wargaming</button>
+          <button class="btn" id="logoutBtn" hidden>Выйти</button>
+        </div>
+        <div class="hint">Без входа API отдаёт <b>все танки, на которых ты играл</b> (включая проданные). После входа — только то, что сейчас стоит в ангаре.</div>
+        <div class="statusline" id="status"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Фильтры</h2>
+        <label class="f">Уровни</label>
+        <div class="chips" id="tierChips"></div>
+        <label class="f">Классы</label>
+        <div class="chips" id="typeChips"></div>
+        <label class="check"><input type="checkbox" id="onlyPrem"> Только премиум-танки</label>
+      </div>
+
+      <div class="panel">
+        <h2>Челленджи</h2>
+        <label class="f">Сложность</label>
+        <select id="diff">
+          <option value="easy">Лёгкая</option>
+          <option value="normal">Нормальная</option>
+          <option value="hard">Хардкор</option>
+        </select>
+        <details>
+          <summary>Редактировать список</summary>
+          <div class="hint">Одна строка — один челлендж. Префикс <code class="k">[ЛТ,СТ]</code> — только для этих классов (ЛТ, СТ, ТТ, ПТ, САУ). Подстановки зависят от уровня танка и сложности: <code class="k">{dmg}</code> <code class="k">{frags}</code> <code class="k">{assist}</code> <code class="k">{block}</code> <code class="k">{spots}</code> <code class="k">{stuns}</code> <code class="k">{tier}</code></div>
+          <textarea id="chList" spellcheck="false" style="margin-top:8px"></textarea>
+          <button class="btn" id="chReset" style="margin-top:6px">Сбросить к стандартным</button>
+        </details>
+        <label class="check"><input type="checkbox" id="sound"> Звук в этом окне</label>
+      </div>
+
+      <div class="panel">
+        <h2>OBS</h2>
+        <div class="hint" style="margin-top:0">Добавь <b>Источник → Браузер</b> с этим адресом, ширина 1920, высота 460. Фон у оверлея прозрачный, крутишь отсюда — на стриме анимация повторится.</div>
+        <div class="obslink">
+          <input type="text" id="obsUrl" readonly>
+          <button class="btn" id="copyObs">Копировать</button>
+        </div>
+        <div class="hint" id="obsWarn"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const OBS = params.has('obs');
+const HAS_SERVER = location.protocol.startsWith('http');
+const KEY = 'wotRoulette.v1';
+const HANGAR_KEY = 'wotRoulette.hangar.v1';
+
+const REGIONS = {
+  eu:   { name: 'EU (Европа)',              api: 'https://api.worldoftanks.eu' },
+  na:   { name: 'NA (Северная Америка)',    api: 'https://api.worldoftanks.com' },
+  asia: { name: 'ASIA',                     api: 'https://api.worldoftanks.asia' },
+  ru:   { name: 'RU — Мир танков (Lesta, нужен свой ID)', api: 'https://api.tanki.su' },
+};
+const TYPES = { lightTank: 'ЛТ', mediumTank: 'СТ', heavyTank: 'ТТ', 'AT-SPG': 'ПТ', SPG: 'САУ' };
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+const TIERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+const DEFAULT_CH = `Нанести {dmg} урона
+Уничтожить {frags} противников
+Быть №1 по урону в своей команде
+Попасть в топ-3 команды по опыту
+Победить и выжить
+Нанести урон по 5 разным противникам
+Нанести урона больше, чем два своих запаса ХП
+[ЛТ,СТ] Набрать {assist} урона по своему засвету
+[ЛТ] Засветить {spots} противников
+[ТТ,СТ,ПТ] Заблокировать бронёй {block} урона
+[САУ] Оглушить противников {stuns} раз
+Только фугасы весь бой 😈
+Без голды — только базовые снаряды
+Первые 2 минуты боя не стрелять
+Взять базу или сбить захват
+Чат решает: челлендж выбирают зрители`;
+
+const DMG = [0, 350, 550, 750, 1000, 1300, 1700, 2100, 2600, 3100, 3600, 4000];
+const DIFF = { easy: 0.75, normal: 1, hard: 1.35 };
+
+// ---------- Состояние ----------
+function loadJSON(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+const S = Object.assign({
+  region: 'eu', appId: '1e984dbbdf7b1c1fbd284d4cadc0b17f', nick: '',
+  accountId: null, token: null, tokenExp: 0,
+  tiers: [...TIERS], types: Object.keys(TYPES), onlyPrem: false,
+  diff: 'normal', sound: true, excluded: [], challenges: DEFAULT_CH, history: [],
+}, loadJSON(KEY, {}));
+const save = () => saveJSON(KEY, S);
+let hangar = loadJSON(HANGAR_KEY, []);
+let current = null;      // последний результат (payload)
+let spinning = false;
+
+const tokenValid = () => S.token && S.tokenExp * 1000 > Date.now() + 60000;
+
+// ---------- Утилиты ----------
+function rnd() { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 2 ** 32; }
+const pick = arr => arr[Math.floor(rnd() * arr.length)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const round50 = n => Math.max(50, Math.round(n / 50) * 50);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+function setStatus(msg, err = false) { const el = $('#status'); el.textContent = msg; el.classList.toggle('err', err); }
+
+// ---------- Звук ----------
+let ac;
+const soundOn = () => OBS ? !params.has('mute') : S.sound;
+function beep(freq = 900, dur = 0.035, vol = 0.07, type = 'square', delay = 0) {
+  if (!soundOn()) return;
+  try {
+    ac = ac || new AudioContext();
+    const t = ac.currentTime + delay;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch {}
+}
+const fanfare = () => [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.22, 0.08, 'triangle', i * 0.11));
+
+// ---------- WG API ----------
+async function api(method, q) {
+  const u = new URL(`${REGIONS[S.region].api}/wot/${method}/`);
+  u.searchParams.set('application_id', S.appId.trim());
+  for (const [k, v] of Object.entries(q)) if (v != null) u.searchParams.set(k, v);
+  const r = await fetch(u);
+  const j = await r.json();
+  if (j.status !== 'ok') {
+    const e = j.error || {};
+    throw new Error(`${e.message || 'API error'}${e.field ? ` (${e.field})` : ''}`);
+  }
+  return j.data;
+}
+
+async function loadHangar() {
+  $('#loadBtn').disabled = true;
+  try {
+    let id = tokenValid() ? S.accountId : null;
+    if (!id) {
+      if (!S.nick.trim()) throw new Error('Введи ник');
+      setStatus('Ищу игрока…');
+      const list = await api('account/list', { search: S.nick.trim(), type: 'exact' });
+      if (!list.length) throw new Error('Игрок не найден в этом регионе');
+      id = list[0].account_id; S.nick = list[0].nickname; $('#nick').value = S.nick;
+    }
+    setStatus('Загружаю танки…');
+    let mine = null, fromGarage = false;
+    if (tokenValid()) {
+      // Что стоит в ангаре прямо сейчас, отдаёт только tanks/stats с токеном входа
+      try {
+        const st = await api('tanks/stats', {
+          account_id: id, access_token: S.token, in_garage: 1, fields: 'tank_id,in_garage,all.battles',
+        });
+        mine = (st[id] || []).filter(t => t.in_garage !== false).map(t => ({ tank_id: t.tank_id, battles: t.all?.battles || 0 }));
+        fromGarage = mine.length > 0;
+      } catch (e) {
+        if (!/ACCESS_TOKEN/.test(e.message)) throw e;
+        S.token = null; S.tokenExp = 0; renderAuth(); // вход протух — грузим без него
+      }
+    }
+    if (!fromGarage) {
+      const data = await api('account/tanks', { account_id: id, fields: 'tank_id,statistics.battles' });
+      if (!data[id]) throw new Error('Нет данных — профиль скрыт или аккаунт пустой');
+      mine = data[id].map(t => ({ tank_id: t.tank_id, battles: t.statistics?.battles || 0 }));
+    }
+
+    setStatus(`Загружаю картинки (${mine.length})…`);
+    const ids = mine.map(t => t.tank_id);
+    const info = {};
+    for (let i = 0; i < ids.length; i += 100) {
+      Object.assign(info, await api('encyclopedia/vehicles', {
+        tank_id: ids.slice(i, i + 100).join(','), language: 'ru',
+        fields: 'tank_id,name,short_name,tier,type,nation,is_premium,images.big_icon',
+      }));
+    }
+    hangar = mine.map(t => {
+      const v = info[t.tank_id];
+      if (!v) return null;
+      return {
+        id: t.tank_id, name: v.short_name || v.name, tier: v.tier, type: v.type,
+        prem: !!v.is_premium, img: (v.images?.big_icon || '').replace(/^http:/, 'https:'), battles: t.battles,
+      };
+    }).filter(Boolean).sort((a, b) => b.tier - a.tier || a.name.localeCompare(b.name, 'ru'));
+    saveJSON(HANGAR_KEY, hangar);
+    save();
+    setStatus(`Готово: ${hangar.length} танков ${fromGarage ? 'в ангаре' : '(все, на которых играл)'}`);
+    renderAll();
+  } catch (e) {
+    setStatus('Ошибка: ' + e.message, true);
+  } finally {
+    $('#loadBtn').disabled = false;
+  }
+}
+
+function login() {
+  if (!HAS_SERVER) return toast('Для входа запусти start.bat и открой http://localhost:8080');
+  const redirect = location.origin + location.pathname;
+  location.href = `${REGIONS[S.region].api}/wot/auth/login/?application_id=${encodeURIComponent(S.appId.trim())}&redirect_uri=${encodeURIComponent(redirect)}`;
+}
+function logout() {
+  S.token = null; S.tokenExp = 0; save(); renderAuth();
+  setStatus('Вышел. Перезагрузи ангар, чтобы обновить список.');
+}
+function handleAuthRedirect() {
+  if (!params.has('status')) return;
+  if (params.get('status') === 'ok' && params.has('access_token')) {
+    S.token = params.get('access_token');
+    S.tokenExp = +params.get('expires_at') || 0;
+    S.accountId = +params.get('account_id');
+    S.nick = params.get('nickname') || S.nick;
+    save();
+    history.replaceState(null, '', location.pathname);
+    setTimeout(loadHangar, 0);
+  } else if (params.get('status') === 'error') {
+    history.replaceState(null, '', location.pathname);
+    setTimeout(() => setStatus('Вход не удался: ' + (params.get('message') || 'ошибка'), true), 0);
+  }
+}
+
+// ---------- Пул ----------
+const inFilters = t => S.tiers.includes(t.tier) && S.types.includes(t.type) && (!S.onlyPrem || t.prem);
+const pool = () => hangar.filter(t => inFilters(t) && !S.excluded.includes(t.id));
+const slim = t => ({ id: t.id, name: t.name, tier: t.tier, type: t.type, prem: t.prem, img: t.img });
+
+// ---------- Челленджи ----------
+function parseChallenges() {
+  return S.challenges.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const m = l.match(/^\[([^\]]+)\]\s*(.+)$/);
+    return m ? { types: m[1].split(',').map(s => s.trim().toUpperCase()), text: m[2] } : { types: null, text: l };
+  });
+}
+function fillChallenge(text, tank) {
+  const k = DIFF[S.diff] || 1;
+  const dmg = round50((DMG[tank.tier] || 3000) * k * (tank.type === 'SPG' ? 0.75 : 1));
+  const vals = {
+    dmg, tier: ROMAN[tank.tier],
+    frags: Math.max(1, (tank.tier <= 4 ? 4 : 3) + (S.diff === 'hard' ? 1 : S.diff === 'easy' ? -1 : 0)),
+    assist: round50(dmg * 0.8), block: round50(dmg * 0.9),
+    spots: { easy: 4, normal: 6, hard: 8 }[S.diff], stuns: { easy: 6, normal: 10, hard: 15 }[S.diff],
+  };
+  return text.replace(/\{(\w+)\}/g, (m, key) => vals[key] ?? m);
+}
+function challengeSequence(tank) {
+  const label = TYPES[tank.type];
+  let list = parseChallenges().filter(c => !c.types || c.types.includes(label)).map(c => fillChallenge(c.text, tank));
+  if (!list.length) list = ['Просто победить 🙂'];
+  const seq = [];
+  for (let i = 0; i < 20; i++) {
+    let c = pick(list);
+    if (list.length > 1) while (c === seq[seq.length - 1]) c = pick(list);
+    seq.push(c);
+  }
+  return seq; // последний — итоговый
+}
+
+// ---------- Анимация ----------
+function cardHTML(t, extra = '') {
+  return `<div class="tcard t-${t.type} ${t.prem ? 'prem' : ''} ${extra}">
+    <span class="tg">${ROMAN[t.tier]} · ${TYPES[t.type] || ''}</span>
+    <img src="${esc(t.img)}" alt="" loading="eager">
+    <div class="nm">${esc(t.name)}</div>
+  </div>`;
+}
+
+function renderStrip(items) {
+  $('#reelEmpty').hidden = true;
+  $('#strip').innerHTML = items.map(t => cardHTML(t)).join('');
+}
+
+function reelTarget(p) {
+  const reelW = $('#reel').clientWidth;
+  const card = $('#strip').firstElementChild;
+  const cw = card.offsetWidth;
+  const step = cw + parseFloat(getComputedStyle($('#strip')).gap || 10);
+  return { reelW, cw, step, x: reelW / 2 - (p.winIndex * step + cw / 2 + p.jitter * cw) };
+}
+
+function animateReel(p, animate) {
+  const strip = $('#strip');
+  return new Promise(resolve => {
+    const { reelW, cw, step, x } = reelTarget(p);
+    strip.style.transition = 'none';
+    if (!animate) { strip.style.transform = `translateX(${x}px)`; return resolve(); }
+    strip.style.transform = `translateX(${reelW / 2 - cw / 2 - step * 2}px)`;
+    strip.offsetWidth; // reflow
+    strip.style.transition = `transform ${p.dur}ms cubic-bezier(.1,.62,.12,1)`;
+    strip.style.transform = `translateX(${x}px)`;
+
+    let lastIdx = null;
+    const end = performance.now() + p.dur + 80;
+    (function tick() {
+      const m = new DOMMatrix(getComputedStyle(strip).transform);
+      const idx = Math.floor((reelW / 2 - m.m41) / step);
+      if (idx !== lastIdx) { if (lastIdx !== null) beep(1100, 0.025, 0.05); lastIdx = idx; }
+      if (performance.now() < end) requestAnimationFrame(tick); else resolve();
+    })();
+  });
+}
+
+async function animateChallenge(seq, animate) {
+  const el = $('#chText');
+  el.classList.remove('final');
+  if (animate) {
+    el.classList.add('rolling');
+    for (let i = 0; i < seq.length - 1; i++) {
+      el.textContent = seq[i];
+      beep(600 + i * 25, 0.03, 0.05, 'square');
+      await sleep(55 + i * i * 1.6);
+    }
+  }
+  el.classList.remove('rolling');
+  el.textContent = seq[seq.length - 1];
+  el.offsetWidth;
+  el.classList.add('final');
+  if (animate) fanfare();
+}
+
+function showTank(t) {
+  $('#resTank').className = `tank t-${t.type}`;
+  $('#resImg').src = t.img;
+  $('#resMeta').textContent = `${ROMAN[t.tier]} уровень · ${TYPES[t.type]}${t.prem ? ' · ПРЕМ' : ''}`;
+  $('#resName').textContent = t.name;
+}
+function showStatus(st) {
+  $('#resStatus').innerHTML = st === 'ok' ? '<span class="badge ok">✅ ВЫПОЛНЕНО</span>'
+    : st === 'fail' ? '<span class="badge fail">❌ ПРОВАЛ</span>' : '';
+}
+
+async function play(p, animate = true) {
+  current = p; spinning = true; updateButtons();
+  const win = p.items[p.winIndex];
+  const reelOnly = p.kind === 'full' && animate;
+  if (reelOnly) { $('#result').hidden = true; }
+  if (!$('#strip').children.length || p.kind === 'full' || !animate) renderStrip(p.items);
+  await animateReel(p, reelOnly);
+  $('#strip').children[p.winIndex]?.classList.add('win');
+  showTank(win);
+  showStatus(null);
+  $('#result').hidden = false;
+  if (reelOnly) await sleep(350);
+  await animateChallenge(p.ch, animate);
+  showStatus(p.status);
+  spinning = false; updateButtons();
+}
+
+// ---------- Синхронизация с OBS ----------
+async function pushState(p) {
+  if (!HAS_SERVER) return;
+  try { await fetch('/api/state', { method: 'POST', body: JSON.stringify(p) }); } catch {}
+}
+
+function startOverlay() {
+  document.body.classList.add('obs');
+  $('#reelEmpty').textContent = '';
+  let lastId = null, first = true;
+  setInterval(async () => {
+    try {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      if (r.status !== 200) return;
+      const p = await r.json();
+      if (!p || !p.id) return;
+      if (p.id !== lastId) {
+        lastId = p.id;
+        // При первой загрузке/перезагрузке источника не прокручиваем заново — просто показываем результат
+        play(p, !first);
+      } else if (!spinning && current && current.status !== p.status) {
+        current.status = p.status; showStatus(p.status);
+      }
+    } catch {} finally { first = false; }
+  }, 400);
+}
+
+// ---------- Действия ----------
+async function spin() {
+  if (spinning) return;
+  const p = pool();
+  if (!p.length) return toast('Пул пуст — загрузи ангар или ослабь фильтры');
+  const win = pick(p);
+  const N = 64, W = 56;
+  const items = Array.from({ length: N }, (_, i) => slim(i === W ? win : pick(p)));
+  const payload = {
+    id: Date.now() + '-' + Math.floor(rnd() * 1e6), kind: 'full', ts: Date.now(),
+    items, winIndex: W, jitter: (rnd() - 0.5) * 0.8, dur: 7000,
+    ch: challengeSequence(win), status: null,
+  };
+  pushState(payload);
+  await play(payload, true);
+  addHistory(payload);
+}
+
+async function rerollChallenge() {
+  if (spinning || !current) return;
+  const win = current.items[current.winIndex];
+  const payload = { ...current, id: Date.now() + '-' + Math.floor(rnd() * 1e6), kind: 'challenge', ts: Date.now(), ch: challengeSequence(win), status: null };
+  pushState(payload);
+  await play(payload, true);
+  addHistory(payload);
+}
+
+function setResult(st) {
+  if (!current || spinning) return;
+  current.status = st; showStatus(st); pushState(current);
+  const h = S.history.find(x => x.pid === current.id);
+  if (h) { h.status = st; save(); renderHistory(); }
+}
+
+function addHistory(p) {
+  S.history.unshift({ pid: p.id, ts: p.ts, tank: p.items[p.winIndex], ch: p.ch[p.ch.length - 1], status: null });
+  S.history = S.history.slice(0, 200);
+  save(); renderHistory();
+}
+
+// ---------- Рендер панели ----------
+function renderAuth() {
+  const on = tokenValid();
+  $('#loginBtn').hidden = on;
+  $('#logoutBtn').hidden = !on;
+  $('#who').textContent = hangar.length ? `${S.nick || 'игрок'} · ${hangar.length} танков${on ? ' · вход выполнен' : ''}` : 'ангар не загружен';
+}
+
+function renderChips() {
+  $('#tierChips').innerHTML = TIERS.map(t => `<span class="chip ${S.tiers.includes(t) ? 'on' : ''}" data-tier="${t}">${ROMAN[t]}</span>`).join('');
+  $('#typeChips').innerHTML = Object.entries(TYPES).map(([k, v]) => `<span class="chip ${S.types.includes(k) ? 'on' : ''}" data-type="${k}">${v}</span>`).join('');
+}
+
+function renderPool() {
+  $('#poolGrid').innerHTML = hangar.map(t => `
+    <div class="pcard t-${t.type} ${S.excluded.includes(t.id) ? 'off' : ''} ${inFilters(t) ? '' : 'filtered'}" data-id="${t.id}" title="${esc(t.name)} — боёв: ${t.battles}">
+      <span class="tg">${ROMAN[t.tier]} ${TYPES[t.type]}</span>
+      <img src="${esc(t.img)}" alt="" loading="lazy">
+      <div class="nm">${esc(t.name)}</div>
+    </div>`).join('') || '<div class="hint">Здесь появятся твои танки</div>';
+  $('#poolInfo').textContent = hangar.length ? `в рулетке ${pool().length} из ${hangar.length}` : '';
+  if (!current) {
+    $('#reelEmpty').hidden = false;
+    $('#reelEmpty').textContent = hangar.length ? 'Жми КРУТИТЬ 🎰' : 'Загрузи свой ангар справа →';
+    if (hangar.length) $('#strip').innerHTML = '';
+  }
+}
+
+function renderHistory() {
+  $('#hist').innerHTML = S.history.map(h => `
+    <div class="hitem t-${h.tank.type}">
+      <img src="${esc(h.tank.img)}" alt="">
+      <div><b>${ROMAN[h.tank.tier]} ${esc(h.tank.name)}</b><div class="c">${esc(h.ch)}</div></div>
+      <div class="s">${h.status === 'ok' ? '✅' : h.status === 'fail' ? '❌' : '⏳'}</div>
+    </div>`).join('') || '<div class="hint">Пока пусто</div>';
+  const ok = S.history.filter(h => h.status === 'ok').length, fail = S.history.filter(h => h.status === 'fail').length;
+  $('#histStats').textContent = ok + fail ? `✅ ${ok} · ❌ ${fail}` : '';
+}
+
+function updateButtons() {
+  $('#spinBtn').disabled = spinning || !hangar.length;
+  for (const b of ['#rerollBtn', '#okBtn', '#failBtn']) $(b).disabled = spinning || !current;
+}
+
+function renderAll() { renderAuth(); renderChips(); renderPool(); renderHistory(); updateButtons(); }
+
+// ---------- Инициализация ----------
+function initPanel() {
+  $('#region').innerHTML = Object.entries(REGIONS).map(([k, r]) => `<option value="${k}">${r.name}</option>`).join('');
+  $('#region').value = S.region;
+  $('#appId').value = S.appId;
+  $('#nick').value = S.nick;
+  $('#onlyPrem').checked = S.onlyPrem;
+  $('#diff').value = S.diff;
+  $('#sound').checked = S.sound;
+  $('#chList').value = S.challenges;
+
+  const obsUrl = HAS_SERVER ? `${location.origin}${location.pathname}?obs=1` : 'http://localhost:8080/?obs=1';
+  $('#obsUrl').value = obsUrl;
+  if (!HAS_SERVER) $('#obsWarn').innerHTML = '⚠️ Сейчас страница открыта как файл. Для OBS и входа запусти <b>start.bat</b>.';
+
+  $('#region').onchange = e => { S.region = e.target.value; S.token = null; S.accountId = null; save(); renderAuth(); };
+  $('#appId').onchange = e => { S.appId = e.target.value.trim(); save(); };
+  $('#nick').onchange = e => { S.nick = e.target.value.trim(); if (!tokenValid()) S.accountId = null; save(); };
+  $('#nick').onkeydown = e => { if (e.key === 'Enter') { S.nick = e.target.value.trim(); loadHangar(); } };
+  $('#loadBtn').onclick = () => { S.nick = $('#nick').value.trim(); loadHangar(); };
+  $('#loginBtn').onclick = login;
+  $('#logoutBtn').onclick = logout;
+  $('#onlyPrem').onchange = e => { S.onlyPrem = e.target.checked; save(); renderPool(); };
+  $('#diff').onchange = e => { S.diff = e.target.value; save(); };
+  $('#sound').onchange = e => { S.sound = e.target.checked; save(); };
+  $('#chList').oninput = e => { S.challenges = e.target.value; save(); };
+  $('#chReset').onclick = () => { S.challenges = DEFAULT_CH; $('#chList').value = DEFAULT_CH; save(); };
+  $('#copyObs').onclick = () => { navigator.clipboard?.writeText($('#obsUrl').value).then(() => toast('Ссылка скопирована'), () => $('#obsUrl').select()); };
+
+  $('#tierChips').onclick = e => {
+    const t = +e.target.dataset.tier; if (!t) return;
+    S.tiers = S.tiers.includes(t) ? S.tiers.filter(x => x !== t) : [...S.tiers, t];
+    save(); renderChips(); renderPool();
+  };
+  $('#typeChips').onclick = e => {
+    const t = e.target.dataset.type; if (!t) return;
+    S.types = S.types.includes(t) ? S.types.filter(x => x !== t) : [...S.types, t];
+    save(); renderChips(); renderPool();
+  };
+  $('#poolGrid').onclick = e => {
+    const c = e.target.closest('.pcard'); if (!c) return;
+    const id = +c.dataset.id;
+    S.excluded = S.excluded.includes(id) ? S.excluded.filter(x => x !== id) : [...S.excluded, id];
+    save(); c.classList.toggle('off'); $('#poolInfo').textContent = `в рулетке ${pool().length} из ${hangar.length}`;
+  };
+
+  $('#spinBtn').onclick = spin;
+  $('#rerollBtn').onclick = rerollChallenge;
+  $('#okBtn').onclick = () => setResult('ok');
+  $('#failBtn').onclick = () => setResult('fail');
+  $('#clearHist').onclick = () => { if (confirm('Очистить историю?')) { S.history = []; save(); renderHistory(); } };
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+      e.preventDefault(); spin();
+    }
+  });
+
+  handleAuthRedirect();
+  renderAll();
+}
+
+if (OBS) startOverlay(); else initPanel();
+</script>
+</body>
+</html>
