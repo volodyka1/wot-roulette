@@ -1513,7 +1513,7 @@ function createCol(p) {
     <div class="tm-nick"><span></span><em><b>СТРИМЕР</b></em></div>
     <div class="tm-stage"><b class="tm-water"></b><i class="tm-glow"></i>
       <div class="tm-reel"><div class="tm-strip"></div></div>
-      <div class="tm-empty">${EMPTY_ICON}<span>ждёт спина</span></div><i class="tm-flash"></i></div>
+      <div class="tm-empty">${EMPTY_ICON}<span>${p.ph ? 'ждёт игрока' : 'ждёт спина'}</span></div><i class="tm-flash"></i></div>
     <div class="tm-meta"></div>
     <div class="tm-ch"><div class="txt"></div></div>
     <div class="tm-live"></div>
@@ -1523,7 +1523,8 @@ function createCol(p) {
     nickEl: q('.tm-nick span'), reel: q('.tm-reel'), strip: q('.tm-strip'), water: q('.tm-water'), flash: q('.tm-flash'),
     meta: q('.tm-meta'), chBox: q('.tm-ch'), chTxt: q('.tm-ch .txt'), live: q('.tm-live'), stamp: q('.tm-stamp') };
   c.run = makeRunner(() => runCol(c));
-  c.stop = watchAcc(p.acc, TM_LIMIT, (ev, raw, initial) => colEvent(c, ev, raw, initial));
+  // заглушка свободного места: без подписки на спины
+  c.stop = p.ph ? () => {} : watchAcc(p.acc, TM_LIMIT, (ev, raw, initial) => colEvent(c, ev, raw, initial));
   return c;
 }
 function colEvent(c, ev, raw, initial) {
@@ -1539,12 +1540,16 @@ function colEvent(c, ev, raw, initial) {
   if (ev === 'added' && isNew && newest && !initial && c.ready && raw.status !== 'cancelled' && serverNow() - ts < TM_FRESH) c.queue.push(raw.id);
   if (c.ready) c.run();
 }
-// последний не отменённый спин игрока
+// последний не отменённый спин игрока; итоги старше TM_OLD (прошлые сессии) не показываем, pending — всегда
+const TM_OLD = 6 * 3600 * 1000;
 function colLatest(c) {
   let best = null, bt = -1;
+  const now = serverNow();
   c.spins.forEach(raw => {
     if (!raw || raw.status === 'cancelled') return;
     const t = num(+raw.ts, 0);
+    const done = raw.status === 'ok' || raw.status === 'fail' || raw.status === 'ambiguous';
+    if (done && now - (num(+(raw.result && raw.result.checkedAt), 0) || t) > TM_OLD) return;
     if (!best || t > bt || (t === bt && String(raw.id) > String(best.id))) { best = raw; bt = t; }
   });
   return best ? norm(best) : null;
@@ -1739,9 +1744,13 @@ async function runCol(c) {
 // раскладка: друг 1 — стример — друг 2
 function teamRoster(r) {
   const f = r.friends.slice(0, 2), want = [];
-  if (f[0]) want.push(f[0]);
-  if (r.owner) want.push(r.owner);
-  if (f[1]) want.push(f[1]);
+  // при известном стримере всегда три места: пустое место друга — заглушка «ждёт игрока»
+  const ph = k => ({ acc: '_ph' + k, nick: '', owner: false, ph: true });
+  if (r.owner) want.push(f[0] || ph(0), r.owner, f[1] || ph(1));
+  else {
+    if (f[0]) want.push(f[0]);
+    if (f[1]) want.push(f[1]);
+  }
   const keys = want.map(p => p.acc);
   T.cols.forEach((c, acc) => { if (keys.indexOf(acc) < 0) { c.stop(); c.el.remove(); T.cols.delete(acc); } });
   const wrap = $('#tmCols');
@@ -1757,7 +1766,10 @@ function teamRoster(r) {
   $('#team').hidden = false;
   T.shown = true;
 }
-function startTeam() { startRoster(teamRoster); }
+function startTeam() {
+  startRoster(teamRoster);
+  setInterval(() => T.cols.forEach(c => c.run()), 60000); // устаревшие итоги гаснут и без новых событий
+}
 
 // ---------- Серия: цепочка выполнений/провалов ----------
 const S = { rows: new Map(), order: [], shown: false };

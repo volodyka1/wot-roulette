@@ -6,14 +6,14 @@
 <title>Танковая рулетка</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff3d5a'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='white'/%3E%3C/svg%3E">
 <script>
-// Старые ссылки OBS (index.html?obs=…) -> obs.html: obs=1 — основной, obs=feed / obs=board — лента и таблица
+// Старые ссылки OBS (index.html?obs=…) -> obs.html: obs=1 — основной, obs=feed / board / team / series — остальные виджеты
 (function () {
   var p = new URLSearchParams(location.search);
   if (!p.has('obs')) return;
   document.documentElement.classList.add('obs');
   var o = (p.get('obs') || '').toLowerCase(), q = new URLSearchParams();
   if (p.get('room')) q.set('room', p.get('room'));
-  if (o === 'feed' || o === 'board') q.set('w', o);
+  if (['feed', 'board', 'team', 'series'].indexOf(o) >= 0) q.set('w', o);
   ['size', 'mute', 'sound', 'period'].forEach(function (k) { if (p.has(k)) q.set(k, p.get(k)); });
   var s = q.toString();
   location.replace(location.pathname.replace(/[^\/]*$/, '') + 'obs.html' + (s ? '?' + s : ''));
@@ -970,6 +970,10 @@ function login() {
   // друг в комнате возвращается на ту же ?room=ID
   const friendRoom = inRoom() && !RM.owner ? RM.id : '';
   try { if (friendRoom) sessionStorage.setItem(PENDING_ROOM_KEY, friendRoom); else sessionStorage.removeItem(PENDING_ROOM_KEY); } catch {}
+  // друг входит на сервер комнаты: по нему стример искал его ник
+  if (friendRoom && RM.meta && REGIONS[RM.meta.region] && RM.meta.region !== S.region) {
+    S.region = RM.meta.region; save(); $('#region').value = S.region;
+  }
   const redirect = location.origin + location.pathname + (friendRoom ? '?room=' + encodeURIComponent(friendRoom) : '');
   location.href = `${REGIONS[S.region].api}/wot/auth/login/?application_id=${encodeURIComponent(S.appId.trim())}&redirect_uri=${encodeURIComponent(redirect)}`;
 }
@@ -980,6 +984,8 @@ function logout() {
 function handleAuthRedirect() {
   if (!params.has('status')) return;
   if (params.get('status') === 'ok' && params.has('access_token')) {
+    // вошёл другой аккаунт — танки прошлого не крутим, пока грузится свой ангар (renderAll следом)
+    if (String(+params.get('account_id')) !== String(S.accountId)) { hangar = []; saveJSON(HANGAR_KEY, []); }
     S.token = params.get('access_token');
     S.tokenExp = +params.get('expires_at') || 0;
     S.accountId = +params.get('account_id');
@@ -1453,7 +1459,7 @@ async function lateSnapshot(s) {
     const snap = await WR.tracker.snapshot({ ...trackBase(s.acc), tankId: s.tank.id, withAchievements: WR.catalog.needsAchievements(s.challenge) });
     if (snap.lastBattle * 1000 > spunAtOf(s)) {
       // после спина уже были бои — посчитать бой на этом танке нельзя
-      await store.resolve(s, { status: 'ambiguous', result: { text: 'статистику сняли уже после боя', checkedAt: Date.now(), by: 'auto' } });
+      await store.resolve(s, { status: 'ambiguous', result: { text: 'статистику сняли уже после боя', checkedAt: nowSrv(), by: 'auto' } });
     } else await store.rebase(s, snap);
   } catch (e) { trackErr(e); }
 }
@@ -1461,7 +1467,7 @@ async function lateSnapshot(s) {
 // Результат проверки одного спина -> статус
 async function applyCheck(s, r) {
   if (!r) return;
-  const res = d => ({ text: WR.catalog.describe(s.challenge, d), delta: d, checkedAt: Date.now(), by: 'auto' });
+  const res = d => ({ text: WR.catalog.describe(s.challenge, d), delta: d, checkedAt: nowSrv(), by: 'auto' });
   if (r.state === 'done') {
     const ok = WR.catalog.evaluate(s.challenge, r.delta);
     await store.resolve(s, { status: ok ? 'ok' : 'fail', result: res(r.delta) });
@@ -1585,9 +1591,15 @@ async function rerollChallenge() {
     if (!challenge.auto) patch.snapshot = null;
     else if (!hadSnap) patch.spunAt = WR.room.serverNow();
     rerollBusy = true; updateButtons();
-    try { await WR.room.updateSpin(RM.id, e.id, patch); }
+    // транзакцией: только пока спин ещё 'pending' (стример мог успеть закрыть его)
+    let done = true;
+    try {
+      if (typeof WR.room.rerollSpin === 'function') done = (await WR.room.rerollSpin(RM.id, e.id, patch)).committed;
+      else await WR.room.updateSpin(RM.id, e.id, patch);
+    }
     catch (err) { return roomErr(err, true); }
     finally { rerollBusy = false; updateButtons(); }
+    if (!done) return toast('Челлендж уже завершён');
     if (curEntry !== e || spinning) return;
     Object.assign(e, patch);
     if (challenge.auto && !hadSnap) startSnapshot(e);
@@ -1607,7 +1619,7 @@ async function rerollChallenge() {
 // Ручное решение стримера (ручной челлендж или «несколько боёв»)
 async function setResult(st) {
   if (!curEntry || !current || spinning) return;
-  await store.resolve(curEntry, { status: st, result: { text: 'отмечено вручную', checkedAt: Date.now(), by: 'manual' } }, { force: true });
+  await store.resolve(curEntry, { status: st, result: { text: 'отмечено вручную', checkedAt: nowSrv(), by: 'manual' } }, { force: true });
 }
 
 function addHistory(entry) {
@@ -1776,7 +1788,7 @@ const RM = {};
 function resetRM() {
   Object.assign(RM, {
     id: null, key: null, owner: false, claimed: false,
-    meta: null, ready: false, players: {}, whitelist: {}, spins: {},
+    meta: null, ready: false, spinsReady: false, players: {}, whitelist: {}, spins: {},
     me: null, joining: false, fatal: '', conn: null, unsubs: [],
   });
 }
@@ -1787,6 +1799,9 @@ let holdIds = null;
 const shown = s => !(holdIds && String(s.acc || '') === accStr() && !holdIds.has(s.id));
 const ROOM_RE = /^[a-z0-9]{10}$/;
 const PUBLIC_URL = 'https://volodyka1.github.io/wot-roulette/'; // сайт для друзей, когда стример сидит на localhost
+// панель открыта локально (start.bat или файлом): ссылки комнаты строим от PUBLIC_URL, чтобы они работали без start.bat
+const localPanel = () => !HAS_SERVER || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+const roomLinks = () => WR.room.links(RM.id, RM.key, localPanel() ? PUBLIC_URL : undefined);
 // адрес без параметров входа; другу оставляем ?room=ID
 const cleanUrl = () => location.pathname + (isFriend() ? '?room=' + encodeURIComponent(RM.id) : '');
 
@@ -1794,8 +1809,12 @@ const cleanUrl = () => location.pathname + (isFriend() ? '?room=' + encodeURICom
 const roomStore = {
   all: () => Object.values(RM.spins).filter(shown),
   find: id => RM.spins[id] || null,
-  // друг проверяет свои спины, стример — все спины комнаты
-  toCheck: () => Object.values(RM.spins).filter(s => s.status === 'pending' && canTrack(s) && (RM.owner || String(s.acc) === accStr())),
+  // друг проверяет свои спины (пока он в комнате с этого браузера), стример — все спины комнаты
+  toCheck: () => {
+    const p = RM.players[accStr()];
+    if (!RM.owner && !(RM.me && p && p.uid === WR.room.uid)) return [];
+    return Object.values(RM.spins).filter(s => s.status === 'pending' && canTrack(s) && (RM.owner || String(s.acc) === accStr()));
+  },
   async resolve(spin, { status, result }, { force = false } = {}) {
     try {
       const r = await WR.room.resolveSpin(RM.id, spin.id, { status, result }, { force });
@@ -1910,7 +1929,10 @@ function roomSubscribe() {
     roomRender();
   }, err));
   if (RM.owner) keep(WR.room.onWhitelist(id, w => { if (RM.id === id) { RM.whitelist = w || {}; roomRender(); } }, err));
-  keep(WR.room.onSpins(id, { limit: 300 }, (ev, sp) => { if (RM.id === id) mergeSpin(ev, sp); }, err));
+  // крутить можно только после первой загрузки спинов (иначе не видны активные челленджи и занятые танки)
+  const spinsLoaded = () => { if (RM.id === id && !RM.spinsReady) { RM.spinsReady = true; renderPool(); roomRender(); } };
+  if (typeof WR.room.rerollSpin !== 'function') RM.spinsReady = true; // старый room.js из кэша — сигнала готовности нет
+  keep(WR.room.onSpins(id, { limit: 300, onReady: spinsLoaded }, (ev, sp) => { if (RM.id === id) mergeSpin(ev, sp); }, err));
   keep(WR.room.onConnection(c => { if (RM.id === id) { RM.conn = c; renderRoom(); } }));
 }
 function roomStop() {
@@ -1954,6 +1976,7 @@ function ensureTrack() {
 function roomSpinBlock() {
   if (RM.fatal) return RM.fatal;
   if (!RM.ready) return 'Комната ещё подключается…';
+  if (!RM.spinsReady) return 'Загружаю спины комнаты…';
   if (!accStr()) return 'Войди через Wargaming, чтобы крутить в комнате';
   if (RM.owner && !RM.claimed) return 'Нет прав владельца комнаты — обнови страницу';
   if (!RM.owner && !(RM.me && RM.me.acc === accStr())) return 'Сначала войди в комнату — карточка «Комната» справа';
@@ -1994,15 +2017,18 @@ async function joinRoom() {
   RM.joining = true; renderRoom();
   roomSay('Вхожу в комнату…');
   try {
-    const r = await WR.room.join(id, { acc: accStr(), nick: S.nick || '', region: S.region });
+    const roomRegion = RM.meta && REGIONS[RM.meta.region] ? RM.meta.region : '';
+    const r = await WR.room.join(id, { acc: accStr(), nick: S.nick || '', region: roomRegion || S.region });
     if (RM.id !== id) return;
     RM.me = { acc: r.acc, nick: r.nick };
     roomSay(`Ты в комнате как ${r.nick}`);
   } catch (e) {
     if (RM.id !== id) return;
     RM.me = null;
+    const rr = RM.meta && REGIONS[RM.meta.region] ? RM.meta.region : '';
+    const other = rr && rr !== S.region ? ` Сервер комнаты ${rr.toUpperCase()}, а ты вошёл на ${String(S.region).toUpperCase()} — войди через Wargaming ещё раз.` : '';
     const err = e && e.code === 'NOT_WHITELISTED'
-      ? Object.assign(new Error(`Ника ${S.nick || ''} нет в списке игроков этой комнаты — попроси стримера добавить его и нажми «Войти в комнату» ещё раз`), { code: e.code })
+      ? Object.assign(new Error(`Ника ${S.nick || ''} нет в списке игроков этой комнаты — попроси стримера добавить его и нажми «Войти в комнату» ещё раз.${other}`), { code: e.code })
       : e;
     roomErr(err, true);
   } finally {
@@ -2058,7 +2084,7 @@ function renderObsCard() {
   const dir = HAS_SERVER ? location.origin + location.pathname.replace(/[^/]*$/, '') : 'http://localhost:8080/';
   const own = inRoom() && RM.owner && !!(window.WR && WR.room);
   const friend = inRoom() && !RM.owner;
-  $('#obsUrl').value = own ? WR.room.links(RM.id, RM.key).obsTeam : dir + 'obs.html';
+  $('#obsUrl').value = own ? roomLinks().obsTeam : dir + 'obs.html';
   $('#obsUrl').parentElement.hidden = friend;
   $('#obsHint').innerHTML = own
     ? 'Добавь <b>Источник → Браузер</b> с этим адресом: виджет <b>«Команда»</b>, ширина <b>960</b>, высота <b>320</b> — твой танк в центре, друзья по бокам. Вторая ссылка, <b>«Серия»</b> (560×300), — в карточке «Комната». Фон прозрачный.'
@@ -2089,12 +2115,11 @@ function renderOwnerRoom(title) {
   $('#roMeta').textContent = `Код ${RM.id} · сервер ${region.toUpperCase()} · в списке ${wl.length}`;
   // ссылки не меняются, пока комната та же — не трогаем (чтобы не сбивать выделение)
   if ($('#roLinks').dataset.room !== RM.id && window.WR && WR.room) {
-    const L = WR.room.links(RM.id, RM.key);
-    // localhost друзьям не открыть — их ссылка ведёт на сайт
-    const local = !HAS_SERVER || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
-    if (local) L.friends = WR.room.links(RM.id, null, PUBLIC_URL).friends;
+    // localhost друзьям не открыть, а OBS без start.bat — все ссылки ведут на сайт
+    const local = localPanel();
+    const L = roomLinks();
     $('#roLinks').innerHTML = linkRow('Ссылка для друзей', L.friends, 'Отправь друзьям: откроют, войдут через Wargaming — и в игре, если ник есть в списке ниже.'
-        + (local ? ' Ссылка ведёт на сайт рулетки (GitHub Pages) — там должна быть выложена эта версия.' : ''))
+        + (local ? ' Ссылки комнаты ведут на сайт рулетки (GitHub Pages) — там должна быть выложена эта версия.' : ''))
       + linkRow('OBS: команда', L.obsTeam, 'Источник «Браузер» <b>960×320</b> — три танка в ряд: твой в центре, друзья по бокам, под каждым челлендж и итог.')
       + linkRow('OBS: серия', L.obsSeries, '<b>560×300</b> — серии выполнений и провалов у каждого игрока.')
       + `<details class="more-links"><summary>Другие виджеты</summary>`
@@ -2191,9 +2216,12 @@ async function wlAdd() {
 }
 async function wlRemove(acc) {
   const w = RM.whitelist[acc];
-  if (!confirm(`Убрать ${(w && w.nick) || acc} из комнаты? Его спины останутся, но крутить он больше не сможет.`)) return;
+  if (!confirm(`Убрать ${(w && w.nick) || acc} из комнаты? Его незавершённые челленджи отменятся, остальные спины останутся, но крутить он больше не сможет.`)) return;
   try { await WR.room.removeFromWhitelist(RM.id, acc); roomSay(`${(w && w.nick) || acc} убран из комнаты`); }
-  catch (e) { roomErr(e, true); }
+  catch (e) { return roomErr(e, true); }
+  // его активные челленджи иначе зависнут: в «Игроках комнаты» его больше нет
+  const act = Object.values(RM.spins).filter(s => String(s.acc) === String(acc) && (s.status === 'pending' || s.status === 'ambiguous'));
+  for (const s of act) await roomStore.resolve(s, { status: 'cancelled', result: { text: 'Игрок убран из комнаты', checkedAt: nowSrv(), by: 'manual' } }, { force: true });
 }
 async function setRoomMeta(patch) {
   try { await WR.room.updateMeta(RM.id, patch); toast('Настройки комнаты сохранены'); }
@@ -2312,7 +2340,7 @@ function initPanel() {
     const who = inRoom() && String(h.acc) !== accStr() ? ` у ${h.nick || 'друга'}` : '';
     if (act === 'cancel' && !confirm(`Отменить челлендж на ${h.tank.name}${who}? Танк вернётся в рулетку.`)) return;
     const status = act === 'cancel' ? 'cancelled' : act === 'ok' ? 'ok' : 'fail';
-    store.resolve(h, { status, result: { text: act === 'cancel' ? 'отменён' : 'отмечено вручную', checkedAt: Date.now(), by: 'manual' } }, { force: true });
+    store.resolve(h, { status, result: { text: act === 'cancel' ? 'отменён' : 'отмечено вручную', checkedAt: nowSrv(), by: 'manual' } }, { force: true });
   };
   $('#hist').onclick = onSpinAct;
   $('#players').onclick = onSpinAct;

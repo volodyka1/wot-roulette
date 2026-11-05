@@ -289,10 +289,11 @@
     const force = !!(opts && opts.force);
     if (!STATUSES.includes(res.status)) throw rErr('Неверный итог спина: ' + res.status, 'BAD_STATUS');
     const result = clean(res.result);
-    if (result && result.checkedAt == null) result.checkedAt = serverNow();
     const r = roomRef(roomId, 'spins/' + spinId);
     const snap = await op(() => r.get(), 'Не удалось прочитать спин.');
     if (!snap.exists()) throw rErr('Спин не найден — возможно, его удалили', 'NO_SPIN');
+    // время итога — всегда по часам сервера (виджеты OBS сравнивают его с serverNow)
+    if (result) result.checkedAt = serverNow();
     const tx = await op(() => r.transaction(cur => {
       // нет локальной копии — вернём как есть, сервер пришлёт настоящее значение и функция вызовется снова
       if (cur === null) return null;
@@ -305,6 +306,27 @@
     // спин удалили между чтением и транзакцией: «записали» пустоту
     if (tx.committed && !(s && s.exists())) throw rErr('Спин не найден — возможно, его удалили', 'NO_SPIN');
     return { committed: !!tx.committed, spin: s && s.exists() ? Object.assign({ id: s.key }, s.val()) : null };
+  }
+
+  // Перекрутка транзакцией: патч применяется, только пока статус ещё 'pending' (null в патче — удалить поле).
+  // -> { committed } ; committed: false — итог уже записан (или спин удалён), ничего не меняли.
+  async function rerollSpin(roomId, spinId, patch) {
+    roomId = checkRoomId(roomId);
+    spinId = checkSpinId(spinId);
+    const data = clean(patch) || {};
+    delete data.id;
+    const r = roomRef(roomId, 'spins/' + spinId);
+    const snap = await op(() => r.get(), 'Не удалось прочитать спин.');
+    if (!snap.exists()) return { committed: false };
+    const tx = await op(() => r.transaction(cur => {
+      if (cur === null) return null;
+      if (cur.status !== 'pending') return; // отмена: итог уже есть
+      const next = Object.assign({}, cur);
+      for (const k in data) { if (data[k] === null) delete next[k]; else next[k] = data[k]; }
+      return next;
+    }, undefined, false), 'Менять чужие спины может только владелец комнаты.');
+    const s = tx.snapshot;
+    return { committed: !!tx.committed && !!(s && s.exists()) };
   }
 
   // ---------- подписки ----------
@@ -322,6 +344,7 @@
   }
 
   // cb('added' | 'changed' | 'removed', spin с полем id). 'removed' приходит и когда спин выпал из последних limit.
+  // opts.onReady() — один раз, когда пришли все спины первой загрузки (после их 'added').
   function onSpins(roomId, opts, cb, onErr) {
     if (typeof opts === 'function') { onErr = cb; cb = opts; opts = {}; }
     roomId = checkRoomId(roomId);
@@ -335,6 +358,8 @@
       [['child_added', 'added'], ['child_changed', 'changed'], ['child_removed', 'removed']].forEach(([ev, name]) => {
         hs[ev] = q.on(ev, s => cb(name, Object.assign({ id: s.key }, s.val())), fail);
       });
+      // 'value' того же запроса приходит после всех child_added первой загрузки
+      if (opts && typeof opts.onReady === 'function') q.once('value').then(() => { if (!off) opts.onReady(); }, fail);
     }, e => report(onErr, e));
     return () => {
       off = true;
@@ -403,7 +428,7 @@
 
   WR.room = {
     init, serverNow, create, claimOwner, addToWhitelist, removeFromWhitelist, join,
-    publishSpin, updateSpin, resolveSpin, onSpins, onPlayers, onWhitelist, onMeta, links,
+    publishSpin, updateSpin, resolveSpin, rerollSpin, onSpins, onPlayers, onWhitelist, onMeta, links,
     // сверх спецификации: проверка правил, состояние связи, текущий uid
     diagnose, onConnection, updateMeta,
     get uid() { return uid; },
