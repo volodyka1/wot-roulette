@@ -605,9 +605,11 @@ function norm(raw) {
     items, winIndex: wi, jitter: Math.max(-0.5, Math.min(0.5, num(+raw.jitter, 0))),
     dur: Math.max(1500, Math.min(20000, num(+raw.dur, 7000))),
     ch, chFinal: ch[ch.length - 1], tank, status, resultText, auto: !!(chObj && chObj.auto),
-    rerolls: num(+raw.rerolls, 0), checkedAt: num(+(res && res.checkedAt), 0),
+    rerolls: num(+raw.rerolls, 0), checkedAt: num(+(res && res.checkedAt), 0), battleAt: num(+(res && res.battleAt), 0),
   };
 }
+// когда бой засчитан: для порядка итогов в «Серии» и таблице (ручное решение позже не двигает старый бой в конец)
+const resultTime = sp => sp.battleAt || sp.checkedAt || sp.ts;
 const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
 const ICON_FAIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const ICON_AMB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg>';
@@ -790,6 +792,7 @@ function makeRunner(task) {
 }
 // ---------- Конфетти (canvas на весь источник) ----------
 const FX = { ctx: null, parts: [], raf: 0, dpr: 1, w: 0, h: 0, last: 0 };
+const FX_TTL = 5000; // мс: дольше конфетти не живёт даже при медленной отрисовке
 function confettiAt(el, tier, count) {
   try {
     const cv = $('#fx');
@@ -814,6 +817,7 @@ function confettiAt(el, tier, count) {
         rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45,
         w: spark ? 2 : (6 + Math.random() * 8) * k, h: spark ? 2 : (3 + Math.random() * 4) * k,
         c: spark ? '#ffffff' : cols[i % cols.length], life: 0, max: 70 + Math.random() * 70, spark, fl: Math.random() * 6.28,
+        born: performance.now(),
       });
     }
     if (!FX.raf) { FX.last = performance.now(); FX.raf = requestAnimationFrame(fxStep); }
@@ -825,6 +829,8 @@ function fxStep(now) {
   ctx.setTransform(FX.dpr, 0, 0, FX.dpr, 0, 0);
   ctx.clearRect(0, 0, FX.w, FX.h);
   FX.parts = FX.parts.filter(p => {
+    // источник был скрыт (rAF стоял) — старое конфетти не выстреливает пачкой при показе сцены
+    if (now - p.born > FX_TTL) return false;
     p.life += k; p.vy += 0.3 * k; p.vx *= Math.pow(0.975, k); p.vy *= Math.pow(0.985, k);
     p.x += p.vx * k; p.y += p.vy * k; p.rot += p.vr * k; p.fl += 0.22 * k;
     const a = 1 - p.life / p.max;
@@ -1072,7 +1078,14 @@ const runMain = makeRunner(async () => {
     await play(sp, sp.kind === 'challenge' ? 'challenge' : 'full');
   }
   const latest = latestOwner();
-  if (!latest) return;
+  if (!latest) {
+    // спины стёрли («Обнулить») — как после перезагрузки: виджет пустой
+    if (M.shown) {
+      $('#main').hidden = true; $('#plate').hidden = true; $('#plate').classList.remove('in');
+      M.shown = null; M.ch = ''; M.st = undefined; M.rt = ''; R.key = '';
+    }
+    return;
+  }
   if (!M.shown || M.shown.id !== latest.id) { await play(latest, 'static'); return; }
   if (latest.chFinal !== M.ch) { await rerollShown(latest); return; }
   if (latest.status !== M.st || latest.resultText !== M.rt) {
@@ -1086,7 +1099,7 @@ function startMainRoom() {
   watchSpins(40, (ev, raw, initial) => {
     if (ev === 'reset') { M.spins.clear(); M.ready = false; return; }
     if (ev === 'ready') { M.ready = true; runMain(); return; }
-    if (ev === 'removed') { M.spins.delete(raw.id); return; } // экран не трогаем
+    if (ev === 'removed') { M.spins.delete(raw.id); if (M.ready) runMain(); return; }
     if (raw.owner !== true) return;
     const isNew = !M.spins.has(raw.id);
     M.spins.set(raw.id, raw);
@@ -1334,7 +1347,7 @@ function computeBoard() {
     if (!sp.acc || sp.ts < from) return;
     const s = get(sp.acc, sp.nick, sp.owner);
     if (sp.status === 'ok') s.ok++; else if (sp.status === 'fail') s.fail++; else return;
-    s.res.push({ t: sp.checkedAt || sp.ts, st: sp.status });
+    s.res.push({ t: resultTime(sp), st: sp.status });
   });
   return Object.keys(stats).map(k => {
     const s = stats[k];
@@ -1794,7 +1807,14 @@ function teamRoster(r) {
     if (isNew) { c = createCol(p); T.cols.set(p.acc, c); }
     c.nickEl.textContent = p.nick;
     c.el.classList.toggle('is-owner', p.owner);
-    if (wrap.children[i] !== c.el) wrap.insertBefore(c.el, wrap.children[i] || null);
+    if (wrap.children[i] !== c.el) {
+      // при переносе колонки CSS-анимации запускаются заново — снимаем разовые эффекты прошлого итога
+      if (!isNew) {
+        c.el.classList.remove('flash'); c.chBox.classList.remove('fx'); c.live.classList.remove('pop');
+        const st = c.stamp.firstElementChild; if (st) st.classList.remove('fx');
+      }
+      wrap.insertBefore(c.el, wrap.children[i] || null);
+    }
     if (isNew && T.shown) anim(c.el, [{ opacity: 0, transform: 'translateY(20px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 600, easing: 'cubic-bezier(.16,1,.3,1)' });
   });
   $('#team').hidden = false;
@@ -1853,6 +1873,7 @@ function srCreate(p) {
   });
   return r;
 }
+const srOrder = sp => (stOf(sp) === 'pending' ? sp.ts + 1e15 : resultTime(sp));
 function srStats(r) {
   const from = PERIOD_ALL ? 0 : dayStart(), list = [];
   r.spins.forEach(raw => {
@@ -1860,7 +1881,8 @@ function srStats(r) {
     if (sp.status === 'cancelled' || sp.ts < from) return;
     list.push(sp);
   });
-  list.sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  // цепочка — в порядке итогов (как в таблице): бой, сыгранный позже, встаёт правее; ожидающие — в конце
+  list.sort((a, b) => srOrder(a) - srOrder(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   let ok = 0, fail = 0;
   list.forEach(sp => { if (sp.status === 'ok') ok++; else if (sp.status === 'fail') fail++; });
   // незакрытые старые спины в цепочку не берём, текущий (последний) ожидающий — берём
@@ -1982,24 +2004,51 @@ function startSeries() {
   fit();
 })();
 
-// Автообновление: на сайте вышла новая версия — перезагружаемся сами (OBS иначе держит старую копию в кэше)
+// Основной виджет: размер источника поменяли на ходу — ставим ленту обратно под маркер
+(function mainRealign() {
+  if (W !== 'main') return;
+  addEventListener('resize', () => {
+    const sp = M.shown;
+    if (!sp || !$('#strip').children.length || $('#reel').classList.contains('spinning')) return;
+    try {
+      const m = reelTarget(sp);
+      R.cards = Array.from($('#strip').children); R.reelW = m.reelW; R.cw = m.cw; R.step = m.step;
+      setX(m.x);
+      $('#reel').style.setProperty('--wx', (m.reelW / 2 - sp.jitter * m.cw) + 'px');
+    } catch (e) {}
+  });
+})();
+
+// Автообновление: на сайте вышла новая версия — перезагружаемся сами (OBS иначе держит старую копию в кэше).
+// Сравниваем с датой загруженного документа: OBS мог достать из кэша старую страницу уже после выхода новой
 (function autoUpdate() {
   if (!/^https?:$/.test(location.protocol)) return;
+  const docLM = Date.parse(document.lastModified);
   const probe = () => fetch(location.pathname + '?_probe=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
-    .then(r => (r.ok && (r.headers.get('etag') || r.headers.get('last-modified'))) || '')
-    .catch(() => '');
+    .then(r => (r.ok ? { tag: r.headers.get('etag') || '', lm: Date.parse(r.headers.get('last-modified') || '') } : null))
+    .catch(() => null);
+  const reload = () => {
+    // защита от зацикливания: не чаще раза в 10 минут
+    try {
+      const last = +sessionStorage.getItem('wrUpd') || 0;
+      if (Date.now() - last < 600000) return;
+      sessionStorage.setItem('wrUpd', String(Date.now()));
+    } catch (e) {}
+    const u = new URL(location.href);
+    u.searchParams.set('_v', String(Date.now())); // мимо кэша CDN
+    location.replace(u.toString());
+  };
   let base = '';
-  probe().then(v => { base = v; });
-  setInterval(() => {
-    probe().then(v => {
-      if (!v) return;
-      if (!base) { base = v; return; }
-      if (v === base) return;
-      const u = new URL(location.href);
-      u.searchParams.set('_v', String(Date.now())); // мимо кэша CDN
-      location.replace(u.toString());
-    });
-  }, 120000);
+  const check = () => probe().then(v => {
+    if (!v) return;
+    if (isFinite(docLM) && isFinite(v.lm)) { if (v.lm > docLM + 1000) reload(); return; }
+    // нет дат — по ETag: первая удачная проверка становится точкой отсчёта
+    if (!v.tag) return;
+    if (!base) { base = v.tag; return; }
+    if (v.tag !== base) reload();
+  });
+  check();
+  setInterval(check, 120000);
 })();
 </script>
 </body>

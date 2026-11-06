@@ -299,7 +299,12 @@
       if (cur === null) return null;
       if (!force && cur.status !== 'pending') return; // отмена: итог уже есть
       const next = Object.assign({}, cur, { status: res.status });
-      if (result) next.result = result; else delete next.result;
+      if (result) {
+        // battleAt — когда бой засчитали впервые; позднее ручное решение по уже проверенному спину его не двигает,
+        // иначе в «Серии» и таблице старый бой встаёт последним
+        const prev = cur.status !== 'pending' && cur.result ? +(cur.result.battleAt || cur.result.checkedAt) || 0 : 0;
+        next.result = Object.assign({}, result, { battleAt: prev || result.checkedAt });
+      } else delete next.result;
       return next;
     }, undefined, false), 'Записать итог чужого спина может только владелец комнаты.');
     const s = tx.snapshot;
