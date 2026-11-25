@@ -602,12 +602,12 @@ html:not(.w-game) #game{display:none!important}
 #game .ef.bt.tk{margin-top:66px}
 #game .ef-tk{position:absolute;left:14px;bottom:100%;width:124px;height:78px;margin-bottom:-12px;z-index:-2;pointer-events:none}
 #game .ef-tk::before{content:"";position:absolute;left:-14px;right:-26px;top:2px;bottom:0;transition:opacity .5s;
-  background:radial-gradient(44% 54% at 50% 76%,var(--rcg),transparent 70%),radial-gradient(52% 68% at 50% 74%,rgba(8,8,14,.6),transparent 72%)}
+  background:radial-gradient(46% 56% at 50% 78%,var(--rcg),transparent 70%)}
 /* картинки WG обрезаны по верхнему краю — верх плавно растворяем, чтобы не было ровного среза */
-#game .ef-tk img{position:relative;display:block;width:100%;height:100%;object-fit:contain;object-position:50% 100%;transform:scaleX(-1);filter:drop-shadow(0 4px 6px rgba(0,0,0,.65));transition:filter .5s;
+#game .ef-tk img{position:relative;display:block;width:100%;height:100%;object-fit:contain;object-position:50% 100%;transform:scaleX(-1);filter:brightness(1.14) saturate(1.1) drop-shadow(0 4px 6px rgba(0,0,0,.6));transition:filter .5s;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%);mask-image:linear-gradient(180deg,transparent 0,#000 18%)}
-#game .ef.dead .ef-tk img{filter:grayscale(1) brightness(.55) drop-shadow(0 4px 6px rgba(0,0,0,.65))}
-#game .ef.dead .ef-tk::before{opacity:.45}
+#game .ef.dead .ef-tk img{filter:grayscale(1) brightness(.6) drop-shadow(0 4px 6px rgba(0,0,0,.6))}
+#game .ef.dead .ef-tk::before{opacity:.15}
 #game .ef-mt{position:relative;padding:8px 16px 0 18px;transition:opacity .4s}
 #game .ef-cnt{display:flex;align-items:center;gap:8px;height:34px}
 /* строка счётчика не переносится: число целиком, тесно — ужимается подпись слева; «+N» всплывает поверх и места не занимает */
