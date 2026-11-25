@@ -20,8 +20,11 @@
     blocked: ['damageBlockedByArmor'],
   };
 
-  // Один танк в итоге боя -> статистика за этот бой в полях WR.tracker. Чего игра не прислала — того поля нет
-  // (опыт и медали отсюда не берём: их считает только WG API).
+  // Один танк в итоге боя -> статистика за этот бой в полях WR.tracker. Чего игра не прислала — того поля нет.
+  // Опыт — subtotalXP: базовый с премиум-множителем, ровно так его считает статистика танка у WG (проверено на бою:
+  // originalXP 1294 × 1,5 = 1941 = прирост xp в WG API). Он есть только у себя (раздел personal); у друзей в итоге
+  // лишь базовый опыт без их премиума — их опыт по-прежнему проверяет WG API.
+  // Медали — номера записей досье, названия как у WG API (WR.catalog.achNames): свои и чужие из того же боя.
   function deltaOf(v, winnerTeam) {
     if (!v || typeof v !== 'object') return null;
     const d = { battles: 1 };
@@ -32,6 +35,9 @@
     if (team != null && win != null) d.wins = win !== 0 && win === team ? 1 : 0;
     const death = num(v.deathReason);
     if (death != null) d.survived_battles = death < 0 ? 1 : 0;
+    const xp = num(v.subtotalXP);
+    if (xp != null) d.xp = xp;
+    if (Array.isArray(v.achievements) && WR.catalog && typeof WR.catalog.achNames === 'function') d.achievements = WR.catalog.achNames(v.achievements);
     return d;
   }
 

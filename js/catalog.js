@@ -410,7 +410,25 @@
 
   const needsAchievements = instance => !!(defOf(instance) || {}).ach;
 
+  // Медали в итоге боя из игры (мод WotStat: personal / vehicles[].achievements) приходят номерами записей досье —
+  // RECORD_DB_IDS клиента (scripts/common/dossiers2/custom/records.py). Номера постоянные; здесь — все медали,
+  // которые встречаются в челленджах, под теми же названиями, что у WG API (tanks/achievements)
+  const ACH_IDS = {
+    34: 'warrior', 35: 'invader', 36: 'sniper', 37: 'defender', 38: 'steelwall', 39: 'supporter', 40: 'scout',
+    72: 'evileye', 227: 'sniper2', 228: 'mainGun',
+    73: 'medalRadleyWalters', 55: 'medalKolobanov', 74: 'medalLafayettePool', 107: 'medalNikolas', 77: 'medalPascucci',
+    52: 'medalHalonen', 56: 'medalFadin', 50: 'medalOrlik', 53: 'medalBurda', 54: 'medalBillotte', 145: 'medalDeLanglade',
+    298: 'medalGore', 76: 'medalTarczay', 75: 'medalBrunoPietro', 146: 'medalTamadaYoshio', 148: 'huntsman',
+    106: 'medalLehvaslaiho', 300: 'medalStark', 51: 'medalOskin', 110: 'heroesOfRassenay',
+  };
+  // [номер, …] -> { warrior: 1, … } — та же форма, что delta.achievements у WG API
+  function achNames(ids) {
+    const out = {};
+    (Array.isArray(ids) ? ids : []).forEach(id => { const k = ACH_IDS[id]; if (k) out[k] = (out[k] || 0) + 1; });
+    return out;
+  }
+
   WR.catalog = {
-    CLASS_LABEL, DIFF, LABEL_TYPE, list, instancesFor, evaluate, describe, needsAchievements, round50,
+    CLASS_LABEL, DIFF, LABEL_TYPE, list, instancesFor, evaluate, describe, needsAchievements, round50, ACH_IDS, achNames,
   };
 })();

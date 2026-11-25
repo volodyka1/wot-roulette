@@ -724,9 +724,9 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 <div class="toasts" id="toasts"></div>
 
 <!-- ?v= — номер версии, чтобы браузер не держал старые скрипты из кэша после обновления -->
-<script src="js/catalog.js?v=9"></script>
+<script src="js/catalog.js?v=10"></script>
 <script src="js/tracker.js?v=9"></script>
-<script src="js/gamelink.js?v=1"></script>
+<script src="js/gamelink.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -1680,7 +1680,7 @@ function renderCheck() {
     c.classList.toggle('on', on); c.setAttribute('aria-pressed', on);
   }
   $('#checkHint').innerHTML = game
-    ? 'Итог записывается сразу после боя по данным игры — твой и друзей, которые были с тобой в бою (мод друзьям не нужен). Нужен мод <b>WotStat «Виджеты»</b> на этом компьютере. Бой друга без тебя, опыт и медали проверит Wargaming.'
+    ? 'Итог записывается сразу после боя по данным игры — твой и друзей, которые были с тобой в бою (мод друзьям не нужен). Нужен мод <b>WotStat «Виджеты»</b> на этом компьютере. Медали и твой опыт тоже берутся из игры; бой друга без тебя и опыт друзей проверит Wargaming.'
     : 'Итог приходит из статистики Wargaming: обычно за секунды, иногда через пару минут. Работает у всех, мод не нужен.';
   const el = $('#checkStatus');
   let msg = '', ok = false;

@@ -2286,7 +2286,7 @@ const GM_URL_ACC = (params.get('acc') || '').replace(/\D/g, '');
 const GM_FRIENDS = params.get('friends') !== '0';
 const GM_DEMO = params.has('demo') && params.get('demo') !== '0';
 const GM_APP = '1e984dbbdf7b1c1fbd284d4cadc0b17f'; // application_id панели — только чтобы узнать теги танков
-const GM_CATALOG = 'js/catalog.js?v=9';            // те же формулы проверки, что у панели
+const GM_CATALOG = 'js/catalog.js?v=10';            // те же формулы проверки, что у панели
 const GM_BT_KEY = GM_DEMO ? 'wrGameBattleDemo' : 'wrGameBattle'; // бой понарошку не смешиваем с настоящим
 const GM_AFTER = 20 * 60000;                       // итог боя виден, пока игрок не выбрал другой танк, но не дольше
 const G = {
@@ -2521,6 +2521,12 @@ function gmResult(v) {
   if (typeof common.winnerTeam === 'number' && typeof av.team === 'number') got.wins = common.winnerTeam !== 0 && common.winnerTeam === av.team ? 1 : 0;
   const death = pick('deathReason');
   if (death != null && vs.length === 1) got.survived_battles = death < 0 ? 1 : 0;
+  // опыт — как в статистике WG (базовый с премиумом, subtotalXP); медали — номера записей досье -> названия
+  const xp = pick('subtotalXP');
+  if (xp != null) got.xp = xp;
+  if (vs.some(x => Array.isArray(x.achievements)) && WR.catalog && typeof WR.catalog.achNames === 'function') {
+    got.achievements = WR.catalog.achNames([].concat(...vs.map(x => (Array.isArray(x.achievements) ? x.achievements : []))));
+  }
   const fin = Object.assign({}, b.final || b.last || {});
   Object.keys(got).forEach(k => { if (got[k] != null) fin[k] = got[k]; });
   b.final = fin; b.res = true;
@@ -2651,7 +2657,7 @@ function gmView(sp, delta, live) {
   // так, будто бой выигран, — а про победу честно пишем, что она решится в конце (late; итог при этом не окончательный)
   const late = GM_LATE.some(f => used.has(f) && !(f in delta));
   if (late) { delta = Object.assign({}, delta); GM_LATE.forEach(f => { if (used.has(f) && !(f in delta)) delta[f] = 1; }); }
-  for (const f of used) if (!(f in delta)) return null;
+  for (const f of used) if (!(f in delta)) return gmProxy(sp, delta, live); // медали, опыт, промахи — только по итогу боя
   let text = String(WR.catalog.describe(inst, delta) || '');
   if (live) text = text.replace(/выжил: да/g, 'пока жив').replace(/выжил: нет/g, 'уничтожен');
   if (late) text = text.replace(/(победа): да/gi, (m, w) => w + (live ? ' — в конце боя' : ' — ждём итог боя'));
@@ -2676,6 +2682,38 @@ function gmView(sp, delta, live) {
   if (ratio != null) ratio = ok ? 1 : Math.min(ratio, 0.97);
   return { text, ok, ratio, hold, lost, late, keep, pp: efParts(text, sp.chFinal) };
 }
+// Медали, опыт, промахи, число оглушений игра отдаёт только в итоге боя. Пока его нет — показываем то, что видно уже
+// сейчас и к этому относится (у «Воина» — фраги до шести), а сам итог честно обещаем после боя.
+// Пороги — только те, что написаны в самом челлендже; остальные цифры — без цели, просто для ориентира
+const GM_PROXY = {
+  medal_warrior: d => [['Фраги', d.frags, 6]],
+  medal_wall: d => [['Заблокировано', d.blocked], ['непробитий', d.no_damage_direct_hits_received]],
+  medal_main: d => [['Урон', d.damage_dealt]],
+  medal_team: d => [['Засвечено', d.spotted], ['помощь', num(d.radio_assisted_damage, 0) + num(d.track_assisted_damage, 0)]],
+  medal_any: d => [['Фраги', d.frags], ['засвечено', d.spotted], ['заблокировано', d.blocked]],
+  medal_sniper: d => [['Урон', d.damage_dealt]],
+  medal_epic: d => [['Урон', d.damage_dealt], ['фраги', d.frags]],
+  xp: d => [['Урон', d.damage_dealt], ['помощь', num(d.radio_assisted_damage, 0) + num(d.track_assisted_damage, 0)]],
+  accuracy: d => [['Пробитий', d.piercings]],
+  no_miss: d => [['Пробитий', d.piercings]],
+  hits: d => [['Пробитий', d.piercings]],
+  he_hits: d => [['Пробитий', d.piercings]],
+  stun: d => [['Урон по оглушению', d.stun_assisted_damage]],
+};
+const GM_PROXY_NOTE = {
+  medal: ['Медаль засчитаем по итогу боя', 'Медаль — ждём итог боя'],
+  xp: ['Опыт посчитаем по итогу боя', 'Опыт — ждём итог боя'],
+  shots: ['Попадания и промахи посчитаем по итогу боя', 'Попадания — ждём итог боя'],
+  stun: ['Оглушения посчитаем по итогу боя', 'Оглушения — ждём итог боя'],
+};
+function gmProxy(sp, delta, live) {
+  const fn = GM_PROXY[sp.chId];
+  if (!fn) return null;
+  const text = (fn(delta) || []).map(([k, v, max]) => (max != null ? `${k}: ${Math.round(num(v, 0))} / ${max}` : `${k} ${efFmt(num(v, 0))}`)).join(', ');
+  const kind = /^medal_/.test(sp.chId) ? 'medal' : sp.chId === 'xp' ? 'xp' : sp.chId === 'stun' ? 'stun' : 'shots';
+  // proxy — подпись вместо «до цели ещё…»; ok всегда false: выполнено или нет, скажет только итог боя
+  return { text, ok: false, ratio: null, hold: false, lost: false, late: true, keep: false, proxy: GM_PROXY_NOTE[kind][live ? 0 : 1], pp: efParts(text, '') };
+}
 
 // --- модель окна: что показать сейчас ---
 function gmModel() {
@@ -2694,7 +2732,8 @@ function gmModel() {
     m.chip = 'battle';
     m.view = sp.auto ? gmView(sp, (b && b.last) || gmLiveDelta(), true) : null;
     // уже не выполнить: условие сорвано или танк уничтожен, а цифр не хватает (после гибели они не растут) — счётчики сереют
-    m.over = !!(m.view && !m.view.ok && (m.view.lost || (b && b.dead)));
+    // (медаль и опыт после гибели ещё могут прийти — их не гасим)
+    m.over = !!(m.view && !m.view.ok && !m.view.proxy && (m.view.lost || (b && b.dead)));
     if (!sp.auto) m.note = 'Ручной челлендж — итог отметит стример';
     else if (!m.view) m.note = 'Этот челлендж посчитаем после боя';
     else if (b && b.partial) m.note = 'Окно открыли посреди боя — часть цифр не видна';
@@ -2703,8 +2742,9 @@ function gmModel() {
     m.view = sp.auto && b && b.final ? gmView(sp, b.final, false) : null;
     if (st === 'pending') {
       m.chip = 'check';
-      m.over = !!(m.view && !m.view.ok && !(b.partial && !b.res)); // по данным игры не выполнено (если окно видело весь бой)
-      if (m.view && b.partial && !b.res) m.note = 'Часть боя окно не видело — ждём итог боя и проверку';
+      m.over = !!(m.view && !m.view.ok && !m.view.proxy && !(b.partial && !b.res)); // по данным игры не выполнено (если окно видело весь бой)
+      if (m.view && m.view.proxy) m.note = m.view.proxy; // медаль, опыт — итог боя ещё не пришёл
+      else if (m.view && b.partial && !b.res) m.note = 'Часть боя окно не видело — ждём итог боя и проверку';
       else if (m.view && m.view.late && m.view.ok) m.note = 'Своё сделал — победу узнаем из итога боя'; // вышел из боя раньше конца
       else if (m.view) {
         m.note = m.view.ok ? 'По данным игры — выполнено. Ждём проверку' : 'По данным игры — не выполнено. Ждём проверку';
@@ -2799,6 +2839,7 @@ function efFoot(s) {
   const v = s.view, pp = v && v.pp;
   const extra = s.note ? `<span class="${s.noteCls}">${esc(s.note)}</span>` : '';
   if (!v) return extra;
+  if (v.proxy) return esc(v.proxy) + (extra ? '<br>' + extra : ''); // медаль, опыт, промахи — итог только после боя
   if (s.done) return `<span class="good">✓ Выполнено${s.dead ? '' : ' — доиграй бой'}</span>` + (extra ? '<br>' + extra : '');
   // цифры уже набраны, а челлендж ещё нет (не выжил, получил много) — подсказки «ещё 0» нет, условие видно строкой выше
   let main = '';
