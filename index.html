@@ -730,7 +730,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="js/room.js?v=11"></script>
+<script src="js/room.js?v=12"></script>
 <script>
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -2293,6 +2293,7 @@ function renderRoom() {
   if (solo) return;
   const title = (RM.meta && RM.meta.title) || 'Комната';
   if (RM.owner) renderOwnerRoom(title); else renderFriendRoom(title);
+  renderLook();
 }
 
 function renderOwnerRoom(title) {
@@ -2309,7 +2310,7 @@ function renderOwnerRoom(title) {
         + (local ? ' Ссылки комнаты ведут на сайт рулетки (GitHub Pages) — там должна быть выложена эта версия.' : ''))
       + linkRow('OBS: команда', L.obsTeam, 'Источник «Браузер» <b>960×320</b> — три танка в ряд: твой в центре, друзья по бокам, под каждым челлендж и итог.')
       + linkRow('OBS: серия', L.obsSeries, '<b>560×300</b> — серии выполнений и провалов у каждого игрока.')
-      + linkRow('В игре (мод WotStat)', gameLink(), gameHint())
+      + linkRow('В игре (мод WotStat)', gameLink(), gameHint()) + LOOK_ROW
       + `<details class="more-links"><summary>Другие виджеты</summary>`
       + linkRow('OBS: барабан', L.obsMain, '<b>760×320</b> — только твой спин с барабаном. Широкий, как раньше (1920×460), — допиши <code class="k">&amp;size=big</code>.')
       + linkRow('OBS: лента друзей', L.obsFeed, '<b>480×600</b> — спины друзей и их итоги по мере появления.')
@@ -2340,13 +2341,38 @@ function gameHint() {
     + 'Твой челлендж прямо в игре: в ангаре подскажет, тот ли танк выбран, в бою — прогресс вживую, после боя — итог. Ниже — друзья. Ширина ~360, высота подстроится сама.';
 }
 function gameLink() { return roomLinks().game + (accStr() ? '&acc=' + encodeURIComponent(accStr()) : ''); }
+// Вид окна в игре — у каждого игрока свой (players/{acc}/look в комнате). Окно в игре меняется сразу,
+// ссылку в моде трогать не нужно. &look= в ссылке окна важнее этой настройки
+const LOOK_ROW = '<div class="look-row" data-look-row></div>';
+function myLook() { const p = inRoom() ? RM.players[accStr()] : null; return p && p.look === 'mini' ? 'mini' : 'efir'; }
+function renderLook() {
+  const cur = myLook();
+  document.querySelectorAll('[data-look-row]').forEach(el => {
+    if (el.dataset.cur === cur && el.firstChild) return; // не трогаем, пока выбор тот же (фокус и наведение не сбиваются)
+    el.dataset.cur = cur;
+    el.innerHTML = '<label class="f">Вид окна в игре</label><div class="chips">'
+      + [['efir', 'Эфир'], ['mini', 'Минимал']].map(([k, n]) => `<span class="chip${k === cur ? ' on' : ''}" data-look="${k}" tabindex="0" role="button" aria-pressed="${k === cur}"><span>${n}</span></span>`).join('')
+      + '</div><div class="hint">«Эфир» — лента рулетки в ангаре и большой танк в бою. «Минимал» — компактная карточка с теми же цифрами. Меняется сразу, ссылку в моде трогать не нужно.</div>';
+  });
+}
+async function setLook(look) {
+  const acc = accStr(), p = inRoom() && acc ? RM.players[acc] : null;
+  if (!p) return toast('Сначала войди в комнату');
+  if (myLook() === look) return;
+  const prev = p.look;
+  p.look = look; renderLook(); // сразу, не дожидаясь базы
+  try {
+    await WR.room.setLook(RM.id, acc, look);
+    toast(look === 'mini' ? 'Окно в игре: «Минимал»' : 'Окно в игре: «Эфир»');
+  } catch (e) { p.look = prev; renderLook(); roomErr(e, true); }
+}
 function renderFriendRoom(title) {
   const logged = tokenValid() && !!S.accountId;
   const me = RM.me && RM.me.acc === accStr() ? RM.me : null;
   // ссылка не меняется, пока та же комната и тот же игрок — не трогаем, чтобы не сбивать выделение
   const gkey = me && window.WR && WR.room ? RM.id + ':' + accStr() : '';
   if ($('#rfGame').dataset.key !== gkey) {
-    $('#rfGame').innerHTML = gkey ? linkRow('В игре (мод WotStat)', gameLink(), gameHint()) : '';
+    $('#rfGame').innerHTML = gkey ? linkRow('В игре (мод WotStat)', gameLink(), gameHint()) + LOOK_ROW : '';
     $('#rfGame').dataset.key = gkey;
   }
   $('#rfTitle').textContent = title;
@@ -2544,6 +2570,13 @@ function initPanel() {
   };
   $('#hist').onclick = onSpinAct;
   $('#players').onclick = onSpinAct;
+  // вид окна в игре: фишки в карточке «Комната» перерисовываются, поэтому слушаем на документе.
+  // Enter / Пробел с клавиатуры переключают вид и не доходят до «Пробел — крутить»
+  document.addEventListener('click', e => { const c = e.target.closest && e.target.closest('[data-look]'); if (c) setLook(c.dataset.look); });
+  document.addEventListener('keydown', e => {
+    const c = e.target.closest && e.target.closest('[data-look]');
+    if (c && (e.key === 'Enter' || (e.code === 'Space' && c.matches(':focus-visible')))) { e.preventDefault(); e.stopPropagation(); setLook(c.dataset.look); }
+  }, true);
 
   document.addEventListener('keydown', e => {
     if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {

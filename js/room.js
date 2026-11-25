@@ -24,6 +24,7 @@
   };
   const REGIONS = ['eu', 'na', 'asia'];
   const STATUSES = ['pending', 'ok', 'fail', 'ambiguous', 'cancelled'];
+  const LOOKS = ['efir', 'mini'];   // вид окна в игре: «Эфир» и «Минимал»
   const TIMEOUT = 15000;
   const RULES_HINT = 'Проверь, что правила из database.rules.json вставлены в консоль Firebase (Realtime Database → Правила → Опубликовать).';
 
@@ -238,6 +239,7 @@
       joinedAt: (same && old.joinedAt) || TS(),
       owner,
     };
+    if ((same || owner) && LOOKS.includes(old.look)) player.look = old.look; // выбранный вид окна в игре не теряем при перезаходе
     try {
       await op(() => roomRef(roomId, 'players/' + acc).set(player));
     } catch (e) {
@@ -448,11 +450,20 @@
     return ids.length;
   }
 
+  // Вид окна в игре (obs.html?w=game): у каждого игрока свой, окно читает players/{acc}/look и меняется сразу.
+  // Пишет сам игрок (в свою запись) или стример — правила базы те же, что для входа в комнату
+  async function setLook(roomId, acc, look) {
+    roomId = checkRoomId(roomId);
+    acc = checkAcc(acc);
+    if (!LOOKS.includes(look)) throw rErr('Неизвестный вид окна: ' + look, 'BAD_LOOK');
+    await op(() => roomRef(roomId, 'players/' + acc).update({ look }), 'Вид окна меняет сам игрок или стример.');
+  }
+
   WR.room = {
     init, serverNow, create, claimOwner, addToWhitelist, removeFromWhitelist, join,
     publishSpin, updateSpin, resolveSpin, rerollSpin, onSpins, onPlayers, onWhitelist, onMeta, links,
-    // сверх спецификации: проверка правил, состояние связи, текущий uid
-    diagnose, onConnection, updateMeta, clearSpins,
+    // сверх спецификации: проверка правил, состояние связи, текущий uid, вид окна в игре
+    diagnose, onConnection, updateMeta, clearSpins, setLook, LOOKS,
     get uid() { return uid; },
     STATUSES,
   };
