@@ -425,6 +425,20 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 /* ---------- Комната ---------- */
 .room-links .obslink{margin-top:0}
 .room-links .hint{margin-top:6px}
+/* вид окна в игре — выбор картинкой: кнопки-«радио», выбранная в градиентной рамке */
+.looks{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(260px,380px));align-items:start}
+.look{position:relative;display:block;width:100%;margin:0;padding:10px 10px 12px;border-radius:var(--r-md);border:2px solid rgba(255,255,255,.08);background:rgba(8,8,13,.6);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .25s var(--out)}
+.look:hover{border-color:rgba(255,138,61,.5);transform:translateY(-2px)}
+.look:active{transform:scale(.99)}
+.look:focus-visible{outline:2px solid var(--a2);outline-offset:3px}
+.look img{display:block;width:100%;height:auto;pointer-events:none}
+.look .lk-h{display:flex;align-items:center;gap:10px;margin-top:10px}
+.look .lk-n{font:900 italic 17px/1 var(--fd);text-transform:uppercase;letter-spacing:.02em}
+.look .lk-ok{display:none;margin-left:auto;padding:5px 9px;border-radius:5px;transform:skewX(-12deg);background:var(--grad);color:#fff;font:800 italic 10px/1 var(--fd);letter-spacing:.1em;text-transform:uppercase}
+.look .lk-d{display:block;margin-top:6px;color:var(--muted);font:500 12px/1.4 var(--fu)}
+.look.on{background:linear-gradient(rgba(14,14,21,.97),rgba(14,14,21,.97)) padding-box,var(--grad) border-box;border-color:transparent;box-shadow:0 12px 32px rgba(255,61,90,.22)}
+.look.on .lk-ok{display:inline-block}
+@media (prefers-reduced-motion:reduce){.look,.look:hover,.look:active{transition:none;transform:none}}
 .warn{color:#ffcf3f}
 .wl{display:flex;flex-direction:column;gap:6px}
 .wl-item{display:flex;align-items:center;gap:10px;padding:7px 10px 7px 14px;border-radius:9px;background:var(--s1);border:1px solid var(--line)}
@@ -2344,15 +2358,28 @@ function gameLink() { return roomLinks().game + (accStr() ? '&acc=' + encodeURIC
 // Вид окна в игре — у каждого игрока свой (players/{acc}/look в комнате). Окно в игре меняется сразу,
 // ссылку в моде трогать не нужно. &look= в ссылке окна важнее этой настройки
 const LOOK_ROW = '<div class="look-row" data-look-row></div>';
+// картинки — настоящее окно в бою (2x, designs/previews → img/*.webp)
+const LOOK_OPTS = [
+  ['efir', 'Эфир', 'Лента рулетки в ангаре, крупный танк в бою', 'img/look-efir.webp', 720, 597],
+  ['mini', 'Минимал', 'Компактная карточка — те же цифры, меньше места', 'img/look-mini.webp', 720, 300],
+];
 function myLook() { const p = inRoom() ? RM.players[accStr()] : null; return p && p.look === 'mini' ? 'mini' : 'efir'; }
 function renderLook() {
   const cur = myLook();
   document.querySelectorAll('[data-look-row]').forEach(el => {
-    if (el.dataset.cur === cur && el.firstChild) return; // не трогаем, пока выбор тот же (фокус и наведение не сбиваются)
+    if (!el.firstChild) {
+      el.innerHTML = '<label class="f">Вид окна в игре</label><div class="looks" role="radiogroup" aria-label="Вид окна в игре">'
+        + LOOK_OPTS.map(([k, n, d, src, w, h]) => `<button type="button" class="look" role="radio" data-look="${k}">`
+          + `<img src="${src}" width="${w}" height="${h}" alt="Окно в игре — вид «${n}»" decoding="async">`
+          + `<span class="lk-h"><span class="lk-n">${n}</span><span class="lk-ok">✓ выбран</span></span><span class="lk-d">${d}</span></button>`).join('')
+        + '</div><div class="hint">Меняется сразу — ссылку в моде трогать не нужно.</div>';
+    }
+    if (el.dataset.cur === cur) return; // разметку не пересоздаём — фокус и наведение не сбиваются
     el.dataset.cur = cur;
-    el.innerHTML = '<label class="f">Вид окна в игре</label><div class="chips">'
-      + [['efir', 'Эфир'], ['mini', 'Минимал']].map(([k, n]) => `<span class="chip${k === cur ? ' on' : ''}" data-look="${k}" tabindex="0" role="button" aria-pressed="${k === cur}"><span>${n}</span></span>`).join('')
-      + '</div><div class="hint">«Эфир» — лента рулетки в ангаре и большой танк в бою. «Минимал» — компактная карточка с теми же цифрами. Меняется сразу, ссылку в моде трогать не нужно.</div>';
+    el.querySelectorAll('[data-look]').forEach(b => {
+      const on = b.dataset.look === cur;
+      b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
+    });
   });
 }
 async function setLook(look) {
@@ -2521,9 +2548,10 @@ function initPanel() {
     $(`#typeChips [data-type="${t}"]`)?.focus();
   };
   // фишки работают и с клавиатуры (Enter / Пробел), не запуская рулетку
+  // (Пробел сюда доходит только после Tab — мышью нажатая фишка Пробел не перехватывает, см. ниже)
   for (const id of ['#tierChips', '#typeChips', '#checkMode']) {
     $(id).onkeydown = e => {
-      if (e.key === 'Enter' && e.target.classList.contains('chip')) {
+      if ((e.key === 'Enter' || e.code === 'Space') && e.target.classList.contains('chip')) {
         e.preventDefault(); e.stopPropagation(); e.target.click();
       }
     };
@@ -2570,19 +2598,31 @@ function initPanel() {
   };
   $('#hist').onclick = onSpinAct;
   $('#players').onclick = onSpinAct;
-  // вид окна в игре: фишки в карточке «Комната» перерисовываются, поэтому слушаем на документе.
-  // Enter / Пробел с клавиатуры переключают вид и не доходят до «Пробел — крутить»
+  // вид окна в игре: карточки в «Комнате» перерисовываются, поэтому слушаем на документе.
+  // Это кнопки: Enter / Пробел (после Tab) жмут их сами; стрелки — как у радио: переключают и переводят фокус
   document.addEventListener('click', e => { const c = e.target.closest && e.target.closest('[data-look]'); if (c) setLook(c.dataset.look); });
   document.addEventListener('keydown', e => {
     const c = e.target.closest && e.target.closest('[data-look]');
-    if (c && (e.key === 'Enter' || (e.code === 'Space' && c.matches(':focus-visible')))) { e.preventDefault(); e.stopPropagation(); setLook(c.dataset.look); }
-  }, true);
-
-  document.addEventListener('keydown', e => {
-    if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
-      e.preventDefault(); spin();
-    }
+    if (!c || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+    e.preventDefault();
+    const other = [...c.parentNode.querySelectorAll('[data-look]')].find(x => x !== c);
+    if (other) { other.focus(); setLook(other.dataset.look); }
   });
+
+  // Пробел — крутить. Нажатая мышью кнопка или фишка сбоку его больше не забирает (раньше Пробел жал её ещё раз:
+  // «Копировать», фильтр…). Кто ходит с клавиатуры (Tab, стрелки), тому Пробел, как обычно, жмёт то, что в фокусе.
+  let kbNav = false;
+  document.addEventListener('pointerdown', () => { kbNav = false; }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Tab' || /^(Arrow\w+|Home|End)$/.test(e.key)) kbNav = true;
+    if (e.code !== 'Space' || e.ctrlKey || e.altKey || e.metaKey) return;
+    const a = document.activeElement;
+    if (a && (a.isContentEditable || a.matches('textarea, select, input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit])'))) return; // тут пишут текст
+    const control = a && a !== document.body && a.matches('button, summary, a[href], input, [tabindex]:not([tabindex="-1"]), [role=button], [role=radio]');
+    if (control && kbNav) return;
+    e.preventDefault(); e.stopPropagation();
+    if (!e.repeat) spin();
+  }, true);
 
   roomBoot();                    // ?room / ?key / сохранённая комната — до разбора входа (адрес возврата)
   const justLoggedIn = params.get('status') === 'ok' && params.has('access_token');
