@@ -2542,8 +2542,10 @@ function gmPick() {
   }
   // только что прокрутили новый спин — показываем его (и подсказку, какой танк выбрать), пока танк в ангаре тот же
   if (G.efHold) {
-    const h = active.find(s => s.id === G.efHold.id);
-    if (h && gmHvKey(hv) === G.efHold.hv) return { mode: 'hangar', sp: h, picked: vehMatch(h.tank, hv) === true, all, active, foreign };
+    // сравниваем только с известным танком: связь с игрой пропала или ангар ещё не прислал танк — это не «сменил танк»
+    const h = active.find(s => s.id === G.efHold.id), k = gmHvKey(hv);
+    if (h && k && !G.efHold.hv) G.efHold.hv = k;
+    if (h && (!k || k === G.efHold.hv)) return { mode: 'hangar', sp: h, picked: vehMatch(h.tank, hv) === true, all, active, foreign };
     G.efHold = null;
   }
   const hit = gmMatch(active, hv);
@@ -2584,7 +2586,7 @@ function gmView(sp, delta, live) {
   // lost — уже сорвано (уничтожен, пробили, получил много): даже если добрать все цифры, не выполнить
   let hold = false, lost = false;
   if (live && GM_HOLD.some(f => used.has(f))) {
-    hold = ok;
+    hold = ok && !(num(delta.survived_battles, 1) < 1); // танк уничтожен — получить урон или пробитие уже нельзя, итог окончательный
     if (!ok) {
       const best = {};
       for (const f of used) best[f] = GM_HOLD.indexOf(f) >= 0 ? delta[f] : 1e9;
@@ -2633,7 +2635,10 @@ function gmModel() {
     m.chip = 'wait';
     if (G.on) {
       if (p.picked) { m.note = '✓ Танк выбран — в бой!'; m.noteCls = 'good'; }
-      else { m.note = 'Выбери в ангаре: ' + (names(p.active) || sp.tank.name); m.noteCls = 'warn'; m.off = true; }
+      else { // танк, который уже выбран в ангаре (у него свой челлендж), в подсказку не попадает
+        const hv = gv('hangar.vehicle.info');
+        m.note = 'Выбери в ангаре: ' + (names(p.active.filter(s => vehMatch(s.tank, hv) !== true)) || sp.tank.name); m.noteCls = 'warn'; m.off = true;
+      }
     } else if (p.active.length > 1) m.note = 'Ещё челленджи на: ' + names(p.active.filter(s => s !== sp));
   } else m.note = sp.resultText;
   if (p.foreign) { m.note = 'В игре другой аккаунт, не из этой ссылки — его бои сюда не засчитаются'; m.noteCls = 'warn'; }
@@ -2713,7 +2718,7 @@ function efFoot(s) {
   const v = s.view, pp = v && v.pp;
   const extra = s.note ? `<span class="${s.noteCls}">${esc(s.note)}</span>` : '';
   if (!v) return extra;
-  if (s.done) return '<span class="good">✓ Выполнено — доиграй бой</span>' + (extra ? '<br>' + extra : '');
+  if (s.done) return `<span class="good">✓ Выполнено${s.dead ? '' : ' — доиграй бой'}</span>` + (extra ? '<br>' + extra : '');
   // цифры уже набраны, а челлендж ещё нет (не выжил, получил много) — подсказки «ещё 0» нет, условие видно строкой выше
   let main = '';
   if (v.hold) main = '<span class="good">Пока всё по плану — продержись до конца боя</span>';
@@ -2894,7 +2899,13 @@ function efUpdate(card, s) {
   if (s.layout === 'bt') card.classList.toggle('dead', !!s.dead);
   const pp = s.view && s.view.pp, mts = card.querySelectorAll('.ef-mt');
   if (pp) {
-    pp.parts.forEach((p, i) => { if (mts[i]) efMeterSet(mts[i], p); });
+    pp.parts.forEach((p, i) => {
+      if (!mts[i]) return;
+      efMeterSet(mts[i], p);
+      // зелёная полоса — челлендж выполняется и счётчик набран; «выполняется» может поменяться и без новых цифр (танк уничтожили)
+      const bar = mts[i].querySelector('.ef-bar');
+      if (bar) bar.classList.toggle('done', !!s.view.ok && p.max > 0 && p.cur >= p.max);
+    });
     if (pp.or) { const lead = efLead(pp); mts.forEach((el, i) => { el.classList.toggle('lead', i === lead); el.classList.toggle('dim', i !== lead); }); }
   }
   const rest = card.querySelector('.ef-rest');
