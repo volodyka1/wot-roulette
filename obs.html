@@ -568,6 +568,7 @@ html:not(.w-game) #game{display:none!important}
 @keyframes efPulse{50%{opacity:.3}}
 #game .ef-chip.wait{background:rgba(255,138,61,.14);color:#ffb38a;box-shadow:inset 0 0 0 1px rgba(255,138,61,.5)}
 #game .ef-chip.bt{background:linear-gradient(100deg,#c0163a,#ff3d5a);color:#fff;box-shadow:0 3px 12px rgba(255,61,90,.35)}
+#game .ef-chip.dead{background:linear-gradient(100deg,#2b2c38,#3d3f4f);color:#c9cad8;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 #game .ef-chip.amb{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600}
 #game .ef-chip.ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c}
 #game .ef-chip.fail{background:linear-gradient(100deg,var(--fail2),var(--fail));color:#fff}
@@ -616,6 +617,8 @@ html:not(.w-game) #game{display:none!important}
 #game .ef.noimg .ef-hid{left:20px}
 #game .ef.dead .ef-tk img{filter:grayscale(1) brightness(.62) drop-shadow(0 7px 7px rgba(0,0,0,.5))}
 #game .ef.dead .ef-glow{opacity:.12}
+/* текст челленджа — поверх слоя танка: тень под рендером не должна затемнять первые слова */
+#game .ef.bt .ef-cht{z-index:3}
 #game .ef-mt{position:relative;padding:8px 16px 0 18px;transition:opacity .4s}
 #game .ef-cnt{display:flex;align-items:center;gap:8px;height:34px}
 /* строка счётчика не переносится: число целиком, тесно — ужимается подпись слева; «+N» всплывает поверх и места не занимает */
@@ -2347,6 +2350,7 @@ function gmSync(init) {
 }
 function gmBattleStart(arena, init) {
   G.efHold = null; // в бой ушли — дальше обычный выбор челленджа по танку
+  EF_BAD.clear();  // картинки, не загрузившиеся в прошлом бою, пробуем снова
   const saved = gmLoadBattle();
   // окно перезагрузилось посреди боя — счётчики событий не теряем
   if (saved && !saved.done && arena && String(saved.arena) === String(arena)) { G.bt = saved; saved.partial = true; return; }
@@ -2723,6 +2727,7 @@ function efFoot(s) {
   let main = '';
   if (v.hold) main = '<span class="good">Пока всё по плану — продержись до конца боя</span>';
   else if (v.lost) main = '<span class="bad">В этом бою уже не выполнить</span>';
+  else if (s.dead) main = '<span class="bad">Танк уничтожен</span> — ждём итог боя'; // цифры больше не вырастут, «ещё N» уже ни к чему
   else if (pp && pp.parts.length) {
     const left = pp.parts.filter(p => p.cur < p.max);
     if (pp.or) { const p = pp.parts[efLead(pp)]; if (p.cur < p.max) main = `Ближе к цели ${esc(p.key)}: ещё <b>${efFmt(p.max - p.cur)}</b>`; }
@@ -2739,7 +2744,9 @@ const EF_BOX = new Map();         // адрес картинки -> где на 
 // танк, на котором сейчас играют (тег из игры), иначе тег танка челленджа из WG API; тега нет — '' (покажем маленькую иконку)
 function efHeroUrl(sp) {
   const veh = (G.bt && G.bt.veh) || (G.on ? gv('battle.vehicle') : null);
-  const raw = (veh && typeof veh === 'object' && typeof veh.tag === 'string' && veh.tag) || G.tags.get(String(sp.tank.id)) || '';
+  // тег из игры — только когда это точно танк челленджа (пока идёт сверка «наугад», картинка должна совпадать с подписью)
+  const raw = (veh && typeof veh === 'object' && typeof veh.tag === 'string' && veh.tag && vehMatch(sp.tank, veh) === true && veh.tag)
+    || G.tags.get(String(sp.tank.id)) || '';
   const tag = String(raw).split(':').pop().toLowerCase();
   return /^[a-z0-9_-]{3,80}$/.test(tag) ? EF_HERO + tag + '/' + tag + '_image_resized.png' : '';
 }
@@ -2753,21 +2760,38 @@ function efHeroBox(img) {
     const x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(img, 0, 0);
     const d = x.getImageData(0, 0, w, h).data;
-    let x0 = w, y0 = h, x1 = -1, y1 = -1;
-    for (let y = 0; y < h; y += 2) for (let px = 0, i = y * w * 4 + 3; px < w; px += 2, i += 8) {
-      if (d[i] > 120) { if (px < x0) x0 = px; if (px > x1) x1 = px; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    // верх корпуса — первая строка, где есть сплошной кусок (не тонкая антенна): иначе танк с антенной вышел бы мельче остальных
+    let x0 = w, y0 = -1, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y += 2) {
+      let run = 0, solid = false, r0 = w, r1 = -1;
+      for (let px = 0, i = y * w * 4 + 3; px < w; px += 2, i += 8) {
+        if (d[i] > 120) { if (++run >= 3) solid = true; if (px < r0) r0 = px; if (px > r1) r1 = px; } else run = 0;
+      }
+      if (r1 < 0 || (y0 < 0 && !solid)) continue;
+      if (y0 < 0) y0 = y;
+      if (r0 < x0) x0 = r0;
+      if (r1 > x1) x1 = r1;
+      y1 = y;
     }
-    if (x1 - x0 > w * .15 && y1 - y0 > h * .15) return { w, h, x0, y0, x1, y1 };
+    if (y0 >= 0 && x1 - x0 > w * .15 && y1 - y0 > h * .15) return { w, h, x0, y0, x1, y1 };
   } catch (e) {}
   return { w, h, x0: Math.round(w * .04), y0: Math.round(h * .2), x1: Math.round(w * .75), y1: Math.round(h * .97) };
 }
 // танк вписан в коробку: по центру, низ на низ; зеркально — в рендерах WG танк смотрит влево, а нам нужно на челлендж
 function efHeroCss(b) {
   const x0 = b.w - b.x1, bw = b.x1 - b.x0, bh = b.y1 - b.y0, k = Math.min(EF_TKW / bw, EF_TKH / bh);
+  // маленькая иконка обрезана по краям кадра — края растворяем; у рендера выше корпуса только антенна — она плавно гаснет
+  const mask = b.w <= 200
+    ? 'linear-gradient(180deg,transparent 0,#000 18%),linear-gradient(90deg,transparent 0,#000 10%,#000 90%,transparent)'
+    : `linear-gradient(180deg,transparent ${Math.max(0, b.y0 * k - 12).toFixed(1)}px,#000 ${(b.y0 * k).toFixed(1)}px)`;
   return `width:${(b.w * k).toFixed(1)}px;height:${(b.h * k).toFixed(1)}px;left:${((EF_TKW - bw * k) / 2 - x0 * k).toFixed(1)}px;`
-    + `top:${(EF_TKH - b.y1 * k).toFixed(1)}px;transform:scaleX(-1)`;
+    + `top:${(EF_TKH - b.y1 * k).toFixed(1)}px;transform:scaleX(-1);-webkit-mask-image:${mask};mask-image:${mask}`
+    + (b.w <= 200 ? ';-webkit-mask-composite:source-in;mask-composite:intersect' : '');
 }
+const EF_BAD = new Set(); // картинки, которые в этом бою не загрузились: при пересборке карточки второй раз не просим
 function efHeroImg(url, fb) {
+  if (EF_BAD.has(url)) url = '';
+  if (EF_BAD.has(fb)) fb = '';
   const src = url || fb || '';
   if (!src) return '';
   const b = EF_BOX.get(src); // эту картинку уже мерили — ставим сразу, без мигания при пересборке карточки
@@ -2789,10 +2813,26 @@ function efHeroLoad(img) {
 }
 // крупной картинки нет (новый танк, сеть) — маленькая иконка из спина; нет и её — шапка без танка
 function efHeroErr(img) {
-  const fb = img.dataset.fb;
-  if (fb) { img.dataset.fb = ''; img.removeAttribute('crossorigin'); img.classList.remove('on'); img.src = fb; return; }
+  const bad = img.getAttribute('src'), fb = img.dataset.fb;
+  if (bad) EF_BAD.add(bad);
+  if (fb && !EF_BAD.has(fb)) { img.dataset.fb = ''; img.removeAttribute('crossorigin'); img.classList.remove('on'); img.src = fb; return; }
   const card = img.closest('.ef');
-  if (card) card.classList.add('noimg');
+  if (card) { card.classList.add('noimg'); delete card.dataset.enter; }
+}
+// название рядом с танком: кегль по настоящей ширине текста (место — 147 px), очень длинное — в две строки
+let efNameCtx = null;
+function efNameCls(name) {
+  const n = Array.from(name).length, byLen = n > 14 ? ' l3' : n > 12 ? ' l2' : n > 10 ? ' l1' : '';
+  try {
+    if (!document.fonts || !document.fonts.check('italic 900 21px Montserrat')) return byLen; // шрифт ещё грузится — по числу букв
+    efNameCtx = efNameCtx || document.createElement('canvas').getContext('2d');
+    for (const [cls, px] of [['', 21], [' l1', 18], [' l2', 15.5]]) {
+      efNameCtx.font = `italic 900 ${px}px Montserrat`;
+      efNameCtx.letterSpacing = (-0.01 * px) + 'px';
+      if (efNameCtx.measureText(name).width <= 146.5) return cls;
+    }
+    return ' l3';
+  } catch (e) { return byLen; }
 }
 
 // модель → вид карточки
@@ -2818,18 +2858,20 @@ function efKey(s) {
   if (s.layout === 'idle') return ['idle', s.text, s.note, s.noteCls, s.tone].join('|');
   const pp = s.view && s.view.pp;
   const sig = pp ? pp.parts.map(p => p.key + '/' + p.max).join(',') + (pp.or ? '|or' : '') + (pp.rest ? '|r' : '') : s.view ? 'txt' : '-';
-  if (s.layout === 'bt') return ['bt', s.sp.id, s.sp.chFinal, sig, s.done, s.note, s.noteCls, s.hero].join('|');
+  if (s.layout === 'bt') return ['bt', s.sp.id, s.sp.chFinal, sig, s.done, s.note, s.noteCls, s.hero, s.dead].join('|');
   return ['hg', s.sp.id, s.sp.chFinal, s.mode, s.chip.join(), s.stamp, s.off, s.flap, sig, s.view ? s.view.ok : '', s.note, s.noteCls].join('|');
 }
 function efHTML(s) {
   if (s.layout === 'idle') return efShell('idle ' + s.tone, null, `<div class="ef-idle"><b>${esc(s.text)}</b></div>` + efSt('', '', s.note, s.noteCls));
   const t = s.t;
   if (s.layout === 'bt') {
-    const right = s.done ? `<span class="ef-slot">${efStamp(true, s.fx)}</span>` : '<span class="ef-chip bt"><span><i></i><em>В БОЮ</em></span></span>';
-    const pic = efHeroImg(s.hero, t.img), n = Array.from(t.name).length; // длинное название — мельче, чтобы влезло рядом с танком
+    const right = s.done ? `<span class="ef-slot">${efStamp(true, s.fx)}</span>`
+      : s.dead ? '<span class="ef-chip dead"><span><i></i><em>УНИЧТОЖЕН</em></span></span>'
+        : '<span class="ef-chip bt"><span><i></i><em>В БОЮ</em></span></span>';
+    const pic = efHeroImg(s.hero, t.img);
     return efShell('bt ' + s.tone + (pic ? '' : ' noimg') + (s.dead ? ' dead' : ''), t,
       `<div class="ef-hero"><i class="ef-glow"></i><div class="ef-tk">${pic}</div><div class="ef-hid"><div class="ef-meta">${efTier(t)}${efCls(t)}</div>`
-      + `<b class="ef-hname${n > 14 ? ' l3' : n > 12 ? ' l2' : n > 10 ? ' l1' : ''}">${esc(t.name)}</b></div></div><div class="ef-tab">${right}</div>`
+      + `<b class="ef-hname${efNameCls(t.name)}">${esc(t.name)}</b></div></div><div class="ef-tab">${right}</div>`
       + efCht(s.sp.chFinal) + efBody(s, false) + `<div class="ef-foot">${efFoot(s)}</div>`);
   }
   const band = efBand(t, [t], true, s.stamp ? efStamp(s.stamp === 'ok', s.fx) : '');
@@ -3081,11 +3123,15 @@ function efRenderMe(m) {
     box.innerHTML = efHTML(s);
     const card = box.firstElementChild;
     if (vals && s.view && s.view.pp) efCarry(card, vals, s.view.pp);
-    // бой только начался — танк въедет в рамку, когда загрузится картинка (при пересборке той же карточки не повторяем)
-    if (s.layout === 'bt' && !vals) {
+    // бой только начался — танк въедет в рамку, когда загрузится картинка (при пересборке той же карточки не повторяем;
+    // если прошлая карточка ещё ждала свою картинку, въезд достаётся новой)
+    if (s.layout === 'bt' && (!vals || (old && old.dataset.enter))) {
       const pic = card.querySelector('.ef-tk img');
       if (pic) { card.dataset.enter = '1'; if (pic.complete && pic.naturalWidth) efHeroLoad(pic); }
     }
+    // картинка грузится слишком долго (сервер молчит) — не держим место пустым: берём маленькую иконку
+    const slow = s.layout === 'bt' ? card.querySelector('.ef-tk img:not(.on)') : null;
+    if (slow) setTimeout(() => { if (slow.isConnected && !slow.classList.contains('on')) efHeroErr(slow); }, 4000);
     if (G.efPop) { G.efPop = false; const row = card.querySelector('.ef-st'); if (row) row.classList.add('pop'); }
     if (cel) efCelebrate(card); else if (s.fx) efFlashHL(card);
   } else if (s.layout !== 'idle') efUpdate(box.firstElementChild, s);
