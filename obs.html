@@ -12,7 +12,8 @@
     obs.html?room=ID&w=team          команда: стример в центре, два друга по бокам, 960x320
     obs.html?room=ID&w=series        серия выполнений/провалов, 560x300 (всё с последнего «Обнулить»; &period=today — только сегодня)
     obs.html?room=ID&w=game&acc=N    в игре через мод WotStat «Виджеты»: свой челлендж и прогресс прямо в бою, ниже друзья
-                                     (ширина ~360, высоту мод подгоняет сам; &friends=0 — без друзей; &demo=1 — пример боя)
+                                     (свёрстано в 360 и растягивается под ширину окна, высоту мод подгоняет сам; &friends=0 — без друзей;
+                                     &demo=1 — пример по кругу, &demo=spin|hangar|wrong|battle|after|ok|fail — одна стадия)
     obs.html                         основной без комнаты: опрос /api/state локального сервера
   Звук: основной и команда — WebAudio (&mute выключает), лента, таблица, серия и игра молчат (&sound=1 включает).
 -->
@@ -466,53 +467,204 @@ html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
 .sr-sk .sk{height:22px;padding:0 9px;font-size:11.5px;white-space:nowrap}
 .sr-sk .sk.fail{color:#ff8fa2}
 
-/* ---------- Игра: окно внутри клиента (мод WotStat «Виджеты») ---------- */
-/* размеры в rem: шрифт растёт вместе с шириной, которую игрок выставил окну в игре */
-html.w-game{font-size:clamp(12px,3.8vw,20px)}
+/* ---------- Игра: окно внутри клиента (мод WotStat «Виджеты»), дизайн «Эфир» ---------- */
+/* окно свёрстано в 360 px и целиком масштабируется под ширину, которую игрок выставил в игре (zoom из JS) */
 html.w-game #fx{display:none}
 html:not(.w-game) #game{display:none!important}
-#game{display:flex;flex-direction:column;gap:.38rem;width:100%;padding:.3rem}
-.gm-me{position:relative;padding:.68rem .85rem .74rem 1.05rem;border-radius:.8rem;overflow:hidden;
-  background:linear-gradient(180deg,rgba(27,26,36,.93),rgba(12,12,18,.93));
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),0 .45rem 1.3rem rgba(0,0,0,.45)}
-.gm-me::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.28rem;background:var(--grad)}
-.gm-me.is-ok::before{background:var(--ok);box-shadow:0 0 .8rem var(--ok)}
-.gm-me.is-fail::before{background:var(--fail);box-shadow:0 0 .8rem var(--fail)}
-.gm-me.is-amb::before{background:var(--amb)}
-.gm-me.is-battle::before{animation:gmPulse 1.6s ease-in-out infinite}
-.gm-me.idle::before{background:rgba(255,255,255,.18)}
-@keyframes gmPulse{50%{opacity:.35}}
-.gm-top{display:flex;align-items:center;gap:.4rem;min-width:0}
-.gm-tier{flex:0 0 auto;font:900 italic .78rem/1 var(--fd);color:#160f04;background:var(--rc2);padding:.2rem .42rem .18rem;border-radius:.3rem}
-.gm-cls{flex:0 0 auto;font:800 .66rem/1 var(--fu);letter-spacing:.05em;color:var(--cc,#ccc);background:var(--ccs,rgba(255,255,255,.08));padding:.22rem .4rem;border-radius:.3rem}
-.gm-name{flex:1 1 auto;min-width:0;font:900 italic 1.05rem/1.15 var(--fd);color:var(--rc2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.6)}
-.gm-chip{flex:0 0 auto;font:800 .64rem/1 var(--fu);letter-spacing:.06em;padding:.32rem .52rem;border-radius:99px;background:rgba(255,255,255,.08);color:var(--muted);white-space:nowrap}
-.gm-chip.battle{background:rgba(255,61,90,.2);color:#ff9aaa}
-.gm-chip.ok{background:rgba(46,229,157,.16);color:var(--ok)}
-.gm-chip.fail{background:rgba(255,61,90,.18);color:#ff7389}
-.gm-chip.amb{background:rgba(255,182,39,.16);color:var(--amb)}
-.gm-ch{margin-top:.42rem;font:800 italic 1rem/1.25 var(--fd);color:var(--text);text-shadow:0 1px 3px rgba(0,0,0,.6)}
-.gm-bar{position:relative;margin-top:.58rem;height:.5rem;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
-.gm-bar>i{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;background:var(--grad);transition:width .6s var(--out)}
-.gm-bar.ok>i{background:linear-gradient(90deg,var(--ok2),var(--ok));box-shadow:0 0 .6rem rgba(46,229,157,.6)}
-.gm-live{margin-top:.34rem;font:600 .84rem/1.3 var(--fu);color:#dcdce8;font-variant-numeric:tabular-nums}
-.gm-note{margin-top:.34rem;font:600 .78rem/1.3 var(--fu);color:var(--muted)}
-.gm-note.good{color:var(--ok)}
-.gm-note.warn{color:var(--amb)}
-.gm-note.bad{color:#ff7389}
-.gm-idle{font:800 italic .92rem/1.3 var(--fd);color:#c9c9d8}
-.gm-frs{display:flex;flex-direction:column;gap:.3rem}
-.gm-fr{display:flex;align-items:center;gap:.45rem;min-width:0;padding:.4rem .62rem;border-radius:.6rem;
-  background:rgba(14,14,20,.85);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-.gm-fr-n{flex:0 0 auto;max-width:38%;font:800 .74rem/1.2 var(--fd);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gm-fr-c{flex:1 1 auto;min-width:0;font:600 .72rem/1.25 var(--fu);color:#b9b9cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gm-fr-c b{color:#ececf5;font-weight:700}
-.gm-fr-s{flex:0 0 auto;font:900 .78rem/1 var(--fu)}
-.gm-fr-s.ok{color:var(--ok)}
-.gm-fr-s.fail{color:#ff7389}
-.gm-fr-s.amb{color:var(--amb)}
-.gm-fr-s.pend{color:var(--dim)}
-.gm-hint{padding:0 .3rem;font:600 .64rem/1.3 var(--fu);color:#8d8da3;text-shadow:0 1px 2px #000}
+#game{width:360px;padding:4px 0 2px;font:14px/1.45 var(--fu);color:var(--text)}
+#game .ef{position:relative;width:360px;isolation:isolate;--edge:rgba(255,255,255,.16);--eglow:none}
+/* мягкая тень под плашкой (статичная): держит текст и на ярком небе, и в тёмном ангаре */
+#game .ef-sh{position:absolute;left:14px;right:14px;top:10px;bottom:-6px;z-index:-2;background:rgba(0,0,0,.5);filter:blur(12px)}
+/* плашка — скошенный сегмент, почти непрозрачный: размыть игру за окном нельзя */
+#game .ef-bg{position:absolute;inset:0;z-index:-1;overflow:hidden;clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+  background:radial-gradient(60% 70% at 14% 0%,var(--rcs),transparent 70%),linear-gradient(180deg,rgba(31,29,41,.95),rgba(12,12,18,.95))}
+#game .ef::before{content:"";position:absolute;left:12px;right:0;top:0;height:3px;z-index:2;background:var(--grad);box-shadow:0 0 12px rgba(255,90,70,.65),0 0 3px rgba(255,138,61,.9)}
+#game .ef::after{content:"";position:absolute;left:0;right:12px;bottom:0;height:3px;z-index:2;background:var(--edge);box-shadow:var(--eglow)}
+#game .ef.s-wait{--edge:linear-gradient(90deg,rgba(255,61,90,.85),rgba(255,138,61,.85))}
+#game .ef.s-bt{--edge:linear-gradient(90deg,#c0163a,#ff3d5a)}
+#game .ef.s-amb{--edge:var(--amb);--eglow:0 0 10px rgba(255,182,39,.6)}
+#game .ef.s-ok{--edge:var(--ok);--eglow:0 0 12px rgba(46,229,157,.75)}
+#game .ef.s-fail{--edge:var(--fail);--eglow:0 0 12px rgba(255,61,90,.75)}
+/* контурная цифра уровня */
+#game .ef-water{position:absolute;right:16px;top:-4px;font:900 italic 86px/1 var(--fd);letter-spacing:-.05em;color:transparent;-webkit-text-stroke:1.5px var(--rc);opacity:.22;transition:opacity .6s,transform .8s var(--out)}
+#game .ef.hg .ef-water{opacity:0;transform:translateX(30px)}
+#game .ef.hg.landed2 .ef-water{opacity:.24;transform:none}
+#game .ef.bt .ef-water{right:12px;top:-2px;font-size:66px;opacity:.14}
+#game .ef.idle .ef-water{display:none}
+/* вспышка рамки при итоге */
+#game .ef-hl{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+  box-shadow:inset 0 0 0 2px var(--hlc,var(--ok)),inset 0 0 46px var(--hlg,rgba(46,229,157,.45))}
+#game .ef.s-fail .ef-hl{--hlc:var(--fail);--hlg:rgba(255,61,90,.45)}
+/* уровень и класс */
+#game .ef-tier{display:inline-flex;align-items:center;flex:0 0 auto;height:20px;padding:0 8px;border-radius:3px;transform:skewX(-12deg);background:var(--rc);color:#120c02;
+  font:900 italic 12px/1 var(--fd);letter-spacing:.03em;box-shadow:0 0 14px var(--rcg)}
+#game .ef-tier>span{transform:skewX(12deg)}
+#game .ef-cls{display:inline-flex;align-items:center;flex:0 0 auto;height:20px;padding:0 6px;border-radius:3px;border:1px solid var(--cc,#aaa);background:var(--ccs,rgba(255,255,255,.08));color:var(--cc,#ddd);font:800 11px/1 var(--fu);letter-spacing:.06em}
+
+/* ангар: лента спина и «сцена» танка */
+#game .ef-band{position:relative;height:92px}
+#game .ef-wash{position:absolute;left:105px;top:0;bottom:0;width:150px;opacity:0;background:radial-gradient(50% 55% at 50% 60%,var(--rcg),transparent 75%);transition:opacity .6s,transform .6s var(--out)}
+#game .ef.landed .ef-wash{opacity:.55}
+#game .ef.landed2 .ef-wash{transform:translateX(-114px)}
+#game .ef-reel{position:absolute;inset:6px 0 4px;overflow:hidden;overflow-x:clip;overflow-y:visible;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
+#game .ef.landed2 .ef-reel{-webkit-mask-image:none;mask-image:none}
+#game .ef-lines{position:absolute;inset:0;opacity:0;background:repeating-linear-gradient(180deg,transparent 0 9px,rgba(255,255,255,.07) 9px 10px,transparent 10px 23px,rgba(255,170,140,.09) 23px 24px)}
+#game .ef-strip{position:absolute;left:0;top:4px;width:max-content;display:flex;gap:8px;will-change:transform}
+#game .ef-tc{position:relative;flex:0 0 92px;width:92px;height:74px;transition:opacity .35s;will-change:transform}
+#game .ef-tc::before{content:"";position:absolute;inset:0;border-radius:4px;transform:skewX(-8deg);
+  background:radial-gradient(90% 70% at 50% 115%,var(--rcs),transparent 70%),linear-gradient(180deg,#252434,#121219);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),inset 0 -2px 0 var(--rc)}
+#game .ef-tc b{position:absolute;left:9px;top:5px;font:900 italic 13px/1 var(--fd);color:var(--rc2);text-shadow:0 0 10px var(--rcg)}
+#game .ef-tc u{position:absolute;right:7px;top:4px;padding:0 4px;border-radius:2px;text-decoration:none;background:var(--ccs,rgba(255,255,255,.08));color:var(--cc,#ddd);font:800 11px/15px var(--fu)}
+#game .ef-tc img{position:absolute;left:4px;bottom:4px;width:84px;height:52px;object-fit:contain;filter:drop-shadow(0 5px 5px rgba(0,0,0,.7))}
+#game .ef-tc.win::before{box-shadow:inset 0 0 0 1.5px var(--rc2),inset 0 -3px 0 var(--rc),0 0 22px var(--rcg)}
+#game .ef.landed .ef-tc:not(.win){opacity:0}
+#game .ef.off .ef-tc.win img{filter:grayscale(1) brightness(.7) drop-shadow(0 5px 5px rgba(0,0,0,.7))}
+#game .ef.off .ef-wash{opacity:.18}
+/* маркер по центру ленты */
+#game .ef-mark{position:absolute;left:50%;top:4px;bottom:2px;width:0;z-index:3;transition:opacity .3s}
+#game .ef-mark i{position:absolute;left:-1.5px;top:6px;bottom:6px;width:3px;background:linear-gradient(180deg,var(--a2),#fff 50%,var(--a1));box-shadow:0 0 8px rgba(255,138,61,.9),0 0 16px rgba(255,61,90,.55)}
+#game .ef-mark::before,#game .ef-mark::after{content:"";position:absolute;left:-7px;border:7px solid transparent}
+#game .ef-mark::before{top:-1px;border-top-color:var(--a2);border-bottom:0}
+#game .ef-mark::after{bottom:-1px;border-bottom-color:var(--a1);border-top:0}
+#game .ef-mark b{position:absolute;left:-18px;top:0;bottom:0;width:36px;opacity:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)}
+#game .ef.landed .ef-mark{opacity:0}
+#game .ef-flash{position:absolute;inset:0;z-index:4;opacity:0;pointer-events:none;background:radial-gradient(34% 70% at 50% 52%,rgba(255,255,255,.9),rgba(255,214,140,.25) 60%,transparent)}
+#game .ef-ring{position:absolute;left:50%;top:50%;width:84px;height:84px;margin:-42px 0 0 -42px;z-index:4;border-radius:50%;border:2px solid var(--rc2);opacity:0;box-shadow:0 0 16px var(--rcg)}
+#game .ef-id{position:absolute;left:132px;right:14px;top:17px;display:flex;flex-direction:column;gap:7px;opacity:0;transform:translateX(16px);transition:opacity .45s var(--out),transform .6s var(--out)}
+#game .ef.landed2 .ef-id{opacity:1;transform:none}
+#game .ef-meta{display:flex;align-items:center;gap:6px}
+#game .ef-name{min-height:27px;font:900 italic 25px/1.05 var(--fd);letter-spacing:-.02em;color:var(--rc2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px;
+  text-shadow:0 2px 10px rgba(0,0,0,.6),0 0 18px var(--rcg)}
+#game .ef-name.typing::after{content:"";display:inline-block;width:.1em;height:.8em;margin-left:.06em;background:var(--a2);vertical-align:-.04em}
+#game .ef-sbox{position:absolute;right:8px;top:12px;z-index:5}
+
+/* челлендж: табло с разрезом посередине */
+#game .ef-ch{padding:0 16px 0 18px}
+#game .ef-lbl{display:flex;align-items:center;gap:8px;height:15px;font:800 italic 11px/1 var(--fd);letter-spacing:.18em;color:#ffb38a;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+#game .ef-lbl::before{content:"";width:18px;height:3px;background:var(--grad);transform:skewX(-30deg)}
+#game .ef-flap{position:relative;margin-top:5px;min-height:44px;display:flex;align-items:center;padding:6px 14px 6px 17px;overflow:hidden;perspective:600px;
+  clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%);background:linear-gradient(180deg,#25242f 0,#1c1b26 50%,#15141d 50%,#101017 100%)}
+#game .ef-flap::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;z-index:3;background:rgba(0,0,0,.7);box-shadow:0 1px 0 rgba(255,255,255,.05)}
+#game .ef-flap::after{content:"";position:absolute;left:6px;top:8px;bottom:8px;width:3px;transform:skewX(-8deg);background:rgba(255,255,255,.18)}
+#game .ef-flap.final::after{background:var(--grad);box-shadow:0 0 10px rgba(255,90,70,.6)}
+#game .ef-flap .txt{position:relative;z-index:2;min-width:0;font:800 italic 15px/1.22 var(--fd);letter-spacing:-.01em;transform-origin:50% 0;backface-visibility:hidden;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+#game .ef-flap.idle .txt,#game .ef-flap.rolling .txt{color:#a3a3b8}
+#game .ef-flap.rolling .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#game .ef-flap.final .txt{color:#fff}
+#game .ef-flap .sw{position:absolute;top:-20%;bottom:-20%;left:0;width:36%;z-index:4;opacity:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:translateX(-160%) skewX(-22deg)}
+#game .ef-cht{position:relative;margin:5px 16px 0 20px;padding-left:12px;font:800 italic 14px/1.25 var(--fd);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+#game .ef-cht::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;transform:skewX(-8deg);background:var(--grad);box-shadow:0 0 8px rgba(255,90,70,.5)}
+#game .ef.hg .ef-cht{margin-top:0}
+
+/* статус */
+#game .ef-st{display:flex;align-items:center;gap:10px;min-height:22px;padding:9px 16px 13px;transition:opacity .3s}
+#game .ef-chip{display:inline-flex;align-items:center;flex:0 0 auto;height:21px;padding:0 10px;border-radius:3px;transform:skewX(-12deg);font:900 italic 11px/1 var(--fd);letter-spacing:.08em;white-space:nowrap}
+#game .ef-chip>span{display:inline-flex;align-items:center;gap:6px;transform:skewX(12deg)}
+#game .ef-chip i{display:none;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+/* единственная бесконечная анимация в покое — медленный пульс точки статуса */
+#game .ef-chip.wait i,#game .ef-chip.bt i,#game .ef-chip.amb i{display:block;animation:efPulse 2.4s ease-in-out infinite}
+@keyframes efPulse{50%{opacity:.3}}
+#game .ef-chip.wait{background:rgba(255,138,61,.14);color:#ffb38a;box-shadow:inset 0 0 0 1px rgba(255,138,61,.5)}
+#game .ef-chip.bt{background:linear-gradient(100deg,#c0163a,#ff3d5a);color:#fff;box-shadow:0 3px 12px rgba(255,61,90,.35)}
+#game .ef-chip.amb{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600}
+#game .ef-chip.ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c}
+#game .ef-chip.fail{background:linear-gradient(100deg,var(--fail2),var(--fail));color:#fff}
+#game .ef-note{min-width:0;font:600 12px/1.3 var(--fu);color:#a9abbd;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+#game .ef-note.good{color:var(--ok)}
+#game .ef-note.warn{color:var(--amb)}
+#game .ef-note.bad{color:#ff7389}
+#game .ef-st.pop .ef-chip{animation:efStPop .55s cubic-bezier(.2,1.6,.4,1) both}
+#game .ef-st.pop .ef-note{animation:efRtIn .55s .1s var(--out) both}
+@keyframes efStPop{0%{opacity:0;transform:skewX(-12deg) scale(1.6)}100%{opacity:1;transform:skewX(-12deg) scale(1)}}
+@keyframes efRtIn{from{opacity:0;transform:translateX(-12px)}}
+/* штамп итога */
+#game .ef-stamp{position:relative;display:inline-flex;align-items:center;padding:6px 12px;border-radius:4px;overflow:hidden;transform:skewX(-14deg) rotate(-3deg);font:900 italic 14px/1 var(--fd);letter-spacing:.02em;white-space:nowrap}
+#game .ef-stamp>span{display:inline-flex;align-items:center;gap:6px;transform:skewX(14deg)}
+#game .ef-stamp svg{width:14px;height:14px}
+#game .ef-stamp.ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c;box-shadow:0 6px 18px rgba(46,229,157,.4)}
+#game .ef-stamp.fail{background:linear-gradient(100deg,var(--fail2),var(--fail));color:#fff;box-shadow:0 6px 18px rgba(255,61,90,.45)}
+#game .ef-stamp .streak{position:absolute;top:-30%;bottom:-30%;left:0;width:30%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent);transform:translateX(-200%)}
+#game .ef-stamp.fx{animation:efStamp .6s cubic-bezier(.2,1.4,.4,1) both}
+#game .ef-stamp.fx .streak{animation:efStreak .8s .35s var(--out) both}
+@keyframes efStamp{0%{opacity:0;transform:skewX(-14deg) rotate(-12deg) scale(2.6)}55%{opacity:1}100%{opacity:1;transform:skewX(-14deg) rotate(-3deg) scale(1)}}
+@keyframes efStreak{to{transform:translateX(480%)}}
+/* в шапке боя и рядом с названием танка штамп меньше — не закрывает значок класса */
+#game .ef-slot .ef-stamp,#game .ef-sbox .ef-stamp{padding:5px 10px;font-size:12px}
+#game .ef-slot .ef-stamp svg,#game .ef-sbox .ef-stamp svg{width:12px;height:12px}
+
+/* бой: шапка, счётчики, полоса с засечками */
+#game .ef-head{display:flex;align-items:center;gap:6px;height:28px;margin:9px 14px 0 20px}
+#game .ef-hname{flex:1 1 auto;min-width:0;margin-left:3px;font:900 italic 18px/1.1 var(--fd);letter-spacing:-.01em;color:var(--rc2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+#game .ef-mt{position:relative;padding:8px 16px 0 18px;transition:opacity .4s}
+#game .ef-cnt{display:flex;align-items:center;gap:8px;height:34px}
+/* строка счётчика не переносится: число целиком, тесно — ужимается подпись слева; «+N» всплывает поверх и места не занимает */
+#game .ef-tag{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;overflow:hidden;height:18px;padding:0 7px;border-radius:2px;transform:skewX(-12deg);background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);
+  color:#d8d8e6;font:900 italic 11px/1 var(--fd);letter-spacing:.1em}
+#game .ef-tag>span{min-width:0;transform:skewX(12deg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#game .ef-val{display:flex;align-items:baseline;gap:5px;flex:0 0 auto;white-space:nowrap;transform-origin:0 70%;transition:transform .45s var(--spring)}
+#game .ef-num{display:inline-block;font:800 30px/1 var(--fu);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6);transform-origin:0 70%}
+#game .ef-of{font:700 14px/1 var(--fu);color:#9a9cb0;font-variant-numeric:tabular-nums}
+#game .ef-pop{position:relative;flex:0 0 0;width:0;align-self:stretch;margin-left:auto}
+#game .ef-pop i{position:absolute;right:4px;top:50%;margin-top:-8px;opacity:0;font:900 italic 15px/1 var(--fd);color:#ffd9bf;white-space:nowrap;text-shadow:0 0 10px rgba(255,138,61,.8),0 1px 2px #000}
+#game .ef-pct{flex:0 0 auto;font:900 italic 20px/1 var(--fd);color:#ffb38a;font-variant-numeric:tabular-nums;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+#game .ef-mt.done .ef-pct{color:var(--ok)}
+#game .ef-bar{position:relative;height:12px;margin-top:7px;overflow:hidden;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%);background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.05))}
+#game .ef-bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,#c0163a,#ff3d5a 45%,#ff8a3d) 0 0/326px 100% no-repeat;transition:width .7s var(--out)}
+#game .ef-bar .tip{position:absolute;right:0;top:0;bottom:0;width:3px;background:#fff;box-shadow:0 0 8px #fff,0 0 14px var(--a2)}
+#game .ef-bar .gain{position:absolute;left:0;top:0;bottom:0;width:0;opacity:0;background:linear-gradient(90deg,rgba(255,255,255,.25),rgba(255,255,255,.95))}
+#game .ef-bar .ticks{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(25% - 2px),rgba(8,8,13,.9) calc(25% - 2px) 25%)}
+#game .ef-bar .shine{position:absolute;left:0;top:0;bottom:0;width:30%;opacity:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent);transform:translateX(-120%) skewX(-20deg)}
+#game .ef-bar.done .fill{background:linear-gradient(90deg,var(--ok2),var(--ok))}
+#game .ef-bar.done .tip{opacity:0}
+#game .ef-mt.sm{padding-top:7px}
+#game .ef-mt.sm .ef-cnt{height:26px}
+#game .ef-mt.sm .ef-num{font-size:22px}
+#game .ef-mt.sm .ef-of{font-size:13px}
+#game .ef-mt.sm .ef-pct{font-size:16px}
+#game .ef-mt.sm .ef-bar,#game .ef-mt.sm .ef-pips{height:8px;margin-top:5px}
+/* или-челлендж: ведущий счётчик крупнее и ярче */
+#game .ef-mt.dim{opacity:.55}
+#game .ef-mt.dim .ef-val{transform:scale(.8)}
+#game .ef-mt.lead .ef-tag{background:var(--grad);color:#fff;box-shadow:0 0 12px rgba(255,90,70,.5)}
+#game .ef-mt.lead::before{content:"";position:absolute;left:7px;top:12px;bottom:0;width:3px;transform:skewX(-8deg);background:var(--grad);box-shadow:0 0 8px rgba(255,90,70,.6)}
+#game .ef-or{display:flex;align-items:center;gap:10px;margin:9px 16px 0 18px;font:900 italic 11px/1 var(--fd);letter-spacing:.18em;color:#9a9cb0}
+#game .ef-or::before,#game .ef-or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.14)}
+#game .ef-pips{display:flex;gap:6px;height:12px;margin-top:7px;padding:0 3px}
+#game .ef-pips i{flex:1;border-radius:2px;transform:skewX(-14deg);background:rgba(255,255,255,.09);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+#game .ef-pips i.on{background:var(--grad);box-shadow:0 0 10px rgba(255,90,70,.45)}
+#game .ef-mt.done .ef-pips i.on{background:linear-gradient(90deg,var(--ok2),var(--ok));box-shadow:0 0 10px rgba(46,229,157,.45)}
+#game .ef-burst{position:absolute;left:0;top:0;width:0;height:0;z-index:5;pointer-events:none}
+#game .ef-burst i{position:absolute;left:-3px;top:-3px;width:6px;height:6px;opacity:0;background:currentColor;box-shadow:0 0 6px currentColor}
+#game .ef-foot{min-height:16px;padding:7px 16px 12px 18px;font:600 12px/1.3 var(--fu);color:#a9abbd;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+#game .ef-foot b{color:#fff;font-weight:800;font-variant-numeric:tabular-nums}
+#game .ef-foot .good{color:var(--ok);font-weight:700}
+#game .ef-foot .warn{color:var(--amb);font-weight:700}
+#game .ef-foot .bad{color:#ff7389;font-weight:700}
+#game .ef-rest{padding:6px 16px 0 18px;font:600 12px/1.3 var(--fu);color:#c9cad8;text-shadow:0 1px 3px rgba(0,0,0,.8);font-variant-numeric:tabular-nums}
+
+/* пусто / подключение */
+#game .ef-idle{padding:14px 16px 6px 20px}
+#game .ef-idle b{display:block;font:900 italic 18px/1.2 var(--fd);letter-spacing:-.01em;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+#game .ef.idle .ef-st{padding-top:6px}
+
+/* друзья под плашкой */
+#game .ef-frs{display:flex;flex-direction:column;gap:4px;margin-top:7px}
+#game .ef-frs:empty{display:none}
+#game .ef-fr{position:relative;isolation:isolate;display:flex;align-items:center;gap:8px;height:27px;padding:0 14px 0 16px}
+#game .ef-fr::before{content:"";position:absolute;inset:0;z-index:-1;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);background:linear-gradient(90deg,rgba(30,28,40,.94),rgba(14,14,20,.92))}
+#game .ef-fr::after{content:"";position:absolute;left:8px;top:0;width:45%;height:2px;background:linear-gradient(90deg,rgba(255,255,255,.22),transparent)}
+#game .ef-fr .n{flex:0 0 auto;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:2px;font:900 italic 11.5px/1.2 var(--fd);letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+#game .ef-fr .c{flex:1 1 auto;min-width:0;font:600 11.5px/1.2 var(--fu);color:#b9b9cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+#game .ef-fr .c b{color:#fff;font-weight:700}
+#game .ef-fr .s{flex:0 0 auto;display:grid;place-items:center;min-width:24px;height:17px;border-radius:2px;transform:skewX(-12deg);font:900 11px/1 var(--fu)}
+#game .ef-fr .s>span{transform:skewX(12deg)}
+#game .ef-fr .s.ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c}
+#game .ef-fr .s.fail{background:linear-gradient(100deg,var(--fail2),var(--fail));color:#fff}
+#game .ef-fr .s.amb{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600}
+#game .ef-fr .s.pend{background:rgba(255,138,61,.14);box-shadow:inset 0 0 0 1px rgba(255,138,61,.45)}
+#game .gm-hint{margin-top:6px;padding:0 16px;font:600 11px/1.3 var(--fu);color:#8d8da3;text-shadow:0 1px 2px #000}
 @media (prefers-reduced-motion:reduce){.foil,.glint,.reel.won .rays{animation:none!important}}
 </style>
 </head>
@@ -584,8 +736,8 @@ html:not(.w-game) #game{display:none!important}
 
 <!-- игра: окно внутри клиента через мод WotStat «Виджеты» — свой челлендж, прогресс в бою, друзья -->
 <section id="game" hidden>
-  <div class="gm-me idle" id="gmMe"></div>
-  <div class="gm-frs" id="gmFrs"></div>
+  <div id="gmMe"></div>
+  <div class="ef-frs" id="gmFrs"></div>
   <div class="gm-hint" id="gmHint" hidden></div>
 </section>
 
@@ -2059,7 +2211,11 @@ const G = {
   bt: null,                 // текущий или последний бой
   tags: new Map(), tagWait: new Set(), tagT: 0,
   fields: new Map(), key: '',
+  spinQ: '', anim: false,   // свой новый спин ждёт прокрута барабана / идёт анимация (обычная отрисовка ждёт)
+  efShown: null, efCel: '', efPop: false, // что было на экране, какой «выполнено» уже отпраздновали, статус «выскакивает»
+  efHold: null,             // только что прокрученный спин держим на экране, пока в ангаре не сменят танк
 };
+const gmHvKey = v => (v && typeof v === 'object' ? String(v.tag || v.localizedName || '') : '');
 const gv = p => G.st.get(p);
 const gmInBattle = () => G.on && gv('battle.isInBattle') === true;
 const GM_PATHS = new Set(['player.id', 'battle.isInBattle', 'battle.arenaId', 'battle.vehicle', 'battle.health',
@@ -2074,15 +2230,24 @@ function gmSetMe(acc, from) {
   if (G.stopMine) G.stopMine();
   const col = { spins: new Map(), ready: false };
   G.mine = col;
-  G.stopMine = watchAcc(acc, 12, (ev, raw) => gmSpinEv(col, ev, raw));
+  G.stopMine = watchAcc(acc, 12, (ev, raw, initial) => gmSpinEv(col, ev, raw, initial));
   gmFriends();
   gmSoon();
 }
-function gmSpinEv(col, ev, raw) {
+function gmSpinEv(col, ev, raw, initial) {
   if (ev === 'reset') { col.spins.clear(); col.ready = false; }
   else if (ev === 'ready') col.ready = true;
   else if (ev === 'removed') col.spins.delete(raw.id);
-  else if (raw && raw.id) col.spins.set(raw.id, raw);
+  else if (raw && raw.id) {
+    const isNew = !col.spins.has(raw.id), ts = num(+raw.ts, 0);
+    col.spins.set(raw.id, raw);
+    // свой новый спин прямо сейчас — в окне прокрутится барабан (при загрузке, на старых и чужих спинах — нет)
+    if (col === G.mine && ev === 'added' && isNew && !initial && col.ready && raw.status !== 'cancelled' && serverNow() - ts < TM_FRESH) {
+      let newest = true;
+      col.spins.forEach(v => { if (v !== raw && num(+v.ts, 0) > ts) newest = false; });
+      if (newest) G.spinQ = raw.id;
+    }
+  }
   gmSoon();
 }
 // игры нет (браузер, OBS без мода) — показываем стримера; игра потом сама переключит на того, кто играет
@@ -2162,6 +2327,7 @@ function gmSync(init) {
   gmSoon();
 }
 function gmBattleStart(arena, init) {
+  G.efHold = null; // в бой ушли — дальше обычный выбор челленджа по танку
   const saved = gmLoadBattle();
   // окно перезагрузилось посреди боя — счётчики событий не теряем
   if (saved && !saved.done && arena && String(saved.arena) === String(arena)) { G.bt = saved; saved.partial = true; return; }
@@ -2355,6 +2521,12 @@ function gmPick() {
     const newer = all.some(s => s.id !== b.spId && s.ts > (b.endSrv || serverNow()) + 5000);
     if (sp && !other && !newer) return { mode: 'after', sp, all, active, foreign };
   }
+  // только что прокрутили новый спин — показываем его (и подсказку, какой танк выбрать), пока танк в ангаре тот же
+  if (G.efHold) {
+    const h = active.find(s => s.id === G.efHold.id);
+    if (h && gmHvKey(hv) === G.efHold.hv) return { mode: 'hangar', sp: h, picked: vehMatch(h.tank, hv) === true, all, active, foreign };
+    G.efHold = null;
+  }
   const hit = gmMatch(active, hv);
   if (hit) return { mode: 'hangar', sp: hit, picked: true, all, active, foreign };
   const recent = all[0] && (gmActive(all[0]) || serverNow() - resultTime(all[0]) < TM_OLD) ? all[0] : null;
@@ -2378,7 +2550,8 @@ function gmFields(inst) {
   G.fields.set(inst.id, res);
   return res;
 }
-// { text, ok, ratio } или null — если челлендж нельзя посчитать по этим цифрам (победа, опыт, медали…)
+const GM_HOLD = ['survived_battles', 'damage_received', 'piercings_received']; // цифры, которые в бою ещё могут испортить итог
+// { text, ok, ratio, hold, lost, pp } или null — если челлендж нельзя посчитать по этим цифрам (победа, опыт, медали…)
 function gmView(sp, delta, live) {
   if (!delta || !sp.chId || !window.WR || !WR.catalog) return null;
   const inst = { id: sp.chId, v: sp.chV, w: sp.chW };
@@ -2388,19 +2561,26 @@ function gmView(sp, delta, live) {
   let text = String(WR.catalog.describe(inst, delta) || '');
   if (live) text = text.replace(/выжил: да/g, 'пока жив').replace(/выжил: нет/g, 'уничтожен');
   const ok = WR.catalog.evaluate(inst, delta) === true;
+  // в бою «выжить / получить мало / не дать пробить» решается только в конце: hold — пока всё держится (но ещё не итог),
+  // lost — уже сорвано (уничтожен, пробили, получил много): даже если добрать все цифры, не выполнить
+  let hold = false, lost = false;
+  if (live && GM_HOLD.some(f => used.has(f))) {
+    hold = ok;
+    if (!ok) {
+      const best = {};
+      for (const f of used) best[f] = GM_HOLD.indexOf(f) >= 0 ? delta[f] : 1e9;
+      try { lost = WR.catalog.evaluate(inst, best) !== true; } catch (e) { lost = false; }
+    }
+  }
   // «Урон: 1840 / 3600» в строке результата (только с подписью — «(3/3)» у точности не считаем):
   // «или» — хватит любого, иначе нужно всё. Полная полоса — только когда челлендж выполнен
   const parts = Array.from(text.matchAll(/:\s*(\d+)\s*\/\s*(\d+)/g)).map(x => (+x[2] > 0 ? Math.min(1, +x[1] / +x[2]) : 0));
   let ratio = parts.length ? (/ или /i.test(sp.chFinal) ? Math.max(...parts) : Math.min(...parts)) : null;
   if (ratio != null) ratio = ok ? 1 : Math.min(ratio, 0.97);
-  return { text, ok, ratio };
+  return { text, ok, ratio, hold, lost, pp: efParts(text, sp.chFinal) };
 }
 
-// --- отрисовка ---
-const GM_CHIP = {
-  battle: ['В БОЮ', 'battle'], wait: ['ЖДЁМ БОЙ', ''], pending: ['ЖДЁМ БОЙ', ''], check: ['ПРОВЕРКА', 'amb'],
-  ok: ['ВЫПОЛНЕНО', 'ok'], fail: ['ПРОВАЛ', 'fail'], ambiguous: ['ОТМЕТИТ СТРИМЕР', 'amb'],
-};
+// --- модель окна: что показать сейчас ---
 function gmModel() {
   if (!G.me) return { idle: G.on ? 'Ищу тебя в комнате…' : 'Подключаюсь…' };
   if (!G.mine.ready) return { idle: 'Загружаю челлендж…' };
@@ -2434,38 +2614,386 @@ function gmModel() {
     m.chip = 'wait';
     if (G.on) {
       if (p.picked) { m.note = '✓ Танк выбран — в бой!'; m.noteCls = 'good'; }
-      else { m.note = 'Выбери в ангаре: ' + (names(p.active) || sp.tank.name); m.noteCls = 'warn'; }
+      else { m.note = 'Выбери в ангаре: ' + (names(p.active) || sp.tank.name); m.noteCls = 'warn'; m.off = true; }
     } else if (p.active.length > 1) m.note = 'Ещё челленджи на: ' + names(p.active.filter(s => s !== sp));
   } else m.note = sp.resultText;
   if (p.foreign) { m.note = 'В игре другой аккаунт, не из этой ссылки — его бои сюда не засчитаются'; m.noteCls = 'warn'; }
   return m;
 }
-function gmMeHTML(m) {
-  if (m.idle) return `<div class="gm-idle">${esc(m.idle)}</div>` + (m.note ? `<div class="gm-note ${m.noteCls || ''}">${esc(m.note)}</div>` : '');
-  const t = m.sp.tank, chip = GM_CHIP[m.chip] || GM_CHIP.wait;
-  return `<div class="gm-top"><span class="gm-tier">${ROMAN[t.tier]}</span>`
-    + (t.type ? `<span class="gm-cls ct-${t.type}">${TYPES[t.type]}</span>` : '')
-    + `<b class="gm-name">${esc(t.name)}</b><span class="gm-chip ${chip[1]}">${chip[0]}</span></div>`
-    + `<div class="gm-ch">${esc(m.sp.chFinal)}</div>`
-    + (m.view && m.view.ratio != null ? `<div class="gm-bar${m.view.ok ? ' ok' : ''}"><i style="width:${Math.round(m.view.ratio * 100)}%"></i></div>` : '')
-    + (m.view ? `<div class="gm-live">${esc(m.view.text)}</div>` : '')
-    + (m.note ? `<div class="gm-note ${m.noteCls || ''}">${esc(m.note)}</div>` : '');
+// --- «Эфир»: окно в стиле плашки со стрима ---
+const EF_RW = 360, EF_CW = 92, EF_STEP = 100, EF_SLIDE = 114; // окно 360, карточка ленты 92 + зазор 8; после посадки едет влево на 114
+const EF_OUT = 'cubic-bezier(.16,1,.3,1)', EF_SPRING = 'cubic-bezier(.2,1.6,.4,1)';
+const efFmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const efX = i => EF_RW / 2 - (i * EF_STEP + EF_CW / 2); // сдвиг ленты, при котором карточка i стоит под маркером
+// подписи счётчиков и единицы для «ещё N …» по строке результата каталога («Урон: 1840 / 3600»)
+const EF_TAGS = { 'урон': 'УРОН', 'фраги': 'ФРАГИ', 'засвечено': 'ЗАСВЕТ', 'по засвету': 'ПО ЗАСВЕТУ', 'по гусле': 'ПО ГУСЛЕ',
+  'заблокировано': 'БЛОК', 'оглушений': 'ОГЛУШЕНИЯ', 'урон по оглушению': 'ОГЛУШЕНИЕ', 'пробитий': 'ПРОБИТИЯ',
+  'непробитий': 'НЕПРОБИТИЯ', 'попаданий': 'ПОПАДАНИЯ', 'попаданий фугасами': 'ФУГАСЫ', 'помощь': 'ПОМОЩЬ', 'вклад': 'ВКЛАД',
+  'очки захвата': 'ЗАХВАТ', 'сбито': 'СБИТО', 'опыт': 'ОПЫТ' };
+const EF_UNITS = { 'урон': 'урона', 'по засвету': 'урона', 'по гусле': 'урона', 'заблокировано': 'урона', 'урон по оглушению': 'урона',
+  'помощь': 'урона', 'вклад': 'урона', 'опыт': 'опыта', 'фраги': ['фраг', 'фрага', 'фрагов'], 'засвечено': ['противник', 'противника', 'противников'],
+  'оглушений': ['оглушение', 'оглушения', 'оглушений'], 'пробитий': ['пробитие', 'пробития', 'пробитий'],
+  'непробитий': ['непробитие', 'непробития', 'непробитий'], 'попаданий': ['попадание', 'попадания', 'попаданий'],
+  'попаданий фугасами': ['попадание', 'попадания', 'попаданий'], 'очки захвата': ['очко', 'очка', 'очков'], 'сбито': ['очко', 'очка', 'очков'] };
+// «Урон: 1840 / 4800 или фраги: 1 / 4, выжил: да» → счётчики { key, tag, cur, max, pct }, «или» и остаток текста
+function efParts(text, chFinal) {
+  const parts = [], rest = [];
+  String(text || '').split(/,\s+|\s+или\s+/).forEach(seg => {
+    const m = seg.match(/^\s*([^:]+?):\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*$/);
+    if (!m) { if (seg.trim()) rest.push(seg.trim()); return; }
+    const key = m[1].trim().toLowerCase(), cur = +m[2], max = +m[3];
+    parts.push({ key, tag: EF_TAGS[key] || key.split(' ')[0].toUpperCase(), cur, max, pct: max > 0 ? Math.min(100, Math.floor(cur * 100 / max)) : 0 });
+  });
+  return { parts, or: / или /i.test(chFinal || '') && parts.length > 1, rest: rest.join(', ') };
 }
-function gmRender() {
-  const m = gmModel(), sp = m.sp, box = $('#gmMe');
-  const tone = m.mode === 'battle' || m.battle ? ' is-battle' : m.chip === 'ok' ? ' is-ok' : m.chip === 'fail' ? ' is-fail'
-    : m.chip === 'ambiguous' || m.chip === 'check' ? ' is-amb' : '';
-  const cls = 'gm-me' + (sp ? ' rar-' + RAR(sp.tank.tier) : ' idle') + tone;
-  if (box.className !== cls) box.className = cls;
-  const bar = !!(m.view && m.view.ratio != null);
-  const key = [m.idle || '', sp ? sp.id : '', sp ? sp.chFinal : '', m.mode || '', m.chip || '', bar, !!m.view, m.note || '', m.noteCls || ''].join('|');
-  if (key !== G.key) { G.key = key; box.innerHTML = gmMeHTML(m); }
-  else if (m.view) { // те же блоки — только цифры: полоска плавно растёт
-    const live = box.querySelector('.gm-live');
-    if (live && live.textContent !== m.view.text) live.textContent = m.view.text;
-    const el = box.querySelector('.gm-bar');
-    if (el && bar) { el.classList.toggle('ok', m.view.ok); el.firstElementChild.style.width = Math.round(m.view.ratio * 100) + '%'; }
+const efLead = pp => pp.parts.reduce((b, p, i, a) => (p.max > 0 && p.cur / p.max > a[b].cur / Math.max(1, a[b].max) ? i : b), 0);
+function efLeft(p) {
+  const n = Math.max(0, Math.round(p.max - p.cur)), u = EF_UNITS[p.key];
+  return `ещё <b>${efFmt(n)}</b>` + (u ? ' ' + (Array.isArray(u) ? plural(n, u[0], u[1], u[2]) : u) : '');
+}
+
+// разметка
+const efTier = t => `<span class="ef-tier"><span>${ROMAN[t.tier]}</span></span>`;
+const efCls = t => (t.type ? `<span class="ef-cls ct-${t.type}">${TYPES[t.type]}</span>` : '');
+const efCard = (t, win) => `<div class="ef-tc rar-${RAR(t.tier)}${t.type ? ' ct-' + t.type : ''}${win ? ' win' : ''}"><b>${ROMAN[t.tier]}</b>`
+  + (t.type ? `<u>${TYPES[t.type]}</u>` : '') + (t.img ? `<img src="${esc(t.img)}" alt="" decoding="async" ${IMG_ERR}>` : '') + '</div>';
+const efShell = (cls, t, inner) => `<div class="ef ${cls}${t ? ' rar-' + RAR(t.tier) : ''}"><i class="ef-sh"></i><div class="ef-bg">`
+  + (t ? `<b class="ef-water">${ROMAN[t.tier]}</b>` : '') + `</div>${inner}<i class="ef-hl"></i></div>`;
+// лента: в покое — одна карточка победителя у левого края (как в конце прокрута)
+const efBand = (t, list, still, sbox) => `<div class="ef-band"><i class="ef-wash"></i><div class="ef-reel"><i class="ef-lines"></i>`
+  + `<div class="ef-strip"${still ? ' style="transform:translate3d(20px,0,0)"' : ''}>${list.map(x => efCard(x, still)).join('')}</div></div>`
+  + `<div class="ef-mark"><i></i><b></b></div><i class="ef-ring"></i><i class="ef-flash"></i>`
+  + `<div class="ef-id"><div class="ef-meta">${efTier(t)}${efCls(t)}</div><div class="ef-name">${esc(t.name)}</div></div>`
+  + `<div class="ef-sbox">${sbox || ''}</div></div>`;
+const efFlap = (txt, cls) => `<div class="ef-ch"><div class="ef-lbl">ЧЕЛЛЕНДЖ НА БОЙ</div><div class="ef-flap ${cls}"><div class="txt">${esc(txt)}</div><i class="sw"></i></div></div>`;
+const efCht = txt => `<div class="ef-cht">${esc(txt)}</div>`;
+const efSt = (chip, label, note, nc) => `<div class="ef-st">${chip ? `<span class="ef-chip ${chip}"><span><i></i><em>${label}</em></span></span>` : ''}`
+  + `<span class="ef-note ${nc || ''}">${esc(note || '')}</span></div>`;
+const efStamp = (ok, fx) => `<div class="ef-stamp ${ok ? 'ok' : 'fail'}${fx ? ' fx' : ''}"><span>${ok ? ICON_OK : ICON_FAIL}${ok ? 'ВЫПОЛНЕНО' : 'ПРОВАЛ'}</span><i class="streak"></i></div>`;
+function efMeter(p, cls, done) {
+  const pips = p.max > 0 && p.max <= 10; // штучное (фраги, засвет) — делениями, урон — полосой с засечками
+  const full = p.max > 0 && p.cur >= p.max; // зелёная полоса — только у набранного счётчика (в «или» второй остаётся как есть)
+  return `<div class="ef-mt ${cls}${full ? ' done' : ''}" data-k="${esc(p.key)}" data-v="${p.cur}"><div class="ef-cnt"><span class="ef-tag"><span>${esc(p.tag)}</span></span>`
+    + `<span class="ef-val"><b class="ef-num">${efFmt(p.cur)}</b><span class="ef-of">/ ${efFmt(p.max)}</span></span><b class="ef-pop"><i></i></b><span class="ef-pct">${p.pct}%</span></div>`
+    + (pips ? `<div class="ef-pips">${Array.from({ length: p.max }, (_, i) => `<i${i < p.cur ? ' class="on"' : ''}></i>`).join('')}</div>`
+      : `<div class="ef-bar${done && full ? ' done' : ''}"><i class="fill" style="width:${p.pct}%"><i class="tip"></i></i><i class="gain"></i><i class="ticks"></i><i class="shine"></i></div>`)
+    + `<span class="ef-burst">${'<i></i>'.repeat(9)}</span></div>`;
+}
+function efBody(s, small) {
+  const v = s.view, pp = v && v.pp;
+  if (!pp) return '';
+  if (!pp.parts.length) return v.text ? `<div class="ef-rest">${esc(v.text)}</div>` : '';
+  const lead = efLead(pp);
+  const html = pp.or
+    ? pp.parts.map((p, i) => efMeter(p, (i === lead ? 'lead' : 'dim') + (small ? ' sm' : ''), v.ok)).join('<div class="ef-or">ИЛИ — ХВАТИТ ЛЮБОГО</div>')
+    : pp.parts.map(p => efMeter(p, small || pp.parts.length > 1 ? 'sm' : '', v.ok)).join('');
+  return html + (pp.rest ? `<div class="ef-rest">${esc(pp.rest)}</div>` : '');
+}
+// строка под счётчиками в бою
+function efFoot(s) {
+  const v = s.view, pp = v && v.pp;
+  const extra = s.note ? `<span class="${s.noteCls}">${esc(s.note)}</span>` : '';
+  if (!v) return extra;
+  if (s.done) return '<span class="good">✓ Выполнено — доиграй бой</span>' + (extra ? '<br>' + extra : '');
+  // цифры уже набраны, а челлендж ещё нет (не выжил, получил много) — подсказки «ещё 0» нет, условие видно строкой выше
+  let main = '';
+  if (v.hold) main = '<span class="good">Пока всё по плану — продержись до конца боя</span>';
+  else if (v.lost) main = '<span class="bad">В этом бою уже не выполнить</span>';
+  else if (pp && pp.parts.length) {
+    const left = pp.parts.filter(p => p.cur < p.max);
+    if (pp.or) { const p = pp.parts[efLead(pp)]; if (p.cur < p.max) main = `Ближе к цели ${esc(p.key)}: ещё <b>${efFmt(p.max - p.cur)}</b>`; }
+    else if (pp.parts.length === 1) { if (left.length) main = 'До цели ' + efLeft(left[0]); }
+    else if (left.length) main = 'Осталось: ' + left.map(p => `${esc(p.key)} <b>${efFmt(p.max - p.cur)}</b>`).join(', ');
   }
+  return main + (extra ? (main ? '<br>' : '') + extra : '');
+}
+
+// модель → вид карточки
+function efState(m) {
+  if (m.idle) return { layout: 'idle', text: m.idle, note: m.note || '', noteCls: m.noteCls || '', tone: m.battle ? 's-bt' : '' };
+  const sp = m.sp, st = stOf(sp);
+  const s = { sp, t: sp.tank, layout: m.mode === 'battle' ? 'bt' : 'hg', mode: m.mode, note: m.note || '', noteCls: m.noteCls || '', view: m.view, off: !!m.off };
+  // «выполнено» в бою — только когда итог уже не испортить (выжить / получить мало решится в конце боя)
+  if (s.layout === 'bt') { s.done = !!(m.view && m.view.ok && !m.view.hold); s.tone = s.done ? 's-ok' : 's-bt'; return s; }
+  s.stamp = st === 'ok' || st === 'fail' ? st : '';
+  s.chip = m.chip === 'check' ? ['amb', 'ПРОВЕРКА'] : st === 'ok' ? ['ok', 'ВЫПОЛНЕНО'] : st === 'fail' ? ['fail', 'ПРОВАЛ']
+    : st === 'ambiguous' ? ['amb', 'ОТМЕТИТ СТРИМЕР'] : ['wait', 'ЖДЁМ БОЙ'];
+  s.tone = st === 'ok' ? 's-ok' : st === 'fail' ? 's-fail' : m.chip === 'check' || st === 'ambiguous' || s.off ? 's-amb' : 's-wait';
+  s.flap = st === 'pending' && m.mode === 'hangar'; // ждём бой — табло с челленджем; после боя — строка и цифры
+  return s;
+}
+function efKey(s) {
+  if (s.layout === 'idle') return ['idle', s.text, s.note, s.noteCls, s.tone].join('|');
+  const pp = s.view && s.view.pp;
+  const sig = pp ? pp.parts.map(p => p.key + '/' + p.max).join(',') + (pp.or ? '|or' : '') + (pp.rest ? '|r' : '') : s.view ? 'txt' : '-';
+  if (s.layout === 'bt') return ['bt', s.sp.id, s.sp.chFinal, sig, s.done, s.note, s.noteCls].join('|');
+  return ['hg', s.sp.id, s.sp.chFinal, s.mode, s.chip.join(), s.stamp, s.off, s.flap, sig, s.view ? s.view.ok : '', s.note, s.noteCls].join('|');
+}
+function efHTML(s) {
+  if (s.layout === 'idle') return efShell('idle ' + s.tone, null, `<div class="ef-idle"><b>${esc(s.text)}</b></div>` + efSt('', '', s.note, s.noteCls));
+  const t = s.t;
+  if (s.layout === 'bt') {
+    const right = s.done ? `<span class="ef-slot">${efStamp(true, s.fx)}</span>` : '<span class="ef-chip bt"><span><i></i><em>В БОЮ</em></span></span>';
+    return efShell('bt ' + s.tone, t, `<div class="ef-head">${efTier(t)}${efCls(t)}<b class="ef-hname">${esc(t.name)}</b>${right}</div>`
+      + efCht(s.sp.chFinal) + efBody(s, false) + `<div class="ef-foot">${efFoot(s)}</div>`);
+  }
+  const band = efBand(t, [t], true, s.stamp ? efStamp(s.stamp === 'ok', s.fx) : '');
+  const mid = s.flap ? efFlap(s.sp.chFinal, 'final') : efCht(s.sp.chFinal) + efBody(s, true);
+  return efShell('hg landed landed2 ' + s.tone + (s.off ? ' off' : ''), t, band + mid + efSt(s.chip[0], s.chip[1], s.note, s.noteCls));
+}
+
+// анимации
+const efFlashHL = card => anim(card.querySelector('.ef-hl'), [{ opacity: 0 }, { opacity: 1, offset: .18 }, { opacity: 0 }], { duration: 1000, easing: 'ease-out' });
+const efPop = (el, txt) => {
+  if (!el) return;
+  el.textContent = txt;
+  anim(el, [{ opacity: 0, transform: 'translateY(8px) scale(.8)' }, { opacity: 1, transform: 'translateY(-2px) scale(1.1)', offset: .22 },
+    { opacity: 1, transform: 'translateY(-6px) scale(1)', offset: .6 }, { opacity: 0, transform: 'translateY(-14px) scale(1)' }], { duration: 1100, easing: 'ease-out' });
+};
+// счёт вверх: rAF только пока идёт счёт; источник скрыт (rAF стоит) — таймер всё равно ставит итог
+function efCount(el, a, b, ms) {
+  const tok = (el._tok = (el._tok || 0) + 1), t0 = performance.now();
+  const f = now => {
+    if (el._tok !== tok) return;
+    const k = Math.min(1, (now - t0) / ms);
+    el.textContent = efFmt(a + (b - a) * (1 - Math.pow(1 - k, 3)));
+    if (k < 1) requestAnimationFrame(f);
+  };
+  requestAnimationFrame(f);
+  setTimeout(() => { if (el._tok === tok) el.textContent = efFmt(b); }, ms + 150);
+}
+// новые цифры без пересборки: число считает, полоса дорастает со вспышкой нового куска, «+520» всплывает
+function efMeterSet(el, p) {
+  const prev = num(+el.dataset.v, NaN);
+  el.dataset.v = p.cur;
+  if (prev === p.cur) return;
+  const numEl = el.querySelector('.ef-num'), up = isFinite(prev) && p.cur > prev;
+  el.querySelector('.ef-pct').textContent = p.pct + '%';
+  el.classList.toggle('done', p.max > 0 && p.cur >= p.max);
+  const bar = el.querySelector('.ef-bar');
+  if (bar) {
+    const r0 = isFinite(prev) && p.max > 0 ? Math.min(100, prev * 100 / p.max) : 0;
+    bar.querySelector('.fill').style.width = p.pct + '%';
+    if (up) {
+      const gain = bar.querySelector('.gain');
+      gain.style.left = r0.toFixed(2) + '%'; gain.style.width = Math.max(0, p.pct - r0).toFixed(2) + '%';
+      anim(gain, [{ opacity: .95 }, { opacity: 0 }], { duration: 900, easing: 'ease-out' });
+    }
+  } else el.querySelectorAll('.ef-pips i').forEach((pi, i) => {
+    const on = i < p.cur;
+    if (on && !pi.classList.contains('on') && up) anim(pi, [{ opacity: 0, transform: 'skewX(-14deg) scale(.4)' },
+      { opacity: 1, transform: 'skewX(-14deg) scale(1.2)', offset: .55 }, { opacity: 1, transform: 'skewX(-14deg) scale(1)' }], { duration: 520, easing: EF_SPRING });
+    pi.classList.toggle('on', on);
+  });
+  if (up) {
+    efCount(numEl, prev, p.cur, 600);
+    anim(numEl, [{ transform: 'scale(1.14)' }, { transform: 'scale(1)' }], { duration: 520, easing: EF_SPRING });
+    efPop(el.querySelector('.ef-pop i'), '+' + efFmt(p.cur - prev));
+  } else { numEl._tok = (numEl._tok || 0) + 1; numEl.textContent = efFmt(p.cur); } // идущий счёт вверх не должен вернуть старое число
+}
+// карточку пересобрали в том же бою (например, на «выполнено») — последний прирост всё равно отыгрываем: счёт, «+N», вспышка
+const efVals = card => new Map(Array.from(card.querySelectorAll('.ef-mt')).map(m => [m.dataset.k, num(+m.dataset.v, NaN)]));
+function efCarry(card, vals, pp) {
+  card.querySelectorAll('.ef-mt').forEach((m, i) => {
+    const p = pp.parts[i], v = vals.get(m.dataset.k);
+    if (p && isFinite(v) && v < p.cur) { m.dataset.v = v; efMeterSet(m, p); }
+  });
+}
+function efUpdate(card, s) {
+  if (!card) return;
+  const pp = s.view && s.view.pp, mts = card.querySelectorAll('.ef-mt');
+  if (pp) {
+    pp.parts.forEach((p, i) => { if (mts[i]) efMeterSet(mts[i], p); });
+    if (pp.or) { const lead = efLead(pp); mts.forEach((el, i) => { el.classList.toggle('lead', i === lead); el.classList.toggle('dim', i !== lead); }); }
+  }
+  const rest = card.querySelector('.ef-rest');
+  if (rest && s.view) { const txt = pp && pp.parts.length ? pp.rest : s.view.text; if (rest.textContent !== txt) rest.textContent = txt; }
+  const foot = card.querySelector('.ef-foot');
+  if (foot) { const h = efFoot(s); if (foot._h !== h) { foot._h = h; foot.innerHTML = h; } }
+}
+// выполнено посреди боя: блик по набранной полосе, искры у её конца (или у последнего деления), вспышка рамки —
+// меньше секунды, прицел не закрывает. В «или» празднуем тот счётчик, что набран, а не первый по порядку
+function efCelebrate(card) {
+  efFlashHL(card);
+  const done = Array.from(card.querySelectorAll('.ef-mt.done'));
+  done.forEach(m => {
+    const sh = m.querySelector('.ef-bar .shine');
+    if (sh) anim(sh, [{ opacity: 1, transform: 'translateX(-120%) skewX(-20deg)' }, { opacity: 1, transform: 'translateX(380%) skewX(-20deg)' }], { duration: 700, easing: EF_OUT });
+    m.querySelectorAll('.ef-pips i').forEach((pi, i) => anim(pi, [{ transform: 'skewX(-14deg) scale(1)' }, { transform: 'skewX(-14deg) scale(1.3)', offset: .4 },
+      { transform: 'skewX(-14deg) scale(1)' }], { duration: 420, delay: i * 45, easing: 'ease-out' }));
+  });
+  const mt = done.find(m => m.classList.contains('lead')) || done[0], b = mt && mt.querySelector('.ef-burst');
+  if (!mt || !b) return;
+  const bar = mt.querySelector('.ef-bar'), pips = mt.querySelectorAll('.ef-pips i'), end = bar || pips[pips.length - 1];
+  if (!end) return;
+  b.style.left = (end.offsetLeft + end.offsetWidth - (bar ? 6 : 4)) + 'px'; b.style.top = (end.offsetTop + end.offsetHeight / 2) + 'px';
+  const ps = Array.from(b.children), cols = ['#2ee59d', '#ffffff', '#ffe49e'];
+  ps.forEach((p, i) => {
+    const a = Math.PI * (.5 + i / (ps.length - 1)), r = 22 + (i % 3) * 11; // искры летят влево — край окна их не режет
+    p.style.color = cols[i % cols.length];
+    anim(p, [{ opacity: 1, transform: 'translate(0,0) rotate(45deg) scale(1.3)' },
+      { opacity: 0, transform: `translate(${(Math.cos(a) * r).toFixed(1)}px,${(Math.sin(a) * r).toFixed(1)}px) rotate(45deg) scale(.3)` }], { duration: 850, easing: EF_OUT });
+  });
+}
+// лента спина: сдвиг + наклон по скорости + карточка под маркером крупнее (только transform)
+function efReelSet(st, x, lean) {
+  st.strip.style.transform = `translate3d(${x.toFixed(2)}px,0,0) skewX(${(-lean).toFixed(2)}deg)`;
+  const lo = Math.max(0, Math.floor((-x - EF_CW) / EF_STEP)), hi = Math.min(st.cards.length - 1, Math.ceil((EF_RW - x) / EF_STEP));
+  for (let i = lo; i <= hi; i++) {
+    const d = Math.abs((x + i * EF_STEP + EF_CW / 2 - EF_RW / 2) / EF_STEP);
+    st.cards[i].style.transform = `scale(${(d < 1 ? 1.1 - .16 * d : Math.max(.84, .94 - .05 * (d - 1))).toFixed(3)})`;
+  }
+}
+// замах назад → разгон → долгое торможение → лёгкий перелёт и возврат на победителя
+function efSpin(st, i0, wi, dur) {
+  return new Promise(res => {
+    const x0 = efX(i0), x1 = efX(wi), os = 16, xa = x1 - os, TA = 260, TS = 420, total = TA + dur + TS;
+    const N = 200, cum = new Float32Array(N + 1);
+    let acc = 0;
+    for (let i = 1; i <= N; i++) { // профиль скорости: плавный набор до 16%, дальше спад
+      const u = (i - .5) / N, a = .16, s = u / a;
+      acc += u < a ? s * s * (3 - 2 * s) : Math.pow((1 - u) / (1 - a), 2.3);
+      cum[i] = acc;
+    }
+    const pos = u => { const f = Math.min(N - 1e-6, u * N), i = Math.floor(f); return (cum[i] + (cum[i + 1] - cum[i]) * (f - i)) / acc; };
+    let px = x0, pi = i0, lastTick = 0, done = false;
+    const t0 = performance.now();
+    const end = () => { if (done) return; done = true; efReelSet(st, x1, 0); st.lines.style.opacity = '0'; res(); };
+    const fr = now => {
+      if (done) return;
+      const t = now - t0;
+      let x;
+      if (t < TA) x = x0 + 18 * Math.sin(Math.PI / 2 * t / TA);
+      else if (t < TA + dur) x = x0 + 18 + (xa - x0 - 18) * pos((t - TA) / dur);
+      else { const k = Math.min(1, (t - TA - dur) / TS); x = xa + os * k * k * (3 - 2 * k); }
+      const v = Math.abs(x - px);
+      px = x;
+      efReelSet(st, x, Math.min(12, v * .45));
+      st.lines.style.opacity = Math.min(1, v / 22).toFixed(2);
+      const idx = Math.round((EF_RW / 2 - EF_CW / 2 - x) / EF_STEP);
+      if (idx !== pi) { pi = idx; if (now - lastTick > 45) { lastTick = now; anim(st.mf, [{ opacity: 1 }, { opacity: 0 }], { duration: 170, easing: 'ease-out' }); } }
+      if (t >= total) end(); else requestAnimationFrame(fr);
+    };
+    requestAnimationFrame(fr);
+    setTimeout(end, total + 800); // источник скрыт (rAF стоит) — всё равно приземляемся
+  });
+}
+function efType(el, s) {
+  const chs = Array.from(s);
+  let i = 0;
+  el.textContent = ''; el.classList.add('typing');
+  const step = () => { el.textContent = chs.slice(0, ++i).join(''); if (i < chs.length) setTimeout(step, 48); else setTimeout(() => el.classList.remove('typing'), 450); };
+  setTimeout(step, 120);
+}
+// табло: перелистывание вариантов, последний — выпавший челлендж, со «шлепком» и бликом
+async function efRollFlap(box, seq) {
+  const el = box.querySelector('.txt');
+  box.style.minHeight = getComputedStyle(box).height; // варианты листаются в одну строку — табло не сжимается, окно не прыгает
+  box.className = 'ef-flap rolling';
+  for (let i = 0; i < seq.length - 1; i++) {
+    el.textContent = seq[i];
+    const w = 60 + i * i * 13;
+    anim(el, [{ transform: 'rotateX(-88deg)', opacity: .2 }, { transform: 'rotateX(0)', opacity: 1 }], { duration: Math.min(230, Math.max(80, w * .85)), easing: 'cubic-bezier(.3,1.45,.5,1)' });
+    await sleep(w);
+  }
+  box.className = 'ef-flap final';
+  el.textContent = seq[seq.length - 1];
+  box.style.minHeight = '';
+  anim(el, [{ transform: 'rotateX(-90deg)', opacity: 0 }, { transform: 'rotateX(0)', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.3,1.45,.5,1)' });
+  anim(box, [{ transform: 'scale(1.06)' }, { transform: 'scale(.98)', offset: .35 }, { transform: 'scale(1)' }], { duration: 650, easing: 'cubic-bezier(.2,1.7,.35,1)' });
+  anim(box.querySelector('.sw'), [{ opacity: 1, transform: 'translateX(-160%) skewX(-22deg)' }, { opacity: 1, transform: 'translateX(420%) skewX(-22deg)' }], { duration: 900, delay: 100, easing: EF_OUT });
+  await sleep(600);
+}
+// новый спин в ангаре: лента карточек проезжает под маркером, победитель встаёт со вспышкой и уезжает влево,
+// печатается название, табло листает челленджи — и окно спокойно переходит в «ждём бой»
+async function efSpinPlay(sp) {
+  G.anim = true;
+  const box = $('#gmMe'), t = sp.tank;
+  try {
+    let list = [t], wi = 0;
+    if (sp.items.length > 1) { // кусок ленты спина: до 18 танков перед победителем и 3 после
+      const from = Math.max(0, sp.winIndex - 18), to = Math.min(sp.items.length, sp.winIndex + 4);
+      list = sp.items.slice(from, to); wi = sp.winIndex - from;
+    }
+    const seq = sp.ch.slice(-8);
+    box.innerHTML = efShell('hg', t, efBand(t, list, false) + efFlap(seq.length > 1 ? 'Крутим рулетку…' : sp.chFinal, seq.length > 1 ? 'idle' : 'final')
+      + efSt('wait', 'ЖДЁМ БОЙ', '', ''));
+    const card = box.firstElementChild;
+    const st = { strip: card.querySelector('.ef-strip'), cards: Array.from(card.querySelectorAll('.ef-tc')), lines: card.querySelector('.ef-lines'), mf: card.querySelector('.ef-mark b') };
+    card.querySelector('.ef-st').style.opacity = '0';
+    const i0 = Math.max(0, wi - 17);
+    efReelSet(st, efX(i0), 0);
+    anim(card, [{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 520, easing: EF_OUT });
+    await sleep(650);
+    if (wi > i0) await efSpin(st, i0, wi, 3000);
+    // посадка: вспышка, плоская ударная волна, победитель подпрыгивает, остальные гаснут
+    const win = st.cards[wi];
+    win.classList.add('win'); card.classList.add('landed');
+    anim(card.querySelector('.ef-flash'), [{ opacity: 1 }, { opacity: 0 }], { duration: 650, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    anim(card.querySelector('.ef-ring'), [{ opacity: .95, transform: 'scale(.45)' }, { opacity: 0, transform: 'scale(2.8,1.05)' }], { duration: 750, easing: EF_OUT });
+    anim(win, [{ transform: 'scale(1.1)' }, { transform: 'scale(1.28)', offset: .3 }, { transform: 'scale(1.12)' }], { duration: 650, easing: 'cubic-bezier(.2,.9,.3,1)' });
+    win.style.transform = 'scale(1.12)';
+    await sleep(680);
+    // карточка уезжает к левому краю, справа печатается название, проступает цифра уровня
+    win.style.transition = 'transform .6s cubic-bezier(.16,1,.3,1)';
+    win.style.transform = `translateX(-${EF_SLIDE}px) scale(1)`;
+    card.classList.add('landed2');
+    efType(card.querySelector('.ef-name'), t.name);
+    await sleep(700);
+    if (seq.length > 1) await efRollFlap(card.querySelector('.ef-flap'), seq);
+    await sleep(180);
+  } catch (e) { console.error(e); }
+  // дальше — обычная отрисовка того же вида, статус «выскакивает». Новый спин остаётся на экране, пока игрок
+  // не сменит танк в ангаре (иначе окно сразу показало бы старый челлендж на выбранном сейчас танке)
+  G.efHold = { id: sp.id, hv: gmHvKey(G.on ? gv('hangar.vehicle.info') : null) };
+  G.efShown = { id: sp.id, ch: sp.chFinal, st: sp.status };
+  G.anim = false; G.key = ''; G.efPop = true;
+  gmRender();
+}
+// перекрут челленджа в том же спине — табло листает заново
+async function efFlapPlay(box, sp) {
+  G.anim = true;
+  try { const seq = sp.ch.slice(-8); if (seq.length > 1) await efRollFlap(box, seq); } catch (e) { console.error(e); }
+  G.anim = false; G.key = '';
+  gmRender();
+}
+function efRenderMe(m) {
+  const box = $('#gmMe'), s = efState(m), key = efKey(s), prev = G.efShown;
+  const flapBox = box.querySelector('.ef-flap');
+  if (s.layout === 'hg' && s.flap && prev && prev.id === s.sp.id && prev.ch !== s.sp.chFinal && flapBox) {
+    G.efShown = { id: s.sp.id, ch: s.sp.chFinal, st: s.sp.status };
+    efFlapPlay(flapBox, s.sp);
+    return;
+  }
+  if (key !== G.key) {
+    // итог только что пришёл — штамп «падает» и рамка вспыхивает; выполнено посреди боя — праздник один раз за бой
+    s.fx = !!(s.stamp && prev && prev.id === s.sp.id && prev.st !== s.sp.status);
+    const celKey = s.layout === 'bt' && s.done ? s.sp.id + ':' + (G.bt ? G.bt.at : '') : '';
+    const cel = !!celKey && G.efCel !== celKey;
+    if (cel) { G.efCel = celKey; s.fx = true; }
+    const old = box.firstElementChild;
+    const vals = s.layout === 'bt' && prev && prev.id === s.sp.id && old && old.classList.contains('bt') ? efVals(old) : null;
+    G.key = key;
+    box.innerHTML = efHTML(s);
+    const card = box.firstElementChild;
+    if (vals && s.view && s.view.pp) efCarry(card, vals, s.view.pp);
+    if (G.efPop) { G.efPop = false; const row = card.querySelector('.ef-st'); if (row) row.classList.add('pop'); }
+    if (cel) efCelebrate(card); else if (s.fx) efFlashHL(card);
+  } else if (s.layout !== 'idle') efUpdate(box.firstElementChild, s);
+  G.efShown = s.layout === 'idle' ? null : { id: s.sp.id, ch: s.sp.chFinal, st: s.sp.status };
+}
+function efZoom() { // окно свёрстано в 360 px — целиком вписываем в ширину, которую выставили в игре (уже — мельче, но без обрезки)
+  const z = Math.max(.25, Math.min(3, (innerWidth || EF_RW) / EF_RW));
+  $('#game').style.zoom = String(Math.round(z * 1000) / 1000);
+}
+
+function gmRender() {
+  if (!G.anim && G.spinQ) {
+    const raw = G.mine.spins.get(G.spinQ);
+    G.spinQ = '';
+    if (raw && !gmInBattle()) efSpinPlay(norm(raw)); // в бою барабан не крутим — спин просто появится в ангаре
+  }
+  if (!G.anim) efRenderMe(gmModel());
   gmRenderFriends();
   const off = !GM_DEMO && !G.on && Date.now() - G.t0 > 8000;
   const hint = $('#gmHint');
@@ -2483,19 +3011,20 @@ function gmRenderFriends() {
     if (!sp) return;
     const st = stOf(sp);
     const s = st === 'ok' ? ['✓', 'ok'] : st === 'fail' ? ['✕', 'fail'] : st === 'ambiguous' ? ['?', 'amb'] : ['⏳', 'pend'];
-    html += `<div class="gm-fr"><span class="gm-fr-n">${esc(f.nick)}</span>`
-      + `<span class="gm-fr-c"><b>${esc(sp.tank.name)}</b> · ${esc(sp.chFinal)}</span><span class="gm-fr-s ${s[1]}">${s[0]}</span></div>`;
+    html += `<div class="ef-fr"><span class="n">${esc(f.nick)}</span><span class="c"><b>${esc(sp.tank.name)}</b> · ${esc(sp.chFinal)}</span>`
+      + `<span class="s ${s[1]}"><span>${s[0]}</span></span></div>`;
   });
   if (html !== G.frHTML) { G.frHTML = html; $('#gmFrs').innerHTML = html; }
 }
 let gmT = 0;
 function gmSoon() { if (!gmT) gmT = setTimeout(() => { gmT = 0; try { gmRender(); } catch (e) { console.error(e); } }, 100); }
 
-// &demo=1 — бой понарошку по кругу, чтобы посмотреть окно без игры.
+// &demo=1 — по кругу: прокрут рулетки, ангар, бой понарошку, итог — чтобы посмотреть окно без игры.
 // &demo=hangar|wrong|battle|after|ok|fail — застыть на одном виде (удобно заранее расставить окно в игре):
 // ангар с нужным танком / с другим танком, середина боя, сразу после боя, итог засчитан / провален.
+// &demo=spin — прокрут рулетки в ангаре, повторяется каждые 12 секунд.
 // Всё только в памяти страницы, в комнату ничего не пишется
-const GM_STAGES = ['hangar', 'wrong', 'battle', 'after', 'ok', 'fail'];
+const GM_STAGES = ['hangar', 'wrong', 'battle', 'after', 'ok', 'fail', 'spin'];
 function gmDemo() {
   const stage = GM_STAGES.indexOf(params.get('demo')) >= 0 ? params.get('demo') : '';
   const send = m => gmMsg(JSON.parse(JSON.stringify(m)));
@@ -2505,6 +3034,7 @@ function gmDemo() {
   (async () => {
     while (!G.me || !G.mine.ready || !(window.WR && WR.catalog)) await sleep(300);
     for (;;) {
+      if (!stage) G.bt = null; // новый круг — снова ангар, а не итог прошлого боя
       let p = gmPick();
       if (!p.active.length) { gmDemoSpin(p.all[0]); p = gmPick(); }
       const sp = p.active[0] || p.sp, t = sp.tank;
@@ -2519,6 +3049,8 @@ function gmDemo() {
         { path: 'hangar.vehicle.info', value: stage === 'wrong' ? other : veh }, { path: 'battle.isInBattle', value: false },
       ] });
       if (stage === 'hangar' || stage === 'wrong') return;
+      if (stage === 'spin') for (;;) { G.spinQ = sp.id; gmSoon(); await sleep(12000); }
+      if (!stage) { G.spinQ = sp.id; gmSoon(); await sleep(400); while (G.anim) await sleep(200); } // круг начинается с прокрута
       await sleep(stage ? 300 : 4000);
       const arena = Date.now();
       set('battle.arenaId', arena); set('battle.vehicle', veh); set('battle.maxHealth', hp); set('battle.health', hp); set('battle.isAlive', true);
@@ -2539,6 +3071,10 @@ function gmDemo() {
         if (stage === 'battle') return;
         await sleep(400);
         if (stage !== 'fail') { [0.25, 0.2].forEach(f => hit(Math.round(v * f))); kill(); }
+        else { // провал: урона не добрали, танк уничтожили
+          fb('receivedDamage', { damage: health, attackReason: 'shot', vehicle: { playerId: 904 } });
+          health = 0; set('battle.health', 0); set('battle.isAlive', false);
+        }
       } else {
         for (let i = 0; i < 24 && health > 0; i++) {
           await sleep(1000);
@@ -2580,16 +3116,32 @@ function gmDemo() {
 function gmDemoSpin(base) {
   const t = (base && base.tank) || { id: 35873, name: 'Hacker', tier: 11, type: 'mediumTank', hp: 2100 };
   const tank = { id: t.id, name: t.name, tier: t.tier, type: t.type || 'mediumTank', prem: !!t.prem, img: t.img || '', hp: t.hp || 1800 };
-  let ch = { id: 'dmg_or_frags', text: 'Нанести 3000 урона или уничтожить 3 противника', auto: true, v: 3000, w: 3 };
+  let ch = { id: 'dmg_or_frags', text: 'Нанести 3000 урона или уничтожить 3 противника', auto: true, v: 3000, w: 3 }, flips = [];
   try {
-    const inst = WR.catalog.instancesFor(tank, { difficulty: 'normal' }).find(i => i.id === 'dmg_or_frags');
+    const all = WR.catalog.instancesFor(tank, { difficulty: 'normal' }), inst = all.find(i => i.id === 'dmg_or_frags');
     if (inst) ch = { id: inst.id, text: inst.text, auto: true, v: inst.v, w: inst.w };
+    flips = all.map(i => i.text).filter(x => x && x !== ch.text).sort(() => Math.random() - 0.5).slice(0, 7); // табло перелистает перед итогом
   } catch (e) {}
-  gmSpinEv(G.mine, 'added', { id: 'demo-spin', acc: G.me, nick: 'demo', owner: true, ts: serverNow(), tank, challenge: ch, ch: [ch.text], status: 'pending' });
+  // лента прокрута: настоящая из последнего спина с этим танком, иначе танки из недавних спинов комнаты
+  let items = null, winIndex = 0;
+  if (base && base.items.length > 1 && base.items[base.winIndex] && base.items[base.winIndex].id === tank.id) { items = base.items; winIndex = base.winIndex; }
+  else {
+    const pool = new Map();
+    [G.mine].concat([...G.fr.values()]).forEach(c => c.spins.forEach(r => {
+      const n = norm(r);
+      n.items.concat([n.tank]).forEach(x => { if (x.img && String(x.id) !== String(tank.id)) pool.set(String(x.id), x); });
+    }));
+    const list = [...pool.values()].sort(() => Math.random() - 0.5);
+    if (list.length) { items = Array.from({ length: 22 }, (_, i) => list[i % list.length]); winIndex = 18; items[winIndex] = tank; }
+  }
+  gmSpinEv(G.mine, 'added', { id: 'demo-spin', acc: G.me, nick: 'demo', owner: true, ts: serverNow(), tank, items: items || [tank], winIndex,
+    challenge: ch, ch: flips.concat([ch.text]), status: 'pending' }, true); // барабан крутит сам демо, когда нужно
 }
 
 function startGame() {
   $('#game').hidden = false;
+  efZoom();
+  addEventListener('resize', efZoom);
   const s = document.createElement('script');
   s.src = GM_CATALOG;
   s.onload = () => { G.fields.clear(); G.key = ''; gmSoon(); };
@@ -2600,7 +3152,7 @@ function startGame() {
   if (GM_URL_ACC) gmSetMe(GM_URL_ACC, 'url');
   startRoster(gmRoster);
   if (GM_DEMO) gmDemo(); else gmConnect();
-  setInterval(() => { gmFallback(); gmSoon(); }, 2000); // подсказки по времени; «после боя» гаснет сам
+  setInterval(() => { gmFallback(); gmSoon(); efZoom(); }, 2000); // подсказки по времени; «после боя» гаснет сам; ширину окна в игре меняют на ходу
   gmSoon();
 }
 
