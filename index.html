@@ -413,6 +413,8 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 .chip.on .dot{background:#0b0b10}
 .chip .cnt{margin-left:-2px;font:700 10px/1 var(--fu);font-style:normal;opacity:.7}
 .chip.empty:not(.on){opacity:.38}
+#checkMode .chip{flex:1 1 0;white-space:nowrap;--rc:var(--a2);--rcs:rgba(255,138,61,.28);--rcg:rgba(255,138,61,.3)}
+#checkCard .statusline.ok{border-left-color:var(--ok);color:var(--text)}
 .more-links{margin-top:10px}
 .more-links summary{cursor:pointer;color:var(--muted);font-size:12.5px;font-weight:600}
 
@@ -669,6 +671,16 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
         <div class="statusline" id="roomStatus"></div>
       </div>
 
+      <div class="card enter" style="--i:3" id="checkCard">
+        <h2>Проверка боёв</h2>
+        <div class="chips" id="checkMode">
+          <span class="chip" data-mode="wg" tabindex="0" role="button"><span>Через Wargaming</span></span>
+          <span class="chip" data-mode="game" tabindex="0" role="button"><span>Сразу из игры</span></span>
+        </div>
+        <div class="hint" id="checkHint"></div>
+        <div class="statusline" id="checkStatus"></div>
+      </div>
+
       <div class="card enter" style="--i:3">
         <h2>Фильтры</h2>
         <label class="f">Уровни</label>
@@ -714,6 +726,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 <!-- ?v= — номер версии, чтобы браузер не держал старые скрипты из кэша после обновления -->
 <script src="js/catalog.js?v=9"></script>
 <script src="js/tracker.js?v=9"></script>
+<script src="js/gamelink.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -775,6 +788,7 @@ const S = Object.assign({
   challengeOff: [],        // выключенные челленджи каталога (новые из обновлений включены сразу)
   customManual: '',        // свои ручные строки
   maxActive: 3,            // сколько челленджей одновременно ждут боя
+  gameCheck: false,        // засчитывать бой сразу по данным игры (мод WotStat на этом компьютере); иначе только WG API
 }, loadJSON(KEY, {}));
 const save = () => saveJSON(KEY, S);
 // Перенос старого текстового списка: строки не из старого стандартного становятся своими
@@ -1484,10 +1498,42 @@ function startSnapshot(entry) {
 }
 async function waitSnapshot(s) { if (snapJobs[s.id]) await snapJobs[s.id]; }
 
+// Все спины, что видит этот экран (комната — всех игроков), вместе с завершёнными
+const allSpins = () => (inRoom() ? Object.values(RM.spins) : S.history);
+// Бой засчитан «сразу из игры», а WG API узнаёт о нём позже. Если за это время на том же танке выпал новый челлендж,
+// его слепок снят «до того боя», и WG API отдал бы старый бой как новый. need — сколько боёв на танке должно быть
+// в честном слепке (0 — ограничений нет).
+function gameNeed(s) {
+  let need = 0;
+  for (const x of allSpins()) {
+    if (x === s || !x.result || x.result.via !== 'game' || typeof x.result.battles !== 'number') continue;
+    if (String(x.acc || '') !== String(s.acc || '') || String(x.tank && x.tank.id) !== String(s.tank && s.tank.id)) continue;
+    if (spunAtOf(x) < spunAtOf(s) && x.result.battles > need) need = x.result.battles;
+  }
+  return need;
+}
+const snapStale = s => {
+  const need = gameNeed(s);
+  return !!(need && s.snapshot && s.snapshot.stats && typeof s.snapshot.stats.battles === 'number' && s.snapshot.stats.battles < need);
+};
+// Слепок снят до боя, уже засчитанного игрой: ждём, пока WG API его посчитает, и тогда снимаем заново
+async function refreshStale(s) {
+  const need = gameNeed(s);
+  try {
+    const snap = await WR.tracker.snapshot({ ...trackBase(s.acc), tankId: s.tank.id, withAchievements: WR.catalog.needsAchievements(s.challenge) });
+    const b = snap.stats.battles;
+    if (b < need) return;                                // WG API ещё не знает о прошлом бое — ждём
+    if (b === need) return void await store.rebase(s, snap); // теперь слепок честный
+    // после прошлого боя на танке уже сыграли ещё, а игра этот бой не прислала — по WG API его не выделить
+    await store.resolve(s, { status: 'ambiguous', result: { text: 'статистику сняли уже после боя', checkedAt: nowSrv(), by: 'auto' } });
+  } catch (e) { trackErr(e); }
+}
+
 // Слепка нет (не удалось снять при спине) — снять сейчас
 async function lateSnapshot(s) {
   try {
     const snap = await WR.tracker.snapshot({ ...trackBase(s.acc), tankId: s.tank.id, withAchievements: WR.catalog.needsAchievements(s.challenge) });
+    if (snap.stats.battles < gameNeed(s)) return; // WG API ещё не посчитал бой, засчитанный игрой, — попробуем позже
     if (snap.lastBattle * 1000 > spunAtOf(s)) {
       // после спина уже были бои — посчитать бой на этом танке нельзя
       await store.resolve(s, { status: 'ambiguous', result: { text: 'статистику сняли уже после боя', checkedAt: nowSrv(), by: 'auto' } });
@@ -1520,6 +1566,8 @@ async function checkPending(spins) {
     const ready = [];
     for (const s of list) {
       await waitSnapshot(s);
+      if (s.status !== 'pending') continue;        // пока ждали, итог уже записала игра
+      if (snapStale(s)) { await refreshStale(s); continue; }
       if (s.snapshot) ready.push(s);
       // чужой свежий спин: слепок ещё снимает страница друга — подождём
       else if (String(s.acc) !== accStr() && nowSrv() - spunAtOf(s) < 60000) continue;
@@ -1531,6 +1579,8 @@ async function checkPending(spins) {
     catch (e) { trackErr(e); continue; }
     for (const s of ready) {
       out[s.id] = res[s.id];
+      // пока шёл запрос к WG API, игра могла засчитать бой (этот или прошлый на том же танке) — ответ уже не к месту
+      if (s.status !== 'pending' || snapStale(s)) continue;
       await applyCheck(s, res[s.id]);
     }
   }
@@ -1557,6 +1607,7 @@ function scheduleTrack(ms = TRACK_MS) {
 async function canReroll(s) {
   await waitSnapshot(s);
   if (!canTrack(s) || !s.snapshot) return true; // ручной челлендж — проверять нечем
+  if (snapStale(s)) return true;                // слепок снят до боя, уже засчитанного игрой: по нему «новый бой» не определить
   let r;
   try { r = (await WR.tracker.check({ ...trackBase(s.acc), items: [trackItem(s)] }))[s.id]; }
   catch (e) { toast('Не удалось проверить бои: ' + e.message); return false; }
@@ -1566,6 +1617,90 @@ async function canReroll(s) {
   await applyCheck(s, r);
   toast('Бой на этом танке уже сыгран — перекрутить нельзя');
   return false;
+}
+
+// ---------- Зачёт сразу из игры (WR.game: мод WotStat «Виджеты» на этом компьютере) ----------
+// Второй режим проверки. Игра присылает полный итог боя — свой и всех, кто был в этом бою, — и панель сразу
+// записывает итог своего челленджа, а у стримера ещё и челленджей друзей из того же боя (взвод), даже если у друга
+// мода нет. Всё, чего игра не видела (бой друга без стримера, опыт, медали), по-прежнему проверяет WG API.
+const GAME_SLACK = 20000;                       // допуск расхождения часов игры и комнаты
+const GAME_TYPES = new Set([1]);                // тип боя: 1 — обычный случайный (что WG API считает в статистику танка)
+const gameSeen = new Set();                     // бои, итог которых уже разобран
+let gameSt = { want: false, on: false, pid: '', inBattle: false }, gameNote = '';
+// Формула челленджа читает только то, что есть в итоге боя из игры? (опыт и медали там не берём)
+function gameCovers(ch, d) {
+  const used = new Set();
+  const spy = new Proxy({}, {
+    get: (o, k) => { if (typeof k === 'string') used.add(k); return 0; },
+    has: (o, k) => { if (typeof k === 'string') used.add(k); return true; },
+  });
+  try { WR.catalog.evaluate(ch, spy); WR.catalog.describe(ch, spy); } catch (e) { return false; }
+  if (!used.size) return false;
+  for (const f of used) if (!(f in d)) return false;
+  return true;
+}
+// Итог боя из игры -> итоги челленджей, которые ждут этот бой
+async function gameResult(b) {
+  if (!S.gameCheck || !b || !b.entries || !b.entries.length) return;
+  if (b.arena && gameSeen.has(b.arena)) return;
+  if (b.arena) gameSeen.add(b.arena);
+  if (b.bonusType != null && !GAME_TYPES.has(b.bonusType)) { gameSay('Бой не случайный — его проверит Wargaming'); return; }
+  // начало боя по часам комнаты: из итога боя, иначе — когда эта страница увидела начало боя
+  const started = b.startedAt || (b.seenAt ? nowSrv() - (Date.now() - b.seenAt) : 0);
+  let done = 0, mine = 0;
+  for (const s of store.toCheck()) {
+    const e = b.entries.find(x => x.acc === String(s.acc) && String(x.tankId) === String(s.tank && s.tank.id));
+    if (!e) continue;
+    mine++;
+    if (!(started > 0) || spunAtOf(s) > started + GAME_SLACK) continue;  // челлендж выпал уже после начала этого боя
+    if (!gameCovers(s.challenge, e.delta)) continue;                     // опыт, медали — проверит Wargaming
+    const ok = WR.catalog.evaluate(s.challenge, e.delta);
+    if (ok == null) continue;
+    await waitSnapshot(s);
+    if (s.status !== 'pending') continue;
+    const result = { text: WR.catalog.describe(s.challenge, e.delta), delta: e.delta, checkedAt: nowSrv(), by: 'auto', via: 'game' };
+    // сколько боёв на танке станет после этого боя — для слепка следующего челленджа на том же танке (см. gameNeed)
+    const nb = s.snapshot && s.snapshot.stats ? s.snapshot.stats.battles : null;
+    if (typeof nb === 'number') result.battles = nb + 1;
+    if (await store.resolve(s, { status: ok ? 'ok' : 'fail', result })) done++;
+  }
+  gameSay(done ? `Итог боя получен из игры: засчитано ${done}` : mine ? 'Итог боя получен, но этот челлендж проверит Wargaming' : '');
+  if (done) scheduleTrack();
+}
+function gameSay(msg) { gameNote = msg || ''; renderCheck(); }
+function gameSync() {
+  if (!window.WR || !WR.game) return;
+  if (S.gameCheck && !gameSt.want) WR.game.start({ onStatus: st => { gameSt = st; renderCheck(); }, onResult: b => { gameResult(b).catch(e => console.warn('Зачёт из игры:', e)); } });
+  else if (!S.gameCheck && gameSt.want) WR.game.stop();
+}
+function renderCheck() {
+  const game = !!S.gameCheck;
+  for (const c of $('#checkMode').children) {
+    const on = (c.dataset.mode === 'game') === game;
+    c.classList.toggle('on', on); c.setAttribute('aria-pressed', on);
+  }
+  $('#checkHint').innerHTML = game
+    ? 'Итог записывается сразу после боя по данным игры — твой и друзей, которые были с тобой в бою (мод друзьям не нужен). Нужен мод <b>WotStat «Виджеты»</b> на этом компьютере. Бой друга без тебя, опыт и медали проверит Wargaming.'
+    : 'Итог приходит из статистики Wargaming: обычно за секунды, иногда через пару минут. Работает у всех, мод не нужен.';
+  const el = $('#checkStatus');
+  let msg = '', ok = false;
+  if (game) {
+    if (!window.WR || !WR.game) msg = 'Не загрузился js/gamelink.js — проверяю через Wargaming';
+    else if (!gameSt.on) msg = 'Игра не найдена: запусти игру с модом и разреши сайту доступ, если спросит браузер. Пока проверяю через Wargaming.';
+    else {
+      ok = true;
+      const other = gameSt.pid && accStr() && gameSt.pid !== accStr();
+      msg = (other ? 'Игра на связи, но в ней другой аккаунт — свои бои проверит Wargaming' : gameSt.inBattle ? 'Игра на связи · идёт бой' : 'Игра на связи') + (gameNote ? ' · ' + gameNote : '');
+    }
+  }
+  el.textContent = msg; el.hidden = !msg;
+  el.classList.toggle('ok', ok); el.classList.remove('err');
+}
+function setCheckMode(game) {
+  if (!!S.gameCheck === !!game) return;
+  S.gameCheck = !!game; save();
+  gameNote = '';
+  gameSync(); renderCheck();
 }
 
 // ---------- Действия ----------
@@ -1668,6 +1803,7 @@ function renderAuth() {
   $('#acctMeta').textContent = `Сервер ${(REGIONS[S.region] || REGIONS.eu).name} · ${hangar.length ? `${tanksWord(hangar.length)} в рулетке` : 'ангар не загружен'}`;
   $('#who').textContent = hangar.length ? `${S.nick || 'игрок'} · ${tanksWord(hangar.length)}` : 'ангар не загружен';
   renderRoom(); // кнопки комнаты зависят от входа
+  renderCheck(); // строка «в игре другой аккаунт» зависит от входа
 }
 
 function renderChips() {
@@ -1734,7 +1870,7 @@ const chText = h => (h.challenge && h.challenge.text) || (Array.isArray(h.ch) ? 
 // Строка спина (история и «Игроки комнаты»); live — отдельная строка статуса
 function spinRow(h, { isNew = false, live = false } = {}) {
   const t = h.tank || {}, txt = chText(h);
-  const res = h.result && h.result.text ? ` · ${h.result.text}` : '';
+  const res = h.result && h.result.text ? ` · ${h.result.text}${h.result.via === 'game' ? ' · ⚡ из игры' : ''}` : '';
   const line = live ? '' : h.status === 'ambiguous' ? (isFriend() ? ' · несколько боёв — отметит стример' : ' · несколько боёв — отметь сам') : res;
   const st = live ? statusLine(h.status, h.result && h.result.text) : '';
   return `
@@ -2333,6 +2469,7 @@ function initPanel() {
   $('#logoutBtn').onclick = logout;
   $('#onlyPrem').onchange = e => { S.onlyPrem = e.target.checked; save(); renderPool(); };
   $('#sound').onchange = e => { S.sound = e.target.checked; save(); };
+  $('#checkMode').onclick = e => { const c = e.target.closest('[data-mode]'); if (c) setCheckMode(c.dataset.mode === 'game'); };
   $('#chAuto').onchange = onChallengeToggle;
   $('#chManual').onchange = onChallengeToggle;
   $('#chCustom').oninput = e => { S.customManual = e.target.value; save(); updateChCount(); };
@@ -2358,7 +2495,7 @@ function initPanel() {
     $(`#typeChips [data-type="${t}"]`)?.focus();
   };
   // фишки работают и с клавиатуры (Enter / Пробел), не запуская рулетку
-  for (const id of ['#tierChips', '#typeChips']) {
+  for (const id of ['#tierChips', '#typeChips', '#checkMode']) {
     $(id).onkeydown = e => {
       if (e.key === 'Enter' && e.target.classList.contains('chip')) {
         e.preventDefault(); e.stopPropagation(); e.target.click();
@@ -2422,6 +2559,7 @@ function initPanel() {
   if (!justLoggedIn && tokenValid()) setTimeout(loadHangar, 0);
   roomStart();
   setTimeout(trackTick, 2000);   // незавершённые челленджи с прошлого раза
+  renderCheck(); gameSync();     // режим проверки: «сразу из игры» подключается к моду на этом компьютере
 }
 
 if (!OBS) initPanel(); // с ?obs=… страница уже уходит на obs.html
