@@ -641,6 +641,9 @@ html:not(.w-game) #game{display:none!important}
 #game .ef-bar .shine{position:absolute;left:0;top:0;bottom:0;width:30%;opacity:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent);transform:translateX(-120%) skewX(-20deg)}
 #game .ef-bar.done .fill{background:linear-gradient(90deg,var(--ok2),var(--ok))}
 #game .ef-bar.done .tip{opacity:0}
+/* набранный счётчик — зелёный, даже если челлендж ещё не закрыт (как деления у фрагов): видно, что осталось добрать */
+#game .ef-mt.done .ef-bar .fill{background:linear-gradient(90deg,var(--ok2),var(--ok))}
+#game .ef-mt.done .ef-bar .tip{opacity:0}
 #game .ef-mt.sm{padding-top:7px}
 #game .ef-mt.sm .ef-cnt{height:26px}
 #game .ef-mt.sm .ef-num{font-size:22px}
@@ -3335,11 +3338,10 @@ function miHTML(s) {
     + `<b class="mi-name">${esc(t.name)}</b><span class="mi-chip ${s.chip[0]}">${s.chip[1]}</span></div>`
     + `<div class="mi-ch">${esc(s.sp.chFinal)}</div>`;
   if ((s.bt || s.counters) && pp) {
-    // зелёная полоса — как в «Эфире»: набранная часть выполненного челленджа или уже проваленного (видно, что было сделано)
-    const green = !!v.ok || s.over || s.tone === 'fail';
+    // набранная часть — зелёная, как в «Эфире»: видно, что осталось добрать
     if (pp.parts.length) {
       const lead = pp.or ? efLead(pp) : -1;
-      html += pp.parts.map((p, i) => miMeter(p, green, pp.or && i !== lead)).join(pp.or ? '<div class="mi-or">ИЛИ</div>' : '');
+      html += pp.parts.map((p, i) => miMeter(p, true, pp.or && i !== lead)).join(pp.or ? '<div class="mi-or">ИЛИ</div>' : '');
       if (pp.rest) html += `<div class="mi-rest">${esc(pp.rest)}</div>`;
     } else if (v.text) html += `<div class="mi-rest">${esc(v.text)}</div>`;
   }
