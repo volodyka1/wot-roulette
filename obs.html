@@ -563,8 +563,9 @@ html:not(.w-game) #game{display:none!important}
 #game .ef-chip{display:inline-flex;align-items:center;flex:0 0 auto;height:21px;padding:0 10px;border-radius:3px;transform:skewX(-12deg);font:900 italic 11px/1 var(--fd);letter-spacing:.08em;white-space:nowrap}
 #game .ef-chip>span{display:inline-flex;align-items:center;gap:6px;transform:skewX(12deg)}
 #game .ef-chip i{display:none;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
-/* единственная бесконечная анимация в покое — медленный пульс точки статуса */
-#game .ef-chip.wait i,#game .ef-chip.bt i,#game .ef-chip.amb i{display:block;animation:efPulse 2.4s ease-in-out infinite}
+/* В окне игры ничего не движется без повода: мод пересылает игре каждый перерисованный кадр, и бесконечная анимация
+   переполняет память интерфейса игры (свёрнутая игра вылетала через ~7 минут). Точка статуса мигает дважды и замирает */
+#game .ef-chip.wait i,#game .ef-chip.bt i,#game .ef-chip.amb i{display:block;animation:efPulse 1.2s ease-in-out 2}
 @keyframes efPulse{50%{opacity:.3}}
 #game .ef-chip.wait{background:rgba(255,138,61,.14);color:#ffb38a;box-shadow:inset 0 0 0 1px rgba(255,138,61,.5)}
 #game .ef-chip.bt{background:linear-gradient(100deg,#c0163a,#ff3d5a);color:#fff;box-shadow:0 3px 12px rgba(255,61,90,.35)}
@@ -2902,8 +2903,8 @@ function efCount(el, a, b, ms) {
 // новые цифры без пересборки: число считает, полоса дорастает со вспышкой нового куска, «+520» всплывает
 function efMeterSet(el, p) {
   const prev = num(+el.dataset.v, NaN);
+  if (prev === p.cur) return; // цифра та же — страницу не трогаем вовсе (см. efQuiet)
   el.dataset.v = p.cur;
-  if (prev === p.cur) return;
   const numEl = el.querySelector('.ef-num'), up = isFinite(prev) && p.cur > prev;
   el.querySelector('.ef-pct').textContent = p.pct + '%';
   el.classList.toggle('done', p.max > 0 && p.cur >= p.max);
@@ -3138,8 +3139,32 @@ function efRenderMe(m) {
   G.efShown = s.layout === 'idle' ? null : { id: s.sp.id, ch: s.sp.chFinal, st: s.sp.status };
 }
 function efZoom() { // окно свёрстано в 360 px — целиком вписываем в ширину, которую выставили в игре (уже — мельче, но без обрезки)
-  const z = Math.max(.25, Math.min(3, (innerWidth || EF_RW) / EF_RW));
-  $('#game').style.zoom = String(Math.round(z * 1000) / 1000);
+  const z = String(Math.round(Math.max(.25, Math.min(3, (innerWidth || EF_RW) / EF_RW)) * 1000) / 1000), st = $('#game').style;
+  if (st.zoom !== z) st.zoom = z;
+}
+// Мод WotStat пересылает игре каждый перерисованный кадр окна, поэтому в покое окно обязано стоять неподвижно.
+// Бесконечная анимация — это кадры без остановки: в свёрнутой игре память её интерфейса переполняется минут за семь,
+// и клиент вылетает (25.11.2026 так было дважды — из-за мигающей точки статуса). Всё движение в окне короткое и конечное;
+// сторож раз в 2 секунды гасит то, что само не закончится или тянется дольше EF_ANIM_MAX, и пишет об этом в журнал игры.
+const EF_ANIM_MAX = 20000;
+const EF_QUIET = new Set();
+function efQuiet() {
+  const root = $('#game');
+  let list = [];
+  try {
+    list = root.getAnimations ? root.getAnimations({ subtree: true })
+      : document.getAnimations ? document.getAnimations().filter(a => a.effect && a.effect.target && root.contains(a.effect.target)) : [];
+  } catch (e) {}
+  list.forEach(a => {
+    let t = null;
+    try { t = a.effect && a.effect.getComputedTiming(); } catch (e) {}
+    if (!t) return;
+    const endless = t.iterations === Infinity || !isFinite(t.endTime);
+    if (!endless && !(t.endTime > EF_ANIM_MAX)) return;
+    try { if (endless) a.cancel(); else a.finish(); } catch (e) { try { a.cancel(); } catch (e2) {} }
+    const el = a.effect.target, who = (a.animationName || a.transitionProperty || 'script') + ' @ ' + (el && el.className || el && el.tagName || '?');
+    if (!EF_QUIET.has(who) && EF_QUIET.size < 20) { EF_QUIET.add(who); console.warn('[game] остановлена слишком долгая анимация: ' + who); }
+  });
 }
 
 function gmRender() {
@@ -3152,7 +3177,7 @@ function gmRender() {
   gmRenderFriends();
   const off = !GM_DEMO && !G.on && Date.now() - G.t0 > 8000;
   const hint = $('#gmHint');
-  hint.hidden = !off;
+  if (hint.hidden !== !off) hint.hidden = !off;
   if (off && !hint.textContent) hint.textContent = 'Нет связи с игрой — нужен мод WotStat «Виджеты»';
 }
 function gmRenderFriends() {
@@ -3307,7 +3332,8 @@ function startGame() {
   if (GM_URL_ACC) gmSetMe(GM_URL_ACC, 'url');
   startRoster(gmRoster);
   if (GM_DEMO) gmDemo(); else gmConnect();
-  setInterval(() => { gmFallback(); gmSoon(); efZoom(); }, 2000); // подсказки по времени; «после боя» гаснет сам; ширину окна в игре меняют на ходу
+  // подсказки по времени; «после боя» гаснет сам; ширину окна в игре меняют на ходу; сторож от бесконечных анимаций
+  setInterval(() => { gmFallback(); gmSoon(); efZoom(); efQuiet(); }, 2000);
   gmSoon();
 }
 
