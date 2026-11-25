@@ -698,6 +698,59 @@ html:not(.w-game) #game{display:none!important}
 #game .ef-fr .s.amb{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600}
 #game .ef-fr .s.pend{background:rgba(255,138,61,.14);box-shadow:inset 0 0 0 1px rgba(255,138,61,.45)}
 #game .gm-hint{margin-top:6px;padding:0 16px;font:600 11px/1.3 var(--fu);color:#8d8da3;text-shadow:0 1px 2px #000}
+
+/* ---- «Минимал»: та же информация компактной карточкой — без ленты, картинки танка, подсветок и всплывашек.
+   Выбирается в панели (у каждого игрока своё) или &look=mini в ссылке. Двигается только въезд нового челленджа ---- */
+#game.mini{padding:2px 0}
+#game .mi{position:relative;width:360px;box-sizing:border-box;padding:9px 12px 10px 16px;border-radius:6px;background:rgba(11,11,17,.84);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),0 4px 14px rgba(0,0,0,.35);--mc:#ff3d5a}
+#game .mi::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 2px 2px 0;background:var(--mc)}
+#game .mi.wait{--mc:#ff8a3d}
+#game .mi.ok{--mc:var(--ok)}
+#game .mi.fail{--mc:var(--fail)}
+#game .mi.amb{--mc:var(--amb)}
+#game .mi.gray{--mc:#6b6e80}
+#game .mi.idle{--mc:rgba(255,255,255,.22)}
+#game .mi-row{display:flex;align-items:center;gap:7px;min-height:20px}
+#game .mi-tier{flex:0 0 auto;font:900 italic 12px/1 var(--fd);color:var(--rc)}
+#game .mi-cls{flex:0 0 auto;font:800 10px/1 var(--fu);letter-spacing:.04em;color:var(--cc,#a9abbd)}
+#game .mi-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:900 italic 14.5px/1.2 var(--fd);color:#fff}
+#game .mi-chip{flex:0 0 auto;padding:4px 7px 3px;border-radius:3px;font:900 italic 10px/1 var(--fd);letter-spacing:.08em;color:#fff;background:rgba(255,255,255,.08)}
+#game .mi-chip.wait{color:#ffb38a;background:rgba(255,138,61,.13)}
+#game .mi-chip.bt{background:linear-gradient(100deg,#c0163a,#ff3d5a)}
+#game .mi-chip.dead{color:#c9cad8}
+#game .mi-chip.ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c}
+#game .mi-chip.fail{background:linear-gradient(100deg,var(--fail2),var(--fail))}
+#game .mi-chip.amb{background:linear-gradient(100deg,var(--amb2),var(--amb));color:#241600}
+#game .mi-ch{margin-top:5px;font:700 12.5px/1.3 var(--fu);color:#e9e9f1}
+#game .mi-mt{display:grid;grid-template-columns:auto 1fr auto;align-items:baseline;column-gap:8px;margin-top:7px}
+#game .mi-tag{font:900 italic 9.5px/1 var(--fd);letter-spacing:.1em;color:#a9abbd}
+#game .mi-val{font:600 11.5px/1 var(--fu);color:#9a9cb0;font-variant-numeric:tabular-nums;white-space:nowrap}
+#game .mi-val b{font:800 16px/1 var(--fu);color:#fff}
+#game .mi-pct{font:900 italic 12px/1 var(--fd);color:#ffb38a;font-variant-numeric:tabular-nums}
+#game .mi-mt.done .mi-pct{color:var(--ok)}
+#game .mi-bar{grid-column:1/-1;display:block;position:relative;height:4px;margin-top:5px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+#game .mi-bar>i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:linear-gradient(90deg,#c0163a,#ff3d5a 50%,#ff8a3d)}
+#game .mi-mt.g .mi-bar>i{background:linear-gradient(90deg,var(--ok2),var(--ok))}
+#game .mi.over .mi-mt:not(.done) .mi-bar>i{background:linear-gradient(90deg,#464856,#7b7e90)}
+#game .mi.over .mi-mt:not(.done) .mi-val b{color:#c6c8d6}
+#game .mi.over .mi-mt:not(.done) .mi-pct{color:#8b8ea1}
+#game .mi-mt.dim{opacity:.55}
+#game .mi-or{margin-top:6px;font:900 italic 9px/1 var(--fd);letter-spacing:.18em;color:#7d7f92}
+#game .mi-rest{margin-top:6px;font:600 11.5px/1.3 var(--fu);color:#b9b9cc}
+#game .mi-foot{margin-top:6px;font:600 11.5px/1.3 var(--fu);color:#a9abbd}
+#game .mi-foot b{color:#fff;font-weight:800}
+#game .mi-foot .good{color:var(--ok);font-weight:700}
+#game .mi-foot .warn{color:var(--amb);font-weight:700}
+#game .mi-foot .bad{color:#ff7389;font-weight:700}
+#game .mi-idle{font:800 italic 13px/1.3 var(--fd);color:#e9e9f1}
+#game .mi.in{animation:miIn .45s cubic-bezier(.16,1,.3,1) both}
+@keyframes miIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+#game.mini .ef-frs{gap:3px;margin-top:4px}
+#game.mini .ef-fr{height:22px;padding:0 10px 0 12px}
+#game.mini .ef-fr::before{clip-path:none;border-radius:4px;background:rgba(11,11,17,.8)}
+#game.mini .ef-fr::after{display:none}
+#game.mini .gm-hint{padding:0 4px}
 @media (prefers-reduced-motion:reduce){.foil,.glint,.reel.won .rays{animation:none!important}}
 </style>
 </head>
@@ -3197,13 +3250,86 @@ function efQuiet() {
   });
 }
 
-function gmRender() {
-  if (!G.anim && G.spinQ) {
-    const raw = G.mine.spins.get(G.spinQ);
-    G.spinQ = '';
-    if (raw && !gmInBattle()) efSpinPlay(norm(raw)); // в бою барабан не крутим — спин просто появится в ангаре
+// --- вид окна: «Эфир» (по умолчанию) или «Минимал». Игрок выбирает в панели (хранится у него в комнате, players/{acc}/look),
+// &look=mini|efir в ссылке важнее. Меняем вид только в покое — не посреди прокрута ленты
+const GM_LOOK_URL = (params.get('look') || '').toLowerCase();
+function gmLook() {
+  if (GM_LOOK_URL === 'mini' || GM_LOOK_URL === 'efir') return GM_LOOK_URL;
+  const p = G.me && RS.players ? RS.players[G.me] : null;
+  return p && p.look === 'mini' ? 'mini' : 'efir';
+}
+function miState(m) {
+  if (m.idle) return { idle: true, text: m.idle, note: m.note || '', noteCls: m.noteCls || '' };
+  const sp = m.sp, st = stOf(sp), v = m.view, bt = m.mode === 'battle';
+  const s = { sp, t: sp.tank, bt, view: v, note: m.note || '', noteCls: m.noteCls || '', over: !!m.over };
+  if (bt) {
+    s.done = !!(v && v.ok && !v.hold);
+    s.dead = !!(G.bt && !G.bt.done && G.bt.dead);
+    s.over = s.over && !s.done;
+    s.chip = s.done ? ['ok', 'ВЫПОЛНЕНО'] : s.dead ? ['dead', 'УНИЧТОЖЕН'] : ['bt', 'В БОЮ'];
+    s.tone = s.done ? 'ok' : s.over ? 'gray' : 'bt';
+  } else {
+    s.chip = m.chip === 'check' ? ['amb', 'ПРОВЕРКА'] : st === 'ok' ? ['ok', 'ВЫПОЛНЕНО'] : st === 'fail' ? ['fail', 'ПРОВАЛ']
+      : st === 'ambiguous' ? ['amb', 'ОТМЕТИТ СТРИМЕР'] : ['wait', 'ЖДЁМ БОЙ'];
+    s.tone = st === 'ok' ? 'ok' : st === 'fail' ? 'fail' : s.over ? 'gray' : m.chip === 'check' || st === 'ambiguous' || m.off ? 'amb' : 'wait';
+    s.counters = !(st === 'pending' && m.mode === 'hangar'); // до боя — только челлендж и подсказка
   }
-  if (!G.anim) efRenderMe(gmModel());
+  return s;
+}
+function miMeter(p, green, dim) {
+  const full = p.max > 0 && p.cur >= p.max;
+  return `<div class="mi-mt${full ? ' done' : ''}${full && green ? ' g' : ''}${dim ? ' dim' : ''}"><span class="mi-tag">${esc(p.tag)}</span>`
+    + `<span class="mi-val"><b>${efFmt(p.cur)}</b> / ${efFmt(p.max)}</span><span class="mi-pct">${p.pct}%</span>`
+    + `<i class="mi-bar"><i style="width:${p.pct}%"></i></i></div>`;
+}
+function miHTML(s) {
+  if (s.idle) return `<div class="mi idle"><div class="mi-row"><span class="mi-idle">${esc(s.text)}</span></div>`
+    + (s.note ? `<div class="mi-foot"><span class="${esc(s.noteCls)}">${esc(s.note)}</span></div>` : '') + '</div>';
+  const t = s.t, v = s.view, pp = v && v.pp;
+  let html = `<div class="mi ${s.tone}${s.over ? ' over' : ''} rar-${RAR(t.tier)}"><div class="mi-row"><span class="mi-tier">${ROMAN[t.tier]}</span>`
+    + (t.type ? `<span class="mi-cls ct-${t.type}">${TYPES[t.type]}</span>` : '')
+    + `<b class="mi-name">${esc(t.name)}</b><span class="mi-chip ${s.chip[0]}">${s.chip[1]}</span></div>`
+    + `<div class="mi-ch">${esc(s.sp.chFinal)}</div>`;
+  if ((s.bt || s.counters) && pp) {
+    // зелёная полоса — как в «Эфире»: набранная часть выполненного челленджа или уже проваленного (видно, что было сделано)
+    const green = !!v.ok || s.over || s.tone === 'fail';
+    if (pp.parts.length) {
+      const lead = pp.or ? efLead(pp) : -1;
+      html += pp.parts.map((p, i) => miMeter(p, green, pp.or && i !== lead)).join(pp.or ? '<div class="mi-or">ИЛИ</div>' : '');
+      if (pp.rest) html += `<div class="mi-rest">${esc(pp.rest)}</div>`;
+    } else if (v.text) html += `<div class="mi-rest">${esc(v.text)}</div>`;
+  }
+  const foot = s.bt ? efFoot(s) : s.note ? `<span class="${esc(s.noteCls)}">${esc(s.note)}</span>` : '';
+  return html + (foot ? `<div class="mi-foot">${foot}</div>` : '') + '</div>';
+}
+function miRenderMe(m) {
+  const s = miState(m), html = miHTML(s);
+  if (html === G.miHTML) return; // ничего не поменялось — страницу не трогаем
+  G.miHTML = html;
+  const box = $('#gmMe');
+  box.innerHTML = html;
+  if (!s.idle && G.miNew && G.miNew === s.sp.id) { G.miNew = ''; box.firstElementChild.classList.add('in'); } // новый челлендж въезжает один раз
+}
+
+function gmRender() {
+  const look = gmLook();
+  if (look !== G.look && !G.anim) {
+    G.look = look; G.key = ''; G.miHTML = ''; G.efShown = null;
+    $('#gmMe').innerHTML = '';
+    $('#game').classList.toggle('mini', look === 'mini');
+  }
+  if (G.look === 'mini') {
+    // без ленты: новый челлендж просто въезжает в карточку
+    if (G.spinQ) { G.miNew = G.spinQ; G.spinQ = ''; }
+    miRenderMe(gmModel());
+  } else {
+    if (!G.anim && G.spinQ) {
+      const raw = G.mine.spins.get(G.spinQ);
+      G.spinQ = '';
+      if (raw && !gmInBattle()) efSpinPlay(norm(raw)); // в бою барабан не крутим — спин просто появится в ангаре
+    }
+    if (!G.anim) efRenderMe(gmModel());
+  }
   gmRenderFriends();
   const off = !GM_DEMO && !G.on && Date.now() - G.t0 > 8000;
   const hint = $('#gmHint');
