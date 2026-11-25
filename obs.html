@@ -2740,6 +2740,9 @@ function gmModel() {
   } else if (p.mode === 'after') {
     const b = G.bt;
     m.view = sp.auto && b && b.final ? gmView(sp, b.final, false) : null;
+    // итог уже записан (панель стримера могла успеть раньше, чем окно получило свой итог боя), а победы или медали
+    // окно ещё не знает — не показываем рядом со штампом «ждём итог боя»: только текст проверки
+    if ((st === 'ok' || st === 'fail') && m.view && m.view.late) m.view = null;
     if (st === 'pending') {
       m.chip = 'check';
       m.over = !!(m.view && !m.view.ok && !m.view.proxy && !(b.partial && !b.res)); // по данным игры не выполнено (если окно видело весь бой)
