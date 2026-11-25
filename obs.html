@@ -658,6 +658,16 @@ html:not(.w-game) #game{display:none!important}
 #game .ef-pips i{flex:1;border-radius:2px;transform:skewX(-14deg);background:rgba(255,255,255,.09);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 #game .ef-pips i.on{background:var(--grad);box-shadow:0 0 10px rgba(255,90,70,.45)}
 #game .ef-mt.done .ef-pips i.on{background:linear-gradient(90deg,var(--ok2),var(--ok));box-shadow:0 0 10px rgba(46,229,157,.45)}
+/* челлендж уже не выполнить (танк уничтожен, условие сорвано) или итог «провал»: недобранные счётчики серые,
+   набранные — зелёные, чтобы сразу было видно, чего не хватило */
+#game .ef.over .ef-mt:not(.done) .ef-bar .fill{background:linear-gradient(90deg,#464856,#7b7e90) 0 0/326px 100% no-repeat}
+#game .ef.over .ef-mt:not(.done) .ef-pips i.on{background:linear-gradient(90deg,#464856,#7b7e90);box-shadow:none}
+#game .ef.over .ef-mt:not(.done) .ef-num{color:#c6c8d6}
+#game .ef.over .ef-mt:not(.done) .ef-pct{color:#8b8ea1}
+#game .ef.over .ef-mt.lead:not(.done) .ef-tag{background:rgba(255,255,255,.08);color:#a9abbd;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+#game .ef.over .ef-mt.lead:not(.done)::before{background:#6b6e80;box-shadow:none}
+#game .ef.over .ef-mt.done .ef-bar .fill{background:linear-gradient(90deg,var(--ok2),var(--ok))}
+#game .ef.over .ef-bar .tip{opacity:0}
 #game .ef-burst{position:absolute;left:0;top:0;width:0;height:0;z-index:5;pointer-events:none}
 #game .ef-burst i{position:absolute;left:-3px;top:-3px;width:6px;height:6px;opacity:0;background:currentColor;box-shadow:0 0 6px currentColor}
 #game .ef-foot{min-height:16px;padding:7px 16px 12px 18px;font:600 12px/1.3 var(--fu);color:#a9abbd;text-shadow:0 1px 3px rgba(0,0,0,.8)}
@@ -2630,6 +2640,8 @@ function gmModel() {
     const b = G.bt;
     m.chip = 'battle';
     m.view = sp.auto ? gmView(sp, (b && b.last) || gmLiveDelta(), true) : null;
+    // уже не выполнить: условие сорвано или танк уничтожен, а цифр не хватает (после гибели они не растут) — счётчики сереют
+    m.over = !!(m.view && !m.view.ok && (m.view.lost || (b && b.dead)));
     if (!sp.auto) m.note = 'Ручной челлендж — итог отметит стример';
     else if (!m.view) m.note = 'Этот челлендж посчитаем после боя';
     else if (b && b.partial) m.note = 'Окно открыли посреди боя — часть цифр не видна';
@@ -2638,6 +2650,7 @@ function gmModel() {
     m.view = sp.auto && b && b.final ? gmView(sp, b.final, false) : null;
     if (st === 'pending') {
       m.chip = 'check';
+      m.over = !!(m.view && !m.view.ok && !(b.partial && !b.res)); // по данным игры не выполнено (если окно видело весь бой)
       if (m.view && b.partial && !b.res) m.note = 'Часть боя окно не видело — ждём итог боя и проверку';
       else if (m.view && m.view.late && m.view.ok) m.note = 'Своё сделал — победу узнаем из итога боя'; // вышел из боя раньше конца
       else if (m.view) {
@@ -2656,6 +2669,7 @@ function gmModel() {
     } else if (p.active.length > 1) m.note = 'Ещё челленджи на: ' + names(p.active.filter(s => s !== sp));
   } else m.note = sp.resultText;
   if (p.foreign) { m.note = 'В игре другой аккаунт, не из этой ссылки — его бои сюда не засчитаются'; m.noteCls = 'warn'; }
+  if (st === 'fail' && p.mode !== 'battle') m.over = true; // итог «провал» — счётчики серые
   return m;
 }
 // --- «Эфир»: окно в стиле плашки со стрима ---
@@ -2858,6 +2872,7 @@ function efState(m) {
   if (s.layout === 'bt') {
     s.done = !!(m.view && m.view.ok && !m.view.hold); s.tone = s.done ? 's-ok' : 's-bt';
     s.dead = !!(G.bt && !G.bt.done && G.bt.dead); // танк уничтожен — картинка сереет
+    s.over = !!m.over && !s.done;
     s.hero = efHeroUrl(sp);
     return s;
   }
@@ -2866,6 +2881,7 @@ function efState(m) {
     : st === 'ambiguous' ? ['amb', 'ОТМЕТИТ СТРИМЕР'] : ['wait', 'ЖДЁМ БОЙ'];
   s.tone = st === 'ok' ? 's-ok' : st === 'fail' ? 's-fail' : m.chip === 'check' || st === 'ambiguous' || s.off ? 's-amb' : 's-wait';
   s.flap = st === 'pending' && m.mode === 'hangar'; // ждём бой — табло с челленджем; после боя — строка и цифры
+  s.over = !!m.over;
   return s;
 }
 function efKey(s) {
@@ -2883,14 +2899,14 @@ function efHTML(s) {
       : s.dead ? '<span class="ef-chip dead"><span><i></i><em>УНИЧТОЖЕН</em></span></span>'
         : '<span class="ef-chip bt"><span><i></i><em>В БОЮ</em></span></span>';
     const pic = efHeroImg(s.hero, t.img);
-    return efShell('bt ' + s.tone + (pic ? '' : ' noimg') + (s.dead ? ' dead' : ''), t,
+    return efShell('bt ' + s.tone + (pic ? '' : ' noimg') + (s.dead ? ' dead' : '') + (s.over ? ' over' : ''), t,
       `<div class="ef-hero"><i class="ef-glow"></i><div class="ef-tk">${pic}</div><div class="ef-hid"><div class="ef-meta">${efTier(t)}${efCls(t)}</div>`
       + `<b class="ef-hname${efNameCls(t.name)}">${esc(t.name)}</b></div></div><div class="ef-tab">${right}</div>`
       + efCht(s.sp.chFinal) + efBody(s, false) + `<div class="ef-foot">${efFoot(s)}</div>`);
   }
   const band = efBand(t, [t], true, s.stamp ? efStamp(s.stamp === 'ok', s.fx) : '');
   const mid = s.flap ? efFlap(s.sp.chFinal, 'final') : efCht(s.sp.chFinal) + efBody(s, true);
-  return efShell('hg landed landed2 ' + s.tone + (s.off ? ' off' : ''), t, band + mid + efSt(s.chip[0], s.chip[1], s.note, s.noteCls));
+  return efShell('hg landed landed2 ' + s.tone + (s.off ? ' off' : '') + (s.over ? ' over' : ''), t, band + mid + efSt(s.chip[0], s.chip[1], s.note, s.noteCls));
 }
 
 // анимации
@@ -2953,6 +2969,7 @@ function efCarry(card, vals, pp) {
 function efUpdate(card, s) {
   if (!card) return;
   if (s.layout === 'bt') card.classList.toggle('dead', !!s.dead);
+  card.classList.toggle('over', !!s.over);
   const pp = s.view && s.view.pp, mts = card.querySelectorAll('.ef-mt');
   if (pp) {
     pp.parts.forEach((p, i) => {
