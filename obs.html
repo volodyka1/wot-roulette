@@ -2577,22 +2577,30 @@ function gmFields(inst) {
   return res;
 }
 const GM_HOLD = ['survived_battles', 'damage_received', 'piercings_received']; // цифры, которые в бою ещё могут испортить итог
-// { text, ok, ratio, hold, lost, pp } или null — если челлендж нельзя посчитать по этим цифрам (победа, опыт, медали…)
+const GM_LATE = ['wins'];                                                       // решается только итогом боя
+// { text, ok, ratio, hold, lost, late, keep, pp } или null — если челлендж нельзя посчитать по этим цифрам (опыт, медали, точность…)
 function gmView(sp, delta, live) {
   if (!delta || !sp.chId || !window.WR || !WR.catalog) return null;
   const inst = { id: sp.chId, v: sp.chV, w: sp.chW };
   const used = gmFields(inst);
   if (!used) return null;
+  // победы до конца боя никто не знает: всё остальное («урон и победить», «фраги и победить») считаем уже сейчас —
+  // так, будто бой выигран, — а про победу честно пишем, что она решится в конце (late; итог при этом не окончательный)
+  const late = GM_LATE.some(f => used.has(f) && !(f in delta));
+  if (late) { delta = Object.assign({}, delta); GM_LATE.forEach(f => { if (used.has(f) && !(f in delta)) delta[f] = 1; }); }
   for (const f of used) if (!(f in delta)) return null;
   let text = String(WR.catalog.describe(inst, delta) || '');
   if (live) text = text.replace(/выжил: да/g, 'пока жив').replace(/выжил: нет/g, 'уничтожен');
+  if (late) text = text.replace(/(победа): да/gi, (m, w) => w + (live ? ' — в конце боя' : ' — ждём итог боя'));
   const ok = WR.catalog.evaluate(inst, delta) === true;
   // в бою «выжить / получить мало / не дать пробить» решается только в конце: hold — пока всё держится (но ещё не итог),
   // lost — уже сорвано (уничтожен, пробили, получил много): даже если добрать все цифры, не выполнить
+  const keep = GM_HOLD.some(f => used.has(f));
   let hold = false, lost = false;
-  if (live && GM_HOLD.some(f => used.has(f))) {
-    hold = ok && !(num(delta.survived_battles, 1) < 1); // танк уничтожен — получить урон или пробитие уже нельзя, итог окончательный
-    if (!ok) {
+  if (late || (live && keep)) {
+    // танк уничтожен — получить урон или пробитие уже нельзя, итог окончательный; с победой он окончателен только после боя
+    hold = ok && (late || !(num(delta.survived_battles, 1) < 1));
+    if (!ok && keep) {
       const best = {};
       for (const f of used) best[f] = GM_HOLD.indexOf(f) >= 0 ? delta[f] : 1e9;
       try { lost = WR.catalog.evaluate(inst, best) !== true; } catch (e) { lost = false; }
@@ -2603,7 +2611,7 @@ function gmView(sp, delta, live) {
   const parts = Array.from(text.matchAll(/:\s*(\d+)\s*\/\s*(\d+)/g)).map(x => (+x[2] > 0 ? Math.min(1, +x[1] / +x[2]) : 0));
   let ratio = parts.length ? (/ или /i.test(sp.chFinal) ? Math.max(...parts) : Math.min(...parts)) : null;
   if (ratio != null) ratio = ok ? 1 : Math.min(ratio, 0.97);
-  return { text, ok, ratio, hold, lost, pp: efParts(text, sp.chFinal) };
+  return { text, ok, ratio, hold, lost, late, keep, pp: efParts(text, sp.chFinal) };
 }
 
 // --- модель окна: что показать сейчас ---
@@ -2631,6 +2639,7 @@ function gmModel() {
     if (st === 'pending') {
       m.chip = 'check';
       if (m.view && b.partial && !b.res) m.note = 'Часть боя окно не видело — ждём итог боя и проверку';
+      else if (m.view && m.view.late && m.view.ok) m.note = 'Своё сделал — победу узнаем из итога боя'; // вышел из боя раньше конца
       else if (m.view) {
         m.note = m.view.ok ? 'По данным игры — выполнено. Ждём проверку' : 'По данным игры — не выполнено. Ждём проверку';
         m.noteCls = m.view.ok ? 'good' : 'bad';
@@ -2726,8 +2735,12 @@ function efFoot(s) {
   if (s.done) return `<span class="good">✓ Выполнено${s.dead ? '' : ' — доиграй бой'}</span>` + (extra ? '<br>' + extra : '');
   // цифры уже набраны, а челлендж ещё нет (не выжил, получил много) — подсказки «ещё 0» нет, условие видно строкой выше
   let main = '';
-  if (v.hold) main = '<span class="good">Пока всё по плану — продержись до конца боя</span>';
-  else if (v.lost) main = '<span class="bad">В этом бою уже не выполнить</span>';
+  if (v.hold) {
+    main = !v.late ? '<span class="good">Пока всё по плану — продержись до конца боя</span>'
+      : v.keep ? '<span class="good">Пока всё по плану — доживи до конца и победи</span>'  // «победить и выжить»
+        : s.dead ? '<span class="good">Своё сделал</span> — ждём, победит ли команда'
+          : '<span class="good">Своё сделал — теперь нужна победа</span>';
+  } else if (v.lost) main = '<span class="bad">В этом бою уже не выполнить</span>';
   else if (s.dead) main = '<span class="bad">Танк уничтожен</span> — ждём итог боя'; // цифры больше не вырастут, «ещё N» уже ни к чему
   else if (pp && pp.parts.length) {
     const left = pp.parts.filter(p => p.cur < p.max);
@@ -3163,7 +3176,7 @@ function efQuiet() {
     if (!endless && !(t.endTime > EF_ANIM_MAX)) return;
     try { if (endless) a.cancel(); else a.finish(); } catch (e) { try { a.cancel(); } catch (e2) {} }
     const el = a.effect.target, who = (a.animationName || a.transitionProperty || 'script') + ' @ ' + (el && el.className || el && el.tagName || '?');
-    if (!EF_QUIET.has(who) && EF_QUIET.size < 20) { EF_QUIET.add(who); console.warn('[game] остановлена слишком долгая анимация: ' + who); }
+    if (!EF_QUIET.has(who) && EF_QUIET.size < 20) { EF_QUIET.add(who); console.warn('[roulette] stopped an endless or too long animation: ' + who); } // латиницей: в журнале игры кириллица нечитаема
   });
 }
 
@@ -3320,6 +3333,8 @@ function gmDemoSpin(base) {
 
 function startGame() {
   $('#game').hidden = false;
+  // мод пишет консоль страницы в журнал игры (game.log) — по этой строке видно, какая версия окна сейчас загружена
+  console.log('[roulette] game window, page of ' + document.lastModified);
   efZoom();
   addEventListener('resize', efZoom);
   const s = document.createElement('script');
