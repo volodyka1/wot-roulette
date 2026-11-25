@@ -11,14 +11,22 @@
     obs.html?room=ID&w=board         таблица, 480x420 (всё с последнего «Обнулить»; &period=today — только сегодня)
     obs.html?room=ID&w=team          команда: стример в центре, два друга по бокам, 960x320
     obs.html?room=ID&w=series        серия выполнений/провалов, 560x300 (всё с последнего «Обнулить»; &period=today — только сегодня)
+    obs.html?room=ID&w=game&acc=N    в игре через мод WotStat «Виджеты»: свой челлендж и прогресс прямо в бою, ниже друзья
+                                     (ширина ~360, высоту мод подгоняет сам; &friends=0 — без друзей; &demo=1 — пример боя)
     obs.html                         основной без комнаты: опрос /api/state локального сервера
-  Звук: основной и команда — WebAudio (&mute выключает), лента, таблица и серия молчат (&sound=1 включает).
+  Звук: основной и команда — WebAudio (&mute выключает), лента, таблица, серия и игра молчат (&sound=1 включает).
 -->
 <script>
 (function () {
   var p = new URLSearchParams(location.search), w = (p.get('w') || p.get('obs') || 'main').toLowerCase();
-  if (w !== 'feed' && w !== 'board' && w !== 'team' && w !== 'series') w = 'main';
+  if (w !== 'feed' && w !== 'board' && w !== 'team' && w !== 'series' && w !== 'game') w = 'main';
   document.documentElement.className = 'w-' + w + (p.get('size') === 'big' ? ' big' : '');
+  // игровой виджет: мод WotStat «Виджеты» подгоняет высоту окна под содержимое
+  if (w === 'game') {
+    var m = document.createElement('meta');
+    m.name = 'wotstat-widget:auto-height'; m.content = 'true';
+    document.head.appendChild(m);
+  }
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -457,6 +465,54 @@ html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
 .sr-sk{grid-area:k;justify-self:end}
 .sr-sk .sk{height:22px;padding:0 9px;font-size:11.5px;white-space:nowrap}
 .sr-sk .sk.fail{color:#ff8fa2}
+
+/* ---------- Игра: окно внутри клиента (мод WotStat «Виджеты») ---------- */
+/* размеры в rem: шрифт растёт вместе с шириной, которую игрок выставил окну в игре */
+html.w-game{font-size:clamp(11px,3.4vw,18px)}
+html.w-game #fx{display:none}
+html:not(.w-game) #game{display:none!important}
+#game{display:flex;flex-direction:column;gap:.38rem;width:100%;padding:.3rem}
+.gm-me{position:relative;padding:.68rem .85rem .74rem 1.05rem;border-radius:.8rem;overflow:hidden;
+  background:linear-gradient(180deg,rgba(27,26,36,.93),rgba(12,12,18,.93));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),0 .45rem 1.3rem rgba(0,0,0,.45)}
+.gm-me::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.28rem;background:var(--grad)}
+.gm-me.is-ok::before{background:var(--ok);box-shadow:0 0 .8rem var(--ok)}
+.gm-me.is-fail::before{background:var(--fail);box-shadow:0 0 .8rem var(--fail)}
+.gm-me.is-amb::before{background:var(--amb)}
+.gm-me.is-battle::before{animation:gmPulse 1.6s ease-in-out infinite}
+.gm-me.idle::before{background:rgba(255,255,255,.18)}
+@keyframes gmPulse{50%{opacity:.35}}
+.gm-top{display:flex;align-items:center;gap:.4rem;min-width:0}
+.gm-tier{flex:0 0 auto;font:900 italic .78rem/1 var(--fd);color:#160f04;background:var(--rc2);padding:.2rem .42rem .18rem;border-radius:.3rem}
+.gm-cls{flex:0 0 auto;font:800 .66rem/1 var(--fu);letter-spacing:.05em;color:var(--cc,#ccc);background:var(--ccs,rgba(255,255,255,.08));padding:.22rem .4rem;border-radius:.3rem}
+.gm-name{flex:1 1 auto;min-width:0;font:900 italic 1.05rem/1.15 var(--fd);color:var(--rc2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.gm-chip{flex:0 0 auto;font:800 .6rem/1 var(--fu);letter-spacing:.07em;padding:.32rem .52rem;border-radius:99px;background:rgba(255,255,255,.08);color:var(--muted);white-space:nowrap}
+.gm-chip.battle{background:rgba(255,61,90,.2);color:#ff9aaa}
+.gm-chip.ok{background:rgba(46,229,157,.16);color:var(--ok)}
+.gm-chip.fail{background:rgba(255,61,90,.18);color:#ff7389}
+.gm-chip.amb{background:rgba(255,182,39,.16);color:var(--amb)}
+.gm-ch{margin-top:.42rem;font:800 italic 1rem/1.25 var(--fd);color:var(--text);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.gm-bar{position:relative;margin-top:.58rem;height:.5rem;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+.gm-bar>i{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;background:var(--grad);transition:width .6s var(--out)}
+.gm-bar.ok>i{background:linear-gradient(90deg,var(--ok2),var(--ok));box-shadow:0 0 .6rem rgba(46,229,157,.6)}
+.gm-live{margin-top:.34rem;font:600 .8rem/1.3 var(--fu);color:#dcdce8;font-variant-numeric:tabular-nums}
+.gm-note{margin-top:.34rem;font:600 .72rem/1.3 var(--fu);color:var(--muted)}
+.gm-note.good{color:var(--ok)}
+.gm-note.warn{color:var(--amb)}
+.gm-note.bad{color:#ff7389}
+.gm-idle{font:800 italic .92rem/1.3 var(--fd);color:#c9c9d8}
+.gm-frs{display:flex;flex-direction:column;gap:.3rem}
+.gm-fr{display:flex;align-items:center;gap:.45rem;min-width:0;padding:.4rem .62rem;border-radius:.6rem;
+  background:rgba(14,14,20,.85);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.gm-fr-n{flex:0 0 auto;max-width:38%;font:800 .7rem/1.2 var(--fd);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-fr-c{flex:1 1 auto;min-width:0;font:600 .68rem/1.25 var(--fu);color:#b9b9cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-fr-c b{color:#ececf5;font-weight:700}
+.gm-fr-s{flex:0 0 auto;font:900 .78rem/1 var(--fu)}
+.gm-fr-s.ok{color:var(--ok)}
+.gm-fr-s.fail{color:#ff7389}
+.gm-fr-s.amb{color:var(--amb)}
+.gm-fr-s.pend{color:var(--dim)}
+.gm-hint{padding:0 .3rem;font:600 .64rem/1.3 var(--fu);color:#8d8da3;text-shadow:0 1px 2px #000}
 @media (prefers-reduced-motion:reduce){.foil,.glint,.reel.won .rays{animation:none!important}}
 </style>
 </head>
@@ -526,6 +582,13 @@ html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
   <div class="bd"><div id="srRows"></div></div>
 </section>
 
+<!-- игра: окно внутри клиента через мод WotStat «Виджеты» — свой челлендж, прогресс в бою, друзья -->
+<section id="game" hidden>
+  <div class="gm-me idle" id="gmMe"></div>
+  <div class="gm-frs" id="gmFrs"></div>
+  <div class="gm-hint" id="gmHint" hidden></div>
+</section>
+
 <script>
 'use strict';
 // Виджеты читают комнату без входа: правила разрешают чтение rooms/{id} всем.
@@ -534,7 +597,7 @@ html:not(.w-team) #team,html:not(.w-series) #series{display:none!important}
 // Поэтому читаем базу напрямую через firebase.database() с тем же конфигом.
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
-const W = (function () { const w = (params.get('w') || params.get('obs') || 'main').toLowerCase(); return ['feed', 'board', 'team', 'series'].indexOf(w) >= 0 ? w : 'main'; })();
+const W = (function () { const w = (params.get('w') || params.get('obs') || 'main').toLowerCase(); return ['feed', 'board', 'team', 'series', 'game'].indexOf(w) >= 0 ? w : 'main'; })();
 const ROOM = (function () { const r = (params.get('room') || '').trim().toLowerCase(); return /^[a-z0-9]{10}$/.test(r) ? r : null; })();
 const BIG = params.get('size') === 'big';
 // По умолчанию считаем всё с последнего «Обнулить» в панели (стрим часто идёт за полночь);
@@ -580,7 +643,7 @@ const IMG_ERR = 'onerror="this.style.visibility=\'hidden\'"';
 function normTank(t) {
   t = t && typeof t === 'object' ? t : {};
   const tier = Math.max(1, Math.min(11, Math.round(num(+t.tier, 1)) || 1));
-  return { id: t.id, name: str(t.name) || 'Танк', tier, type: TYPES[t.type] ? t.type : '', prem: !!t.prem, img: str(t.img) };
+  return { id: t.id, name: str(t.name) || 'Танк', tier, type: TYPES[t.type] ? t.type : '', prem: !!t.prem, img: str(t.img), hp: num(+t.hp, 0) };
 }
 // Спин (запись комнаты или payload /api/state) -> объект, с которым можно работать без проверок
 function norm(raw) {
@@ -595,6 +658,8 @@ function norm(raw) {
   const chText = str(chObj && chObj.text);
   if (chText && ch[ch.length - 1] !== chText) ch.push(chText); // итог — всегда текст челленджа
   if (!ch.length) ch = [''];
+  // id и числа челленджа — для живого прогресса в игровом виджете (формулы проверки берём из js/catalog.js)
+  const chId = str(chObj && chObj.id), chV = num(+(chObj && chObj.v), 0), chW = chObj && chObj.w != null ? num(+chObj.w, 0) : null;
   const res = raw.result && typeof raw.result === 'object' ? raw.result : null;
   let resultText = str(res && res.text) || str(raw.resultText);
   const status = STATUSES.indexOf(raw.status) >= 0 ? raw.status : null;
@@ -604,7 +669,7 @@ function norm(raw) {
     ts: num(+raw.ts, 0), kind: raw.kind === 'challenge' ? 'challenge' : 'full',
     items, winIndex: wi, jitter: Math.max(-0.5, Math.min(0.5, num(+raw.jitter, 0))),
     dur: Math.max(1500, Math.min(20000, num(+raw.dur, 7000))),
-    ch, chFinal: ch[ch.length - 1], tank, status, resultText, auto: !!(chObj && chObj.auto),
+    ch, chFinal: ch[ch.length - 1], tank, status, resultText, auto: !!(chObj && chObj.auto), chId, chV, chW,
     rerolls: num(+raw.rerolls, 0), checkedAt: num(+(res && res.checkedAt), 0), battleAt: num(+(res && res.battleAt), 0),
   };
 }
@@ -1975,6 +2040,532 @@ function startSeries() {
   setInterval(runSeries, 60000); // смена дня
 }
 
+// ---------- Игра: окно внутри клиента (мод WotStat «Виджеты») ----------
+// Наверху — свой челлендж: в ангаре подсказка, тот ли танк выбран; в бою — живой прогресс (данные игры отдаёт
+// data-provider, встроенный в мод: ws://localhost:38200); после боя — итог. Ниже — челленджи друзей.
+// Окно только показывает: итог в комнату по-прежнему пишет проверка в панели (WG API).
+const GM_URL_ACC = (params.get('acc') || '').replace(/\D/g, '');
+const GM_FRIENDS = params.get('friends') !== '0';
+const GM_DEMO = params.has('demo') && params.get('demo') !== '0';
+const GM_APP = '1e984dbbdf7b1c1fbd284d4cadc0b17f'; // application_id панели — только чтобы узнать теги танков
+const GM_CATALOG = 'js/catalog.js?v=9';            // те же формулы проверки, что у панели
+const GM_BT_KEY = GM_DEMO ? 'wrGameBattleDemo' : 'wrGameBattle'; // бой понарошку не смешиваем с настоящим
+const GM_AFTER = 20 * 60000;                       // итог боя виден, пока игрок не выбрал другой танк, но не дольше
+const G = {
+  t0: Date.now(), me: '', meFrom: '', roster: null,
+  mine: { spins: new Map(), ready: false }, stopMine: null,
+  fr: new Map(), frOrder: [], frHTML: null,
+  on: false, st: new Map(), // связь с игрой и её состояние: путь -> значение
+  bt: null,                 // текущий или последний бой
+  tags: new Map(), tagWait: new Set(), tagT: 0,
+  fields: new Map(), key: '',
+};
+const gv = p => G.st.get(p);
+const gmInBattle = () => G.on && gv('battle.isInBattle') === true;
+const GM_PATHS = new Set(['player.id', 'battle.isInBattle', 'battle.arenaId', 'battle.vehicle', 'battle.health',
+  'battle.maxHealth', 'battle.isAlive', 'hangar.vehicle.info', 'game.state']);
+
+// чей челлендж показываем: из ссылки (&acc=), иначе кто сейчас в игре, иначе стример
+function gmSetMe(acc, from) {
+  acc = String(acc || '').replace(/\D/g, '');
+  if (!acc || (G.meFrom === 'url' && from !== 'url')) return;
+  if (G.me === acc) { G.meFrom = from; return; }
+  G.me = acc; G.meFrom = from; G.key = '';
+  if (G.stopMine) G.stopMine();
+  const col = { spins: new Map(), ready: false };
+  G.mine = col;
+  G.stopMine = watchAcc(acc, 12, (ev, raw) => gmSpinEv(col, ev, raw));
+  gmFriends();
+  gmSoon();
+}
+function gmSpinEv(col, ev, raw) {
+  if (ev === 'reset') { col.spins.clear(); col.ready = false; }
+  else if (ev === 'ready') col.ready = true;
+  else if (ev === 'removed') col.spins.delete(raw.id);
+  else if (raw && raw.id) col.spins.set(raw.id, raw);
+  gmSoon();
+}
+// игры нет (браузер, OBS без мода) — показываем стримера; игра потом сама переключит на того, кто играет
+function gmFallback() {
+  if (G.me || GM_URL_ACC || !G.roster || !G.roster.owner || G.on || Date.now() - G.t0 < 4000) return;
+  gmSetMe(G.roster.owner.acc, 'owner');
+}
+function gmRoster(r) { G.roster = r; gmFallback(); gmFriends(); }
+function gmFriends() {
+  const r = G.roster;
+  const want = GM_FRIENDS && r ? [r.owner].concat(r.friends).filter(p => p && p.acc && p.acc !== G.me) : [];
+  const keys = want.map(p => p.acc);
+  G.fr.forEach((f, acc) => { if (keys.indexOf(acc) < 0) { f.stop(); G.fr.delete(acc); } });
+  want.forEach(p => {
+    let f = G.fr.get(p.acc);
+    if (!f) {
+      const col = f = { spins: new Map(), ready: false, nick: p.nick, stop: () => {} };
+      f.stop = watchAcc(p.acc, 6, (ev, raw) => gmSpinEv(col, ev, raw));
+      G.fr.set(p.acc, f);
+    }
+    f.nick = p.nick;
+  });
+  G.frOrder = keys;
+  gmSoon();
+}
+
+// --- данные игры: data-provider мода WotStat (сообщения init / state / trigger, пути через точку) ---
+function gmConnect() {
+  let wait = 1500;
+  const open = () => {
+    let ws;
+    try { ws = new WebSocket('ws://localhost:38200'); } catch (e) { setTimeout(open, wait); return; }
+    ws.onopen = () => { wait = 1500; };
+    ws.onmessage = ev => { let m = null; try { m = JSON.parse(ev.data); } catch (e) {} if (m) gmMsg(m); };
+    ws.onclose = () => {
+      if (G.on) { G.on = false; gmSoon(); }
+      setTimeout(open, wait);
+      wait = Math.min(15000, Math.round(wait * 1.6));
+    };
+  };
+  open();
+}
+function gmMsg(m) {
+  if (!m || typeof m !== 'object') return;
+  if (m.type === 'init' && Array.isArray(m.states)) {
+    G.st = new Map();
+    m.states.forEach(s => { if (s && typeof s.path === 'string') G.st.set(s.path, s.value); });
+    G.on = true;
+    if (G.bt && !G.bt.done) G.bt.partial = true; // связь рвалась посреди боя — события за это время не видели
+    gmSync(true);
+  } else if (m.type === 'state' && typeof m.path === 'string') {
+    G.st.set(m.path, m.value);
+    // позиция, прицел, скорость и прочее идут десятки раз в секунду — нам они не нужны
+    if (GM_PATHS.has(m.path) || m.path.indexOf('battle.efficiency.') === 0) gmSync(false);
+  } else if (m.type === 'trigger' && typeof m.path === 'string') {
+    if (m.path === 'battle.onPlayerFeedback') gmFeedback(m.value);
+    else if (m.path === 'battle.onBattleResult') gmResult(m.value);
+  }
+}
+function gmSync(init) {
+  const pid = gv('player.id');
+  if (pid) G.pid = String(pid);
+  if (!GM_URL_ACC && pid) gmSetMe(String(pid), 'game');
+  const arena = gv('battle.arenaId'), b = G.bt;
+  if (gv('battle.isInBattle') === true) {
+    // вернулись в тот же бой (обрыв связи, перезаход) — продолжаем его, часть событий могли пропустить
+    if (b && b.done && arena && String(b.arena) === String(arena)) { b.done = false; b.endAt = 0; b.partial = true; }
+    else if (!b || b.done || (arena && b.arena && String(b.arena) !== String(arena))) gmBattleStart(arena, init);
+    else if (!b.arena && arena) b.arena = arena;
+    const nb = G.bt;
+    const veh = gv('battle.vehicle');
+    if (veh && typeof veh === 'object') nb.veh = veh;
+    gmTrack(nb);
+    nb.last = gmLiveDelta();
+    gmSaveSoon();
+  } else if (b && !b.done) gmBattleEnd();
+  gmSoon();
+}
+function gmBattleStart(arena, init) {
+  const saved = gmLoadBattle();
+  // окно перезагрузилось посреди боя — счётчики событий не теряем
+  if (saved && !saved.done && arena && String(saved.arena) === String(arena)) { G.bt = saved; saved.partial = true; return; }
+  G.bt = { arena: arena || 0, at: Date.now(), endAt: 0, endSrv: 0, veh: null, spId: '', done: false, partial: !!init,
+    eff: { damage: 0, assist: 0, blocked: 0, stun: 0 }, hp: null, maxHp: 0, dead: false,
+    frags: 0, spotted: 0, radio: 0, track: 0, tank: 0, pin: 0, pen: 0, cap: 0, def: 0, killed: [], seen: [],
+    last: null, final: null, res: false };
+}
+function gmBattleEnd() {
+  const b = G.bt;
+  if (!b || b.done) return;
+  b.done = true; b.endAt = Date.now(); b.endSrv = serverNow();
+  b.final = Object.assign({}, b.last || gmLiveDelta());
+  gmSaveBattle();
+}
+// цифры боя из состояния игры. Первые 20 с (отсчёт до начала) берём как есть — там могли висеть цифры прошлого боя;
+// дальше цифры только растут: обнуление при выходе из боя (оно может прийти раньше isInBattle=false) итог не портит
+function gmTrack(b) {
+  if (!b.eff) b.eff = { damage: 0, assist: 0, blocked: 0, stun: 0 };
+  const fresh = Date.now() - b.at < 20000;
+  ['damage', 'assist', 'blocked', 'stun'].forEach(k => {
+    const v = gv('battle.efficiency.' + k);
+    if (typeof v === 'number' && isFinite(v)) b.eff[k] = fresh ? v : Math.max(b.eff[k] || 0, v);
+  });
+  const hp = gv('battle.health'), max = gv('battle.maxHealth');
+  if (typeof max === 'number' && max > 0) b.maxHp = max;
+  if (typeof hp === 'number' && isFinite(hp)) b.hp = fresh || b.hp == null ? hp : Math.min(b.hp, hp);
+  if (gv('battle.isAlive') === false && (!fresh || b.pin > 0)) b.dead = true; // в отсчёте до боя «мёртв» — хвост прошлого боя
+}
+// статистика боя «как в WG API» по тому, что видно прямо сейчас (≈ — по событиям ленты эффективности)
+function gmLiveDelta() {
+  const b = G.bt || {}, e = b.eff || {};
+  const track = b.track || 0;
+  let radio = b.radio || 0;
+  if ((e.assist || 0) > radio + track) radio = e.assist - track; // события до подключения не видели — остаток помощи считаем засветом
+  return {
+    damage_dealt: e.damage || 0, radio_assisted_damage: radio, track_assisted_damage: track,
+    stun_assisted_damage: e.stun || 0, blocked: e.blocked || 0,
+    frags: b.frags || 0, spotted: b.spotted || 0,
+    damage_received: b.maxHp > 0 && b.hp != null ? Math.max(0, b.maxHp - Math.max(0, b.hp)) : 0,
+    survived_battles: b.dead ? 0 : 1,
+    no_damage_direct_hits_received: b.tank || 0, piercings_received: b.pin || 0, piercings: b.pen || 0,
+    capture_points: b.cap || 0, dropped_capture_points: b.def || 0,
+  };
+}
+function gmFeedback(v) {
+  const b = G.bt;
+  if (!b || b.done || !v || typeof v !== 'object') return;
+  const d = v.data && typeof v.data === 'object' ? v.data : {};
+  const who = d.vehicle && typeof d.vehicle === 'object' && d.vehicle.playerId ? String(d.vehicle.playerId) : '';
+  const once = (list, key) => { if (!key) return true; if (b[list].indexOf(key) >= 0) return false; b[list].push(key); return true; };
+  const shot = d.attackReason === 'shot';
+  switch (v.type) {
+    case 'kill': if (once('killed', who)) b.frags++; break;
+    case 'spotted': if (d.isVisible !== false && once('seen', who)) b.spotted++; break;
+    case 'radioAssist': b.radio += num(+d.damage, 0); break;
+    case 'trackAssist': b.track += num(+d.damage, 0); break;
+    case 'tanking': b.tank++; break;
+    case 'receivedDamage': if (shot) b.pin++; break;
+    case 'damage': if (shot) b.pen++; break;
+    case 'baseCapturePoints': b.cap += num(+d.points, 0); break;
+    case 'baseCaptureDropped': b.def += num(+d.points, 0); break;
+    default: return;
+  }
+  b.last = gmLiveDelta();
+  gmSaveSoon();
+  gmSoon();
+}
+// полный итог боя от игры: точные цифры вместо живых (сводка «по данным игры», не официальный итог)
+function gmResult(v) {
+  const b = G.bt;
+  if (!b || !b.done || !v || typeof v !== 'object') return;
+  const r = v.personal ? v : v.data && typeof v.data === 'object' && v.data.personal ? v.data : null;
+  if (!r || typeof r.personal !== 'object' || !r.personal) return;
+  const P = r.personal;
+  const keys = Object.keys(P).filter(k => k !== 'avatar' && P[k] && typeof P[k] === 'object');
+  const sp = b.spId ? gmSpins(G.mine).find(s => s.id === b.spId) : null;
+  // итог именно этого боя: по id боя, а если id нет — хотя бы по танку челленджа
+  const uid = r.arenaUniqueID;
+  if (uid != null && uid !== '' && b.arena) { if (String(uid) !== String(b.arena)) return; }
+  else if (!(sp && keys.indexOf(String(sp.tank.id)) >= 0)) return;
+  const vs = keys.map(k => P[k]);
+  if (!vs.length) return;
+  const pick = (...names) => {
+    for (const k of names) if (vs.some(x => typeof x[k] === 'number')) return vs.reduce((s, x) => s + (typeof x[k] === 'number' ? x[k] : 0), 0);
+    return null;
+  };
+  const got = {
+    damage_dealt: pick('damageDealt'), frags: pick('kills'), spotted: pick('spotted'),
+    radio_assisted_damage: pick('damageAssistedRadio'), track_assisted_damage: pick('damageAssistedTrack'),
+    stun_assisted_damage: pick('damageAssistedStun'), blocked: pick('damageBlockedByArmor'), damage_received: pick('damageReceived'),
+    piercings: pick('piercingEnemyHits', 'piercings'), hits: pick('directEnemyHits', 'directHits'), shots: pick('shots'),
+    explosion_hits: pick('explosionHits'), no_damage_direct_hits_received: pick('noDamageDirectHitsReceived'),
+    piercings_received: pick('piercingsReceived'), capture_points: pick('capturePoints'),
+    dropped_capture_points: pick('droppedCapturePoints'), stun_number: pick('stunNum'),
+  };
+  const av = P.avatar && typeof P.avatar === 'object' ? P.avatar : {};
+  const common = r.common && typeof r.common === 'object' ? r.common : {};
+  if (typeof common.winnerTeam === 'number' && typeof av.team === 'number') got.wins = common.winnerTeam !== 0 && common.winnerTeam === av.team ? 1 : 0;
+  const death = pick('deathReason');
+  if (death != null && vs.length === 1) got.survived_battles = death < 0 ? 1 : 0;
+  const fin = Object.assign({}, b.final || b.last || {});
+  Object.keys(got).forEach(k => { if (got[k] != null) fin[k] = got[k]; });
+  b.final = fin; b.res = true;
+  gmSaveBattle();
+  gmSoon();
+}
+let gmSaveT = 0;
+function gmSaveBattle() { clearTimeout(gmSaveT); gmSaveT = 0; try { sessionStorage.setItem(GM_BT_KEY, JSON.stringify(G.bt)); } catch (e) {} }
+function gmSaveSoon() { if (!gmSaveT) gmSaveT = setTimeout(gmSaveBattle, 1000); } // в бою — не чаще раза в секунду
+function gmLoadBattle() {
+  try {
+    const b = JSON.parse(sessionStorage.getItem(GM_BT_KEY) || 'null');
+    return b && typeof b === 'object' && typeof b.at === 'number' && Array.isArray(b.killed) ? b : null;
+  } catch (e) { return null; }
+}
+
+// --- тот ли танк: по тегу WG (A183_XM69_Hacker), иначе по названию; null — пока непонятно ---
+const tagKey = s => String(s || '').split(':').pop().toLowerCase();
+const nameKey = s => String(s || '').toLowerCase().replace(/[\s.\-_'"«»()]/g, '');
+function vehMatch(t, v) {
+  if (!t || !v || typeof v !== 'object') return null;
+  const tg = G.tags.get(String(t.id));
+  if (tg && v.tag) return tagKey(tg) === tagKey(v.tag);
+  const n = nameKey(t.name);
+  if (n && (n === nameKey(v.localizedShortName) || n === nameKey(v.localizedName))) return true;
+  return null;
+}
+function gmTag(t) {
+  const id = t && t.id != null ? String(t.id) : '';
+  if (!/^\d+$/.test(id) || G.tags.has(id) || G.tagWait.has(id)) return;
+  G.tagWait.add(id);
+  clearTimeout(G.tagT);
+  G.tagT = setTimeout(gmTagFetch, 60);
+}
+function gmTagFetch() {
+  const ids = [...G.tagWait].filter(id => !G.tags.has(id)).slice(0, 100);
+  if (!ids.length) return;
+  const later = () => setTimeout(() => ids.forEach(id => G.tagWait.delete(id)), 30000); // через 30 с спросим ещё раз
+  fetch('https://api.worldoftanks.eu/wot/encyclopedia/vehicles/?application_id=' + GM_APP + '&fields=tag&tank_id=' + ids.join(','))
+    .then(r => r.json())
+    .then(j => {
+      // ошибка API (лимит запросов, недоступен) — не «у танка нет тега», а повтор позже
+      if (!(j && j.status === 'ok' && j.data && typeof j.data === 'object')) { later(); return; }
+      ids.forEach(id => { G.tagWait.delete(id); G.tags.set(id, j.data[id] && j.data[id].tag ? String(j.data[id].tag) : null); });
+      gmSoon();
+    })
+    .catch(later);
+}
+
+// --- какой челлендж показать: в бою — тот, что на этом танке; после боя — его итог; в ангаре — на выбранном танке ---
+const gmActive = sp => !sp.status || sp.status === 'pending' || sp.status === 'ambiguous';
+function gmSpins(col) {
+  return [...col.spins.values()].filter(Boolean).map(norm).filter(sp => sp.status !== 'cancelled')
+    .sort((a, b) => b.ts - a.ts || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+}
+function gmMatch(list, veh) {
+  if (!veh || typeof veh !== 'object') return null;
+  return list.find(s => vehMatch(s.tank, veh) === true)
+    || (list.length === 1 && vehMatch(list[0].tank, veh) === null ? list[0] : null);
+}
+function gmPick() {
+  const all = gmSpins(G.mine), active = all.filter(gmActive);
+  new Set(active.concat(all.slice(0, 6))).forEach(sp => gmTag(sp.tank));
+  // в игре другой аккаунт, чем в ссылке: его бои этому игроку не засчитаются — бой и итог не сопоставляем
+  const foreign = !!(GM_URL_ACC && G.on && G.pid && G.pid !== GM_URL_ACC);
+  const b = foreign ? null : G.bt;
+  if (gmInBattle() && b && !b.done) {
+    const veh = b.veh || gv('battle.vehicle');
+    let sp = b.spId ? all.find(s => s.id === b.spId) || null : null;
+    if (sp && vehMatch(sp.tank, veh) === false) { sp = null; b.spId = ''; } // танк в бою сменился (данные пришли с опозданием)
+    if (!sp) {
+      sp = gmMatch(active, veh);
+      // закрепляем за боем только точное совпадение: догадка, пока тег не загружен, может оказаться не тем танком
+      if (sp && vehMatch(sp.tank, veh) === true) { b.spId = sp.id; gmSaveBattle(); }
+    }
+    return { mode: 'battle', sp, all, active, foreign };
+  }
+  const hv = G.on ? gv('hangar.vehicle.info') : null;
+  if (b && b.done && b.spId && Date.now() - b.endAt < GM_AFTER) {
+    const sp = all.find(s => s.id === b.spId);
+    const other = hv ? gmMatch(active.filter(s => s.id !== b.spId), hv) : null;
+    // после боя никто не крутил новый челлендж — показываем итог сыгранного
+    const newer = all.some(s => s.id !== b.spId && s.ts > (b.endSrv || serverNow()) + 5000);
+    if (sp && !other && !newer) return { mode: 'after', sp, all, active, foreign };
+  }
+  const hit = gmMatch(active, hv);
+  if (hit) return { mode: 'hangar', sp: hit, picked: true, all, active, foreign };
+  const recent = all[0] && (gmActive(all[0]) || serverNow() - resultTime(all[0]) < TM_OLD) ? all[0] : null;
+  return { mode: 'hangar', sp: active[0] || recent, picked: false, all, active, foreign };
+}
+
+// --- прогресс: формулы челленджа из каталога на текущих цифрах боя ---
+// какие поля статистики читает челлендж — по факту обращений (две прогонки: нули и большие числа)
+function gmFields(inst) {
+  if (G.fields.has(inst.id)) return G.fields.get(inst.id);
+  const used = new Set();
+  const spy = val => new Proxy({}, {
+    get: (o, k) => { if (typeof k === 'string') used.add(k); return val; },
+    has: (o, k) => { if (typeof k === 'string') used.add(k); return true; },
+  });
+  let res = null;
+  try {
+    WR.catalog.evaluate(inst, spy(0)); WR.catalog.evaluate(inst, spy(1e9)); WR.catalog.describe(inst, spy(0));
+    res = used.size ? used : null;
+  } catch (e) { res = null; }
+  G.fields.set(inst.id, res);
+  return res;
+}
+// { text, ok, ratio } или null — если челлендж нельзя посчитать по этим цифрам (победа, опыт, медали…)
+function gmView(sp, delta, live) {
+  if (!delta || !sp.chId || !window.WR || !WR.catalog) return null;
+  const inst = { id: sp.chId, v: sp.chV, w: sp.chW };
+  const used = gmFields(inst);
+  if (!used) return null;
+  for (const f of used) if (!(f in delta)) return null;
+  let text = String(WR.catalog.describe(inst, delta) || '');
+  if (live) text = text.replace(/выжил: да/g, 'пока жив').replace(/выжил: нет/g, 'уничтожен');
+  const ok = WR.catalog.evaluate(inst, delta) === true;
+  // «Урон: 1840 / 3600» в строке результата (только с подписью — «(3/3)» у точности не считаем):
+  // «или» — хватит любого, иначе нужно всё. Полная полоса — только когда челлендж выполнен
+  const parts = Array.from(text.matchAll(/:\s*(\d+)\s*\/\s*(\d+)/g)).map(x => (+x[2] > 0 ? Math.min(1, +x[1] / +x[2]) : 0));
+  let ratio = parts.length ? (/ или /i.test(sp.chFinal) ? Math.max(...parts) : Math.min(...parts)) : null;
+  if (ratio != null) ratio = ok ? 1 : Math.min(ratio, 0.97);
+  return { text, ok, ratio };
+}
+
+// --- отрисовка ---
+const GM_CHIP = {
+  battle: ['В БОЮ', 'battle'], wait: ['ЖДЁМ БОЙ', ''], pending: ['ЖДЁМ БОЙ', ''], check: ['ПРОВЕРКА', 'amb'],
+  ok: ['ВЫПОЛНЕНО', 'ok'], fail: ['ПРОВАЛ', 'fail'], ambiguous: ['ОТМЕТИТ СТРИМЕР', 'amb'],
+};
+function gmModel() {
+  if (!G.me) return { idle: G.on ? 'Ищу тебя в комнате…' : 'Подключаюсь…' };
+  if (!G.mine.ready) return { idle: 'Загружаю челлендж…' };
+  const p = gmPick(), sp = p.sp;
+  const names = list => Array.from(new Set(list.map(s => s.tank.name))).join(', ');
+  if (p.mode === 'battle' && !sp) {
+    return { idle: 'В этом бою челленджа нет', battle: true,
+      note: p.active.length ? 'Челлендж на: ' + names(p.active) : 'Крути рулетку на сайте между боями', noteCls: p.active.length ? 'warn' : '' };
+  }
+  if (!sp) return { idle: 'Крути рулетку — челлендж появится здесь' };
+  const st = stOf(sp), m = { sp, mode: p.mode, chip: st, view: null, note: '', noteCls: '' };
+  if (p.mode === 'battle') {
+    const b = G.bt;
+    m.chip = 'battle';
+    m.view = sp.auto ? gmView(sp, (b && b.last) || gmLiveDelta(), true) : null;
+    if (!sp.auto) m.note = 'Ручной челлендж — итог отметит стример';
+    else if (!m.view) m.note = 'Этот челлендж посчитаем после боя';
+    else if (b && b.partial) m.note = 'Окно открыли посреди боя — часть цифр не видна';
+  } else if (p.mode === 'after') {
+    const b = G.bt;
+    m.view = sp.auto && b && b.final ? gmView(sp, b.final, false) : null;
+    if (st === 'pending') {
+      m.chip = 'check';
+      if (m.view && b.partial && !b.res) m.note = 'Часть боя окно не видело — ждём итог боя и проверку';
+      else if (m.view) {
+        m.note = m.view.ok ? 'По данным игры — выполнено. Ждём проверку' : 'По данным игры — не выполнено. Ждём проверку';
+        m.noteCls = m.view.ok ? 'good' : 'bad';
+      } else m.note = 'Бой сыгран — проверяем итог';
+    } else m.note = sp.resultText;
+  } else if (st === 'pending') {
+    m.chip = 'wait';
+    if (G.on) {
+      if (p.picked) { m.note = '✓ Танк выбран — в бой!'; m.noteCls = 'good'; }
+      else { m.note = 'Выбери в ангаре: ' + (names(p.active) || sp.tank.name); m.noteCls = 'warn'; }
+    } else if (p.active.length > 1) m.note = 'Ещё челленджи на: ' + names(p.active.filter(s => s !== sp));
+  } else m.note = sp.resultText;
+  if (p.foreign) { m.note = 'В игре другой аккаунт, не из этой ссылки — его бои сюда не засчитаются'; m.noteCls = 'warn'; }
+  return m;
+}
+function gmMeHTML(m) {
+  if (m.idle) return `<div class="gm-idle">${esc(m.idle)}</div>` + (m.note ? `<div class="gm-note ${m.noteCls || ''}">${esc(m.note)}</div>` : '');
+  const t = m.sp.tank, chip = GM_CHIP[m.chip] || GM_CHIP.wait;
+  return `<div class="gm-top"><span class="gm-tier">${ROMAN[t.tier]}</span>`
+    + (t.type ? `<span class="gm-cls ct-${t.type}">${TYPES[t.type]}</span>` : '')
+    + `<b class="gm-name">${esc(t.name)}</b><span class="gm-chip ${chip[1]}">${chip[0]}</span></div>`
+    + `<div class="gm-ch">${esc(m.sp.chFinal)}</div>`
+    + (m.view && m.view.ratio != null ? `<div class="gm-bar${m.view.ok ? ' ok' : ''}"><i style="width:${Math.round(m.view.ratio * 100)}%"></i></div>` : '')
+    + (m.view ? `<div class="gm-live">${esc(m.view.text)}</div>` : '')
+    + (m.note ? `<div class="gm-note ${m.noteCls || ''}">${esc(m.note)}</div>` : '');
+}
+function gmRender() {
+  const m = gmModel(), sp = m.sp, box = $('#gmMe');
+  const tone = m.mode === 'battle' || m.battle ? ' is-battle' : m.chip === 'ok' ? ' is-ok' : m.chip === 'fail' ? ' is-fail'
+    : m.chip === 'ambiguous' || m.chip === 'check' ? ' is-amb' : '';
+  const cls = 'gm-me' + (sp ? ' rar-' + RAR(sp.tank.tier) : ' idle') + tone;
+  if (box.className !== cls) box.className = cls;
+  const bar = !!(m.view && m.view.ratio != null);
+  const key = [m.idle || '', sp ? sp.id : '', sp ? sp.chFinal : '', m.mode || '', m.chip || '', bar, !!m.view, m.note || '', m.noteCls || ''].join('|');
+  if (key !== G.key) { G.key = key; box.innerHTML = gmMeHTML(m); }
+  else if (m.view) { // те же блоки — только цифры: полоска плавно растёт
+    const live = box.querySelector('.gm-live');
+    if (live && live.textContent !== m.view.text) live.textContent = m.view.text;
+    const el = box.querySelector('.gm-bar');
+    if (el && bar) { el.classList.toggle('ok', m.view.ok); el.firstElementChild.style.width = Math.round(m.view.ratio * 100) + '%'; }
+  }
+  gmRenderFriends();
+  const off = !GM_DEMO && !G.on && Date.now() - G.t0 > 8000;
+  const hint = $('#gmHint');
+  hint.hidden = !off;
+  if (off && !hint.textContent) hint.textContent = 'Нет связи с игрой — нужен мод WotStat «Виджеты»';
+}
+function gmRenderFriends() {
+  let html = '';
+  if (GM_FRIENDS) G.frOrder.forEach(acc => {
+    const f = G.fr.get(acc);
+    if (!f || !f.ready) return;
+    const all = gmSpins(f);
+    const sp = all.find(s => !s.status || s.status === 'pending')
+      || (all[0] && (gmActive(all[0]) || serverNow() - resultTime(all[0]) < TM_OLD) ? all[0] : null);
+    if (!sp) return;
+    const st = stOf(sp);
+    const s = st === 'ok' ? ['✓', 'ok'] : st === 'fail' ? ['✕', 'fail'] : st === 'ambiguous' ? ['?', 'amb'] : ['⏳', 'pend'];
+    html += `<div class="gm-fr"><span class="gm-fr-n">${esc(f.nick)}</span>`
+      + `<span class="gm-fr-c"><b>${esc(sp.tank.name)}</b> · ${esc(sp.chFinal)}</span><span class="gm-fr-s ${s[1]}">${s[0]}</span></div>`;
+  });
+  if (html !== G.frHTML) { G.frHTML = html; $('#gmFrs').innerHTML = html; }
+}
+let gmT = 0;
+function gmSoon() { if (!gmT) gmT = setTimeout(() => { gmT = 0; try { gmRender(); } catch (e) { console.error(e); } }, 100); }
+
+// &demo=1 — бой понарошку, чтобы посмотреть окно без игры. Всё только в памяти страницы, в комнату ничего не пишется
+function gmDemo() {
+  const send = m => gmMsg(JSON.parse(JSON.stringify(m)));
+  const set = (path, value) => send({ type: 'state', path, value });
+  const fb = (type, data) => send({ type: 'trigger', path: 'battle.onPlayerFeedback', value: { type, data } });
+  const R = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  (async () => {
+    while (!G.me || !G.mine.ready) await sleep(400);
+    for (;;) {
+      let p = gmPick();
+      if (!p.active.length) { gmDemoSpin(p.all[0]); p = gmPick(); }
+      const t = (p.active[0] || p.sp).tank;
+      gmTag(t);
+      for (let i = 0; i < 12 && !G.tags.has(String(t.id)); i++) await sleep(300);
+      const tg = G.tags.get(String(t.id));
+      const veh = { tag: tg ? 'demo:' + tg : '', localizedName: t.name, localizedShortName: t.name, level: t.tier, class: t.type, role: '' };
+      const hp = t.hp || 1800;
+      send({ type: 'init', states: [
+        { path: 'player.id', value: +G.me }, { path: 'game.state', value: 'hangar' },
+        { path: 'hangar.vehicle.info', value: veh }, { path: 'battle.isInBattle', value: false },
+      ] });
+      await sleep(4000);
+      const arena = Date.now();
+      set('battle.arenaId', arena); set('battle.vehicle', veh); set('battle.maxHealth', hp); set('battle.health', hp); set('battle.isAlive', true);
+      ['damage', 'assist', 'blocked', 'stun'].forEach(k => set('battle.efficiency.' + k, 0));
+      set('battle.isInBattle', true);
+      let dmg = 0, assist = 0, blocked = 0, health = hp, kills = 0, spotted = 0, n = 0;
+      for (let i = 0; i < 24 && health > 0; i++) {
+        await sleep(1000);
+        const x = Math.random(), en = { playerId: 900 + (n++ % 15) };
+        if (x < 0.4) { const d = R(240, 620); dmg += d; set('battle.efficiency.damage', dmg); fb('damage', { damage: d, attackReason: 'shot', vehicle: en }); }
+        else if (x < 0.55) { spotted++; fb('spotted', { isVisible: true, vehicle: { playerId: 2000 + spotted } }); }
+        else if (x < 0.64) { kills++; fb('kill', { vehicle: { playerId: 3000 + kills } }); }
+        else if (x < 0.75) { const d = R(150, 450); assist += d; set('battle.efficiency.assist', assist); fb('radioAssist', { damage: d, attackReason: 'shot', vehicle: en }); }
+        else if (x < 0.87) { const d = R(200, 500); blocked += d; set('battle.efficiency.blocked', blocked); fb('tanking', { damage: d, attackReason: 'shot', vehicle: en }); }
+        else {
+          const d = R(150, 400);
+          health = Math.max(0, health - d); set('battle.health', health); fb('receivedDamage', { damage: d, attackReason: 'shot', vehicle: en });
+          if (!health) set('battle.isAlive', false);
+        }
+      }
+      set('battle.isInBattle', false);
+      await sleep(2500);
+      send({ type: 'trigger', path: 'battle.onBattleResult', value: { arenaUniqueID: arena, common: { winnerTeam: 1 }, personal: {
+        avatar: { team: 1 },
+        [String(t.id || 1)]: { damageDealt: dmg, kills, spotted, damageAssistedRadio: assist, damageAssistedTrack: 0, damageAssistedStun: 0,
+          damageBlockedByArmor: blocked, damageReceived: hp - health, shots: 15, directEnemyHits: 12, piercingEnemyHits: 10,
+          explosionHits: 0, noDamageDirectHitsReceived: 3, piercingsReceived: 4, capturePoints: 0, droppedCapturePoints: 0,
+          stunNum: 0, deathReason: health > 0 ? -1 : 0 },
+      } } });
+      await sleep(15000);
+    }
+  })();
+}
+// пример челленджа для показа, если своего сейчас нет: только в памяти
+function gmDemoSpin(base) {
+  const t = (base && base.tank) || { id: 35873, name: 'Hacker', tier: 11, type: 'mediumTank', hp: 2100 };
+  const tank = { id: t.id, name: t.name, tier: t.tier, type: t.type || 'mediumTank', prem: !!t.prem, img: t.img || '', hp: t.hp || 1800 };
+  let ch = { id: 'dmg_or_frags', text: 'Нанести 3000 урона или уничтожить 3 противника', auto: true, v: 3000, w: 3 };
+  try {
+    const inst = WR.catalog.instancesFor(tank, { difficulty: 'normal' }).find(i => i.id === 'dmg_or_frags');
+    if (inst) ch = { id: inst.id, text: inst.text, auto: true, v: inst.v, w: inst.w };
+  } catch (e) {}
+  gmSpinEv(G.mine, 'added', { id: 'demo-spin', acc: G.me, nick: 'demo', owner: true, ts: serverNow(), tank, challenge: ch, ch: [ch.text], status: 'pending' });
+}
+
+function startGame() {
+  $('#game').hidden = false;
+  const s = document.createElement('script');
+  s.src = GM_CATALOG;
+  s.onload = () => { G.fields.clear(); G.key = ''; gmSoon(); };
+  document.head.appendChild(s);
+  // окно перезагрузилось: бой, который ещё идёт (не старше 30 минут), или недавний итог
+  const saved = gmLoadBattle();
+  if (saved && (saved.done ? Date.now() - saved.endAt < GM_AFTER : Date.now() - saved.at < 30 * 60000)) G.bt = saved;
+  if (GM_URL_ACC) gmSetMe(GM_URL_ACC, 'url');
+  startRoster(gmRoster);
+  if (GM_DEMO) gmDemo(); else gmConnect();
+  setInterval(() => { gmFallback(); gmSoon(); }, 2000); // подсказки по времени; «после боя» гаснет сам
+  gmSoon();
+}
+
 // ---------- Запуск ----------
 (function boot() {
   if (W === 'main') { if (ROOM) startMainRoom(); else startMainLocal(); return; }
@@ -1982,6 +2573,7 @@ function startSeries() {
   if (W === 'feed') startFeed();
   else if (W === 'team') startTeam();
   else if (W === 'series') startSeries();
+  else if (W === 'game') startGame();
   else startBoard();
 })();
 
@@ -2028,6 +2620,8 @@ function startSeries() {
     .then(r => (r.ok ? { tag: r.headers.get('etag') || '', lm: Date.parse(r.headers.get('last-modified') || '') } : null))
     .catch(() => null);
   const reload = () => {
+    // окно в игре не перезагружаем посреди боя — обновимся на следующей проверке, уже в ангаре
+    if (W === 'game' && gmInBattle()) return;
     // защита от зацикливания: не чаще раза в 10 минут
     try {
       const last = +sessionStorage.getItem('wrUpd') || 0;

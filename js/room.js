@@ -417,6 +417,8 @@
       obsMain: obs,
       obsFeed: obs + '&w=feed',
       obsBoard: obs + '&w=board',
+      // окно внутри игры (мод WotStat «Виджеты»); панель дописывает &acc= игрока
+      game: obs + '&w=game',
     };
   }
 

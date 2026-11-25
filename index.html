@@ -663,6 +663,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
           <div class="hint" id="rfHint"></div>
           <button class="btn primary wide" id="rfLogin"><span class="bi">Войти через Wargaming</span></button>
           <button class="btn primary wide" id="rfJoin" hidden><span class="bi">Войти в комнату</span></button>
+          <div class="room-links" id="rfGame"></div>
           <button class="btn ghost wide" id="rfLeave"><span class="bi">Играть одному</span></button>
         </div>
         <div class="statusline" id="roomStatus"></div>
@@ -716,7 +717,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="js/room.js?v=10"></script>
+<script src="js/room.js?v=11"></script>
 <script>
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -2172,6 +2173,7 @@ function renderOwnerRoom(title) {
         + (local ? ' Ссылки комнаты ведут на сайт рулетки (GitHub Pages) — там должна быть выложена эта версия.' : ''))
       + linkRow('OBS: команда', L.obsTeam, 'Источник «Браузер» <b>960×320</b> — три танка в ряд: твой в центре, друзья по бокам, под каждым челлендж и итог.')
       + linkRow('OBS: серия', L.obsSeries, '<b>560×300</b> — серии выполнений и провалов у каждого игрока.')
+      + linkRow('В игре (мод WotStat)', gameLink(), gameHint())
       + `<details class="more-links"><summary>Другие виджеты</summary>`
       + linkRow('OBS: барабан', L.obsMain, '<b>760×320</b> — только твой спин с барабаном. Широкий, как раньше (1920×460), — допиши <code class="k">&amp;size=big</code>.')
       + linkRow('OBS: лента друзей', L.obsFeed, '<b>480×600</b> — спины друзей и их итоги по мере появления.')
@@ -2196,9 +2198,21 @@ function renderOwnerRoom(title) {
   $('#wlAdd').disabled = !RM.claimed;
 }
 
+// окно внутри игры: мод WotStat «Виджеты» → «Добавить виджет» → эта ссылка (своя у каждого игрока)
+function gameHint() {
+  return 'Мод <b>WotStat «Виджеты»</b> (wotstat.info/widgets) → в игре «Добавить виджет» → вставь ссылку. '
+    + 'Твой челлендж прямо в игре: в ангаре подскажет, тот ли танк выбран, в бою — прогресс вживую, после боя — итог. Ниже — друзья. Ширина ~360, высота подстроится сама.';
+}
+function gameLink() { return roomLinks().game + (accStr() ? '&acc=' + encodeURIComponent(accStr()) : ''); }
 function renderFriendRoom(title) {
   const logged = tokenValid() && !!S.accountId;
   const me = RM.me && RM.me.acc === accStr() ? RM.me : null;
+  // ссылка не меняется, пока та же комната и тот же игрок — не трогаем, чтобы не сбивать выделение
+  const gkey = me && window.WR && WR.room ? RM.id + ':' + accStr() : '';
+  if ($('#rfGame').dataset.key !== gkey) {
+    $('#rfGame').innerHTML = gkey ? linkRow('В игре (мод WotStat)', gameLink(), gameHint()) : '';
+    $('#rfGame').dataset.key = gkey;
+  }
   $('#rfTitle').textContent = title;
   $('#rfMeta').textContent = `Код ${RM.id}` + (RM.meta ? ` · сервер ${String(RM.meta.region || 'eu').toUpperCase()}` : '');
   $('#rfLogin').hidden = logged;
