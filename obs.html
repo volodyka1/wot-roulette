@@ -597,6 +597,17 @@ html:not(.w-game) #game{display:none!important}
 /* бой: шапка, счётчики, полоса с засечками */
 #game .ef-head{display:flex;align-items:center;gap:6px;height:28px;margin:9px 14px 0 20px}
 #game .ef-hname{flex:1 1 auto;min-width:0;margin-left:3px;font:900 italic 18px/1.1 var(--fd);letter-spacing:-.01em;color:var(--rc2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+/* в бою танк стоит сверху на рамке: выглядывает из-за её верхнего края (низ картинки спрятан за плашкой, шапку не закрывает),
+   за ним свечение в цвет уровня. Картинка WG смотрит влево — зеркалим, чтобы танк смотрел вдоль плашки. Уничтожен — сереет */
+#game .ef.bt.tk{margin-top:66px}
+#game .ef-tk{position:absolute;left:14px;bottom:100%;width:124px;height:78px;margin-bottom:-12px;z-index:-2;pointer-events:none}
+#game .ef-tk::before{content:"";position:absolute;left:-14px;right:-26px;top:2px;bottom:0;transition:opacity .5s;
+  background:radial-gradient(44% 54% at 50% 76%,var(--rcg),transparent 70%),radial-gradient(52% 68% at 50% 74%,rgba(8,8,14,.6),transparent 72%)}
+/* картинки WG обрезаны по верхнему краю — верх плавно растворяем, чтобы не было ровного среза */
+#game .ef-tk img{position:relative;display:block;width:100%;height:100%;object-fit:contain;object-position:50% 100%;transform:scaleX(-1);filter:drop-shadow(0 4px 6px rgba(0,0,0,.65));transition:filter .5s;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%);mask-image:linear-gradient(180deg,transparent 0,#000 18%)}
+#game .ef.dead .ef-tk img{filter:grayscale(1) brightness(.55) drop-shadow(0 4px 6px rgba(0,0,0,.65))}
+#game .ef.dead .ef-tk::before{opacity:.45}
 #game .ef-mt{position:relative;padding:8px 16px 0 18px;transition:opacity .4s}
 #game .ef-cnt{display:flex;align-items:center;gap:8px;height:34px}
 /* строка счётчика не переносится: число целиком, тесно — ужимается подпись слева; «+N» всплывает поверх и места не занимает */
@@ -2714,7 +2725,11 @@ function efState(m) {
   const sp = m.sp, st = stOf(sp);
   const s = { sp, t: sp.tank, layout: m.mode === 'battle' ? 'bt' : 'hg', mode: m.mode, note: m.note || '', noteCls: m.noteCls || '', view: m.view, off: !!m.off };
   // «выполнено» в бою — только когда итог уже не испортить (выжить / получить мало решится в конце боя)
-  if (s.layout === 'bt') { s.done = !!(m.view && m.view.ok && !m.view.hold); s.tone = s.done ? 's-ok' : 's-bt'; return s; }
+  if (s.layout === 'bt') {
+    s.done = !!(m.view && m.view.ok && !m.view.hold); s.tone = s.done ? 's-ok' : 's-bt';
+    s.dead = !!(G.bt && !G.bt.done && G.bt.dead); // танк уничтожен — картинка над рамкой сереет
+    return s;
+  }
   s.stamp = st === 'ok' || st === 'fail' ? st : '';
   s.chip = m.chip === 'check' ? ['amb', 'ПРОВЕРКА'] : st === 'ok' ? ['ok', 'ВЫПОЛНЕНО'] : st === 'fail' ? ['fail', 'ПРОВАЛ']
     : st === 'ambiguous' ? ['amb', 'ОТМЕТИТ СТРИМЕР'] : ['wait', 'ЖДЁМ БОЙ'];
@@ -2734,7 +2749,10 @@ function efHTML(s) {
   const t = s.t;
   if (s.layout === 'bt') {
     const right = s.done ? `<span class="ef-slot">${efStamp(true, s.fx)}</span>` : '<span class="ef-chip bt"><span><i></i><em>В БОЮ</em></span></span>';
-    return efShell('bt ' + s.tone, t, `<div class="ef-head">${efTier(t)}${efCls(t)}<b class="ef-hname">${esc(t.name)}</b>${right}</div>`
+    // танк сверху на рамке; картинка не загрузилась — убираем и место под неё
+    const tk = t.img ? `<div class="ef-tk"><img src="${esc(t.img)}" alt="" decoding="async" onerror="var c=this.closest('.ef');if(c)c.classList.remove('tk');this.parentNode.style.display='none'"></div>` : '';
+    return efShell('bt ' + s.tone + (tk ? ' tk' : '') + (s.dead ? ' dead' : ''), t, tk
+      + `<div class="ef-head">${efTier(t)}${efCls(t)}<b class="ef-hname">${esc(t.name)}</b>${right}</div>`
       + efCht(s.sp.chFinal) + efBody(s, false) + `<div class="ef-foot">${efFoot(s)}</div>`);
   }
   const band = efBand(t, [t], true, s.stamp ? efStamp(s.stamp === 'ok', s.fx) : '');
@@ -2801,6 +2819,7 @@ function efCarry(card, vals, pp) {
 }
 function efUpdate(card, s) {
   if (!card) return;
+  if (s.layout === 'bt') card.classList.toggle('dead', !!s.dead);
   const pp = s.view && s.view.pp, mts = card.querySelectorAll('.ef-mt');
   if (pp) {
     pp.parts.forEach((p, i) => { if (mts[i]) efMeterSet(mts[i], p); });
@@ -2815,6 +2834,8 @@ function efUpdate(card, s) {
 // меньше секунды, прицел не закрывает. В «или» празднуем тот счётчик, что набран, а не первый по порядку
 function efCelebrate(card) {
   efFlashHL(card);
+  anim(card.querySelector('.ef-tk img'), [{ transform: 'scaleX(-1) translateY(0)' }, { transform: 'scaleX(-1) translateY(-8px)', offset: .35 },
+    { transform: 'scaleX(-1) translateY(0)' }], { duration: 520, easing: 'ease-out' }); // танк на рамке подпрыгивает
   const done = Array.from(card.querySelectorAll('.ef-mt.done'));
   done.forEach(m => {
     const sh = m.querySelector('.ef-bar .shine');
@@ -2977,6 +2998,9 @@ function efRenderMe(m) {
     box.innerHTML = efHTML(s);
     const card = box.firstElementChild;
     if (vals && s.view && s.view.pp) efCarry(card, vals, s.view.pp);
+    // бой только начался — танк поднимается из-за рамки (при пересборке той же карточки не повторяем)
+    if (s.layout === 'bt' && !vals) anim(card.querySelector('.ef-tk'), [{ opacity: 0, transform: 'translateY(30px)' },
+      { opacity: 1, transform: 'translateY(-3px)', offset: .72 }, { opacity: 1, transform: 'none' }], { duration: 640, easing: EF_OUT });
     if (G.efPop) { G.efPop = false; const row = card.querySelector('.ef-st'); if (row) row.classList.add('pop'); }
     if (cel) efCelebrate(card); else if (s.fx) efFlashHL(card);
   } else if (s.layout !== 'idle') efUpdate(box.firstElementChild, s);
