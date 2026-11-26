@@ -347,6 +347,7 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 
 /* ---------- История ---------- */
 .hist{display:flex;flex-direction:column;gap:8px;max-height:400px;overflow:auto;padding-right:4px}
+.hist>*{flex:none}   /* строки не сплющиваются, когда их много: список прокручивается */
 .hitem{position:relative;display:grid;grid-template-columns:78px minmax(0,1fr) auto;gap:14px;align-items:center;padding:8px 14px 8px 18px;border-radius:10px;overflow:hidden;
   background:linear-gradient(90deg,var(--rcs),rgba(20,20,28,.9) 38%);border:1px solid var(--line);transition:transform .3s var(--out),border-color .2s}
 .hitem.new{animation:hIn .7s cubic-bezier(.2,1.4,.4,1) backwards}
