@@ -26,7 +26,7 @@
 :root{
   --bg:#0b0b10; --s0:#0d0d13; --s1:#121219; --s2:#181822; --s3:#20202c; --s4:#2a2a39;
   --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.14);
-  --text:#f3f3f8; --muted:#8d8da3; --dim:#5c5c70;
+  --text:#f3f3f8; --muted:#8d8da3; --dim:#7e7e94;
   --a1:#ff3d5a; --a2:#ff8a3d; --grad:linear-gradient(100deg,#ff3d5a 0%,#ff8a3d 100%);
   --grad-hi:linear-gradient(100deg,#ff5b74 0%,#ffa766 100%);
   --a-glow:rgba(255,61,90,.38); --a-soft:rgba(255,61,90,.14);
@@ -87,7 +87,6 @@ header.top{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom
 .b-sub{display:flex;align-items:center;gap:7px;margin-top:5px;font:700 10.5px/1 var(--fu);letter-spacing:.22em;color:var(--muted)}
 .b-sub i{width:7px;height:7px;border-radius:50%;background:var(--a1);box-shadow:0 0 10px var(--a1);animation:live 1.6s ease-in-out infinite}
 @keyframes live{50%{opacity:.25}}
-.who{padding:7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--line);color:var(--muted);font-weight:600;font-size:13px}
 .sp{flex:1}
 .kbdhint{color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:8px}
 kbd{font:700 11px/1 var(--fu);padding:6px 9px;border-radius:6px;background:var(--s2);border:1px solid var(--line2);border-bottom-width:2px;color:var(--text);letter-spacing:.06em}
@@ -140,6 +139,7 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
   background:var(--s3);color:var(--text);font:600 13px/1 var(--fu);letter-spacing:.01em;cursor:pointer;white-space:nowrap;
   transform:skewX(-12deg);overflow:hidden;isolation:isolate;box-shadow:inset 0 0 0 1px var(--line2);
   transition:transform .3s var(--spring),color .2s,box-shadow .3s var(--out),opacity .2s}
+a.btn{text-decoration:none}
 .btn .bi{display:inline-flex;align-items:center;gap:8px;transform:skewX(12deg)}
 .btn svg{flex:0 0 auto}
 .btn::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--fill,var(--grad));transform:scaleX(0);transform-origin:0 50%;transition:transform .42s var(--out)}
@@ -211,7 +211,9 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 .idle-t{font:900 italic 30px/1.05 var(--fd);letter-spacing:-.01em;text-transform:uppercase;
   background:linear-gradient(100deg,#fff 0%,#fff 42%,#ffb38a 50%,#fff 58%,#fff 100%);background-size:260% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent;animation:idleShine 3.8s linear infinite}
-.idle-h{font:600 12.5px/1.4 var(--fu);color:var(--muted)}
+.idle-h{font:600 12.5px/1.4 var(--fu);color:var(--muted);max-width:520px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
+.reel:has(> .empty:not([hidden])){height:auto;min-height:252px}
+.reel > .empty:not([hidden]){position:relative;min-height:252px}
 .idle kbd{display:inline-block;padding:2px 8px;margin:0 3px;border-radius:5px;font:800 italic 11px/1.35 var(--fd);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--grad);box-shadow:0 3px 10px rgba(255,61,90,.35)}
 @keyframes idleShine{from{background-position:120% 0}to{background-position:-120% 0}}
 @keyframes idleGlow{50%{box-shadow:inset 0 0 0 1px rgba(255,138,61,.6),0 0 60px rgba(255,61,90,.3),0 18px 40px rgba(0,0,0,.5)}}
@@ -414,8 +416,6 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 .chip.on .dot{background:#0b0b10}
 .chip .cnt{margin-left:-2px;font:700 10px/1 var(--fu);font-style:normal;opacity:.7}
 .chip.empty:not(.on){opacity:.38}
-#checkMode .chip{flex:1 1 0;white-space:nowrap;--rc:var(--a2);--rcs:rgba(255,138,61,.28);--rcg:rgba(255,138,61,.3)}
-#checkCard .statusline.ok{border-left-color:var(--ok);color:var(--text)}
 .more-links{margin-top:10px}
 .more-links summary{cursor:pointer;color:var(--muted);font-size:12.5px;font-weight:600}
 
@@ -459,11 +459,185 @@ details summary:focus-visible{outline:2px solid var(--a2);outline-offset:4px;bor
 .pl-tag{padding:4px 8px;border-radius:5px;transform:skewX(-12deg);background:var(--grad);color:#fff;font:800 italic 10px/1 var(--fd);letter-spacing:.1em}
 .pl-meta{color:var(--muted);font-size:12px}
 .pl-cnt{margin-left:auto;color:var(--muted);font-weight:700;font-size:12px}
+.pl-invite{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-style:normal}
 .pl-empty{padding:10px 14px;border-radius:10px;border:1px dashed var(--line2);color:var(--dim);font:700 italic 12.5px/1.3 var(--fd)}
 .hitem .c2{font-size:12px;margin-top:2px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hitem .c2.st-ok{color:var(--ok)}
 .hitem .c2.st-fail{color:#ff7b8e}
 .hitem .c2.st-ambiguous{color:#ffcf3f}
+
+/* ---------- Кокпит справа: строка статуса + разделы во вкладках ---------- */
+.cockpit{display:flex;flex-direction:column;gap:14px;min-width:0}
+@media (min-width:1101px) and (min-height:760px){
+  .cockpit{position:sticky;top:16px;max-height:calc(100vh - 32px)}
+}
+.rail{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.rail .acct{padding:10px 12px}
+.rail .acct-nick{font-size:18px}
+.rail-btns{display:flex;gap:8px;margin-top:8px}
+.rail-none{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:10px 12px;border-radius:10px;background:var(--s1);border:1px solid var(--line)}
+.rail-none>div{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.rail-none b{font:800 italic 15px/1.15 var(--fd)}
+.rail-none span{color:var(--muted);font-size:12.5px}
+/* комната: точка связи, название, роль; ниже — друзья внутри и «Пригласить» */
+.rail-row{display:grid;grid-template-columns:9px minmax(0,1fr) auto;column-gap:10px;row-gap:6px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--s1);border:1px solid var(--line)}
+.rr-t{grid-column:2;font:800 italic 14px/1.15 var(--fd);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-row #roomBadge{grid-column:3;justify-self:end}
+.rr-m{grid-column:2;color:var(--muted);font-size:12px}
+.rail-row #railInvite{grid-column:3;justify-self:end}
+.rail-dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px rgba(46,229,157,.55)}
+.rail-dot.off{background:var(--fail);box-shadow:0 0 10px rgba(255,61,90,.6)}
+.rail-dot.wait{background:#ffb627;box-shadow:0 0 10px rgba(255,182,39,.5)}
+.rail .statusline{margin-top:0;min-height:0}
+.rail .statusline:empty,.set-sec .statusline:empty{display:none}
+.set-sec .statusline{margin-top:10px;min-height:0}
+#checkStatus.ok,#checkStatusHere.ok{border-left-color:var(--ok);color:var(--text)}
+.rail .check{margin-top:2px;font-size:13px}
+.sec{display:flex;align-items:center;gap:9px;margin:22px 0 10px;padding:0;font:800 italic 12px/1 var(--fd);letter-spacing:.14em;text-transform:uppercase;color:var(--text)}
+.sec::before{content:"";flex:0 0 12px;height:9px;background:var(--grad);transform:skewX(-22deg);border-radius:2px}
+.sec.first{margin-top:4px}
+ol.steps{margin:0;padding:0 0 0 20px;color:var(--muted);font-size:12.5px;line-height:1.55}
+ol.steps li{margin:3px 0}
+ol.steps b{color:var(--text)}
+ol.steps a{color:#ffb38a}
+/* ссылка: название + размер + пояснение + адрес + Копировать */
+.lnk{margin-top:14px}
+.lnk:first-child{margin-top:0}
+.lnk-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lnk-n{font:800 italic 14px/1.2 var(--fd)}
+.lnk-size{padding:3px 7px;border-radius:5px;background:var(--s2);border:1px solid var(--line2);color:#ffb38a;font:700 11px/1 var(--fu);letter-spacing:.02em}
+.lnk-note{margin-top:5px;color:var(--muted);font-size:12px;line-height:1.45}
+.lnk .obslink{margin-top:8px}
+.lnk .obslink input{color:var(--muted);font-size:11.5px}
+.copied{color:var(--ok)!important}
+.vh{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* опасная зона */
+details.danger{margin-top:24px;padding:12px 14px 14px;border-radius:var(--r-md);border:1px solid rgba(255,61,90,.28);background:rgba(255,61,90,.05)}
+details.danger summary{color:#ff8a9a}
+details.danger summary::before{border-color:#ff5b74}
+details.danger .btn.wide{margin-top:14px}
+.btn.danger{box-shadow:inset 0 0 0 1px rgba(255,61,90,.6);color:#ffb0bd;--fill:linear-gradient(100deg,var(--fail2),var(--fail))}
+/* выбор «одно из двух» */
+.seg{display:flex;gap:4px;padding:4px;border-radius:10px;background:var(--s0);border:1px solid var(--line2)}
+.seg button{flex:1 1 0;height:36px;padding:0 6px;border:0;border-radius:7px;background:none;color:var(--muted);font:800 italic 12px/1 var(--fd);letter-spacing:.03em;cursor:pointer;white-space:nowrap;transition:color .2s,background .2s,box-shadow .2s}
+.seg button:hover:not(:disabled){color:var(--text)}
+.seg button[aria-checked=true]{background:var(--grad);color:#fff;box-shadow:0 6px 18px rgba(255,61,90,.3)}
+.seg button:focus-visible{outline:2px solid var(--a2);outline-offset:2px}
+.seg button:disabled{opacity:.45;cursor:not-allowed}
+/* следующий шаг на барабане */
+.idle-cta{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px}
+.idle-cta:empty,.idle-cta>[hidden]{display:none}
+#authOut{display:flex;flex-direction:column;align-items:center;gap:10px}
+.srv{display:flex;align-items:center;gap:8px;flex-basis:100%;color:var(--muted);font:600 12px/1 var(--fu);cursor:pointer}
+.srv select{width:auto;height:30px;font-size:12px;padding:0 30px 0 10px}
+/* фильтры — в шапке пула, рядом с тем, что они меняют */
+.pool-filters{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;margin:0 0 14px}
+.pool-filters .fl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pool-filters .fl>span{color:var(--muted);font:700 10.5px/1 var(--fu);text-transform:uppercase;letter-spacing:.14em}
+.pool-filters .check{margin-top:0;font-size:13px}
+#filtersToggle,#histMore{display:none}
+@media (max-width:1100px){
+  .layout{display:flex;flex-direction:column;align-items:stretch;gap:18px}
+  .stage,.cockpit{display:contents}
+  .stage>*,.cockpit>*{min-width:0}
+  #roomAlert{order:0}.rail{order:1}.stage-top{order:2}.deck{order:3}#playersCard{order:4}#histCard{order:5}#poolCard{order:6}#quick{order:7}
+}
+@media (max-width:860px){
+  html:not(.obs) .lt-slot:has(.result[hidden]){display:none}
+  #filtersToggle{display:inline-flex}
+  .card-head{flex-wrap:wrap;row-gap:8px}
+  .card h2{white-space:nowrap}
+  #poolCard:not(.show-filters) .pool-filters{display:none}
+  .pool-grid{grid-auto-flow:column;grid-template-columns:none;grid-template-rows:repeat(2,auto);grid-auto-columns:140px;overflow-x:auto;overflow-y:hidden;max-height:none}
+  .pool-grid:has(> .empty-note){display:block}
+  .hist{max-height:none;overflow:visible}
+  #histCard:not(.all) #hist>.hitem:nth-child(n+9){display:none}
+  #histCard.many:not(.all) #histMore{display:flex}
+  .idle{padding:12px 16px;gap:5px;max-width:calc(100vw - 56px)}
+  .idle-t{font-size:19px}
+  .idle-cta{gap:8px;margin-top:4px}
+  #idleSolo{height:32px;padding:0 13px;font-size:12px}
+}
+@media (hover:none) and (pointer:coarse){
+  .chip,.btn.sm{height:44px}
+  .hbtn{width:44px;height:44px}
+  .seg button{height:44px}
+  .kbdhint,.kbd-only{display:none!important}
+}
+
+/* ---------- Справа: меню «Настроить» ---------- */
+.quick{padding:16px}
+.quick h2{margin:0 0 10px}
+.qrow{display:flex;align-items:center;gap:12px;padding:11px 12px;margin:0 -4px;border-radius:10px;color:var(--text);text-decoration:none;transition:background .2s}
+.qrow:hover{background:var(--s2)}
+.qrow:focus-visible{outline:2px solid var(--a2);outline-offset:1px}
+.qi{flex:0 0 36px;height:36px;display:grid;place-items:center;border-radius:9px;background:var(--a-soft);color:#ffb09a}
+.qt{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.qt b{font:800 italic 14px/1.15 var(--fd)}
+.qt span{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qgo{color:var(--muted);font:700 22px/1 var(--fu)}
+#navSettings svg{margin-right:2px}
+
+/* ---------- Настройки: поверх рулетки на весь экран ---------- */
+.settings{position:fixed;inset:0;z-index:60;overflow:auto;background:radial-gradient(70% 50% at 50% -10%,rgba(255,61,90,.12),transparent 70%),var(--bg);overscroll-behavior:contain}
+html.set-open{overflow:hidden}
+.set-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:16px;padding:14px 28px;background:rgba(11,11,16,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.set-title{margin:0;font:900 italic 24px/1 var(--fd);letter-spacing:-.01em;text-transform:uppercase}
+.set-body{display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px;max-width:1500px;margin:0 auto;padding:24px 28px 60px}
+.set-nav{position:sticky;top:84px;align-self:start;display:flex;flex-direction:column;gap:4px}
+.set-nav a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;color:var(--muted);text-decoration:none;font:800 italic 14px/1.1 var(--fd);transition:background .2s,color .2s}
+.set-nav a:hover{background:var(--s2);color:var(--text)}
+.set-nav a[aria-current=page]{background:linear-gradient(100deg,rgba(255,61,90,.2),rgba(255,138,61,.08));color:#fff;box-shadow:inset 3px 0 0 var(--a1)}
+.set-nav a:focus-visible{outline:2px solid var(--a2);outline-offset:1px}
+.set-main{min-width:0}
+.set-sec{max-width:780px}
+.set-sec.wide{max-width:1120px}
+.set-h{margin:0 0 6px;font:900 italic 30px/1.1 var(--fd);letter-spacing:-.01em;text-transform:uppercase;outline:none}
+.set-lead{margin:0 0 18px;color:#c9cad8;font-size:14.5px;line-height:1.5}
+.set-sec .sec.first{margin-top:6px}
+.steps.how{margin:0 0 14px;font-size:13.5px}
+#sec-game .looks{grid-template-columns:repeat(auto-fill,minmax(300px,460px))}
+/* быстрый старт */
+.guide{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.gstep{display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:16px;padding:14px 16px;border-radius:var(--r-md);background:var(--s1);border:1px solid var(--line)}
+.gnum{width:40px;height:40px;display:grid;place-items:center;border-radius:10px;transform:skewX(-10deg);background:var(--s3);font:900 italic 18px/1 var(--fd);color:var(--muted)}
+.gnum>span{transform:skewX(10deg)}
+.gstep.ok .gnum{background:linear-gradient(135deg,var(--ok2),var(--ok));color:#03150c}
+.gstep.next{border-color:rgba(255,138,61,.5);box-shadow:0 10px 30px rgba(255,61,90,.12)}
+.gstep.next .gnum{background:var(--grad);color:#fff}
+.gtx{display:flex;flex-direction:column;gap:4px;min-width:0}
+.gtx b{font:800 italic 16px/1.2 var(--fd)}
+.gtx span{color:var(--muted);font-size:13px;line-height:1.45}
+.gstep.ok .gtx b{color:#bdf5dd}
+/* виджеты для OBS: примеры */
+.wgal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:6px}
+.wcard{display:flex;flex-direction:column;border-radius:var(--r-lg);background:var(--s1);border:1px solid var(--line);overflow:hidden}
+.wcard.wide{grid-column:1/-1}
+.wcard.rec{border-color:rgba(255,138,61,.45)}
+.wprev{display:grid;place-items:center;padding:18px;min-height:150px;background:repeating-conic-gradient(#15151d 0% 25%,#101016 0% 50%) 50%/22px 22px}
+.wprev img{display:block;max-width:100%;height:auto}
+.wbody{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px}
+.wh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wn{font:900 italic 19px/1 var(--fd);text-transform:uppercase}
+.wrec{padding:4px 8px;border-radius:5px;transform:skewX(-12deg);background:var(--grad);color:#fff;font:800 italic 10px/1 var(--fd);letter-spacing:.1em;text-transform:uppercase}
+.wnote{color:#c9cad8;font-size:13px;line-height:1.45}
+.wbody .obslink{margin-top:2px}
+.wlock{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12.5px}
+@media (max-width:1100px){
+  .set-body{grid-template-columns:1fr;gap:14px;padding:14px 16px 50px}
+  .set-top{padding:12px 16px}
+  .set-nav{position:sticky;top:60px;z-index:1;flex-direction:row;overflow-x:auto;gap:6px;padding:6px 0;background:var(--bg);scrollbar-width:none}
+  .set-nav::-webkit-scrollbar{display:none}
+  .set-nav a{flex:0 0 auto;padding:10px 12px;font-size:13px}
+  .set-nav a[aria-current=page]{box-shadow:inset 0 -3px 0 var(--a1)}
+  .set-h{font-size:24px}
+  .wgal{grid-template-columns:1fr}
+}
+@media (max-width:600px){
+  .set-esc{display:none}
+  .gstep{grid-template-columns:40px minmax(0,1fr);row-gap:10px}
+  .gstep .btn{grid-column:2;justify-self:start}
+}
 
 /* ---------- Тосты ---------- */
 .toasts{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none}
@@ -528,9 +702,9 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
         <div class="b-sub"><i></i>ПРЯМОЙ ЭФИР</div>
       </div>
     </div>
-    <span class="who" id="who">ангар не загружен</span>
     <span class="sp"></span>
     <span class="kbdhint"><kbd>ПРОБЕЛ</kbd> — крутить</span>
+    <a class="btn sm" href="#settings" id="navSettings"><span class="bi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Настройки</span></a>
   </header>
 
   <div class="layout">
@@ -553,7 +727,20 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
               <span class="glint t"><i></i></span><span class="glint b"><i></i></span>
             </div>
             <div class="flash" id="flash"></div>
-            <div class="empty" id="reelEmpty"><div class="idle"><span class="idle-k">Ангар пуст</span><b class="idle-t">Войди через Wargaming</b><span class="idle-h">карточка «Ангар» справа</span></div></div>
+            <!-- заставка барабана: что нужно сделать, чтобы крутить, — и кнопка для этого (renderIdle) -->
+            <div class="empty" id="reelEmpty"><div class="idle">
+              <span class="idle-k" id="idleK">Ангар пуст</span><b class="idle-t" id="idleT">Войди через Wargaming</b><span class="idle-h" id="idleH"></span>
+              <div class="idle-cta">
+                <div id="authOut">
+                  <button class="btn primary" id="loginBtn"><span class="bi">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="8" cy="15" r="4.5"/><path d="M11.5 11.5L20 3M16.5 6.5l3 3M14 9l2 2"/></svg>Войти через Wargaming</span></button>
+                </div>
+                <button class="btn primary" id="rfJoin" hidden><span class="bi">Войти в комнату</span></button>
+                <button class="btn primary" id="idleLoad" hidden><span class="bi">Загрузить ангар</span></button>
+                <button class="btn primary" id="idleReload" hidden><span class="bi">Попробовать ещё раз</span></button>
+                <button class="btn ghost" id="idleSolo" hidden><span class="bi">Играть одному</span></button>
+              </div>
+            </div></div>
           </div>
         </div>
 
@@ -593,6 +780,7 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
           <button class="btn fail" id="failBtn" disabled><span class="bi">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>Провал</span></button>
           <span class="autonote" id="autoNote" hidden><span>проверится автоматически</span></span>
+          <span class="autonote" id="spinWhy" hidden><span></span></span>
         </div>
       </div>
 
@@ -605,17 +793,23 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
         <div class="players" id="players"></div>
       </div>
 
-      <div class="card no-obs enter" style="--i:3">
+      <div class="card no-obs enter" style="--i:3" id="poolCard">
         <div class="card-head">
           <h2>Пул танков</h2>
           <span class="sp"></span>
           <span class="counter" id="poolInfo"></span>
+          <button class="btn sm" id="filtersToggle" aria-expanded="false" aria-controls="poolFilters"><span class="bi">Фильтры</span></button>
         </div>
-        <div class="hint" style="margin:0 0 8px">Клик по танку — исключить/вернуть его в рулетку. Танк с пометкой ⏳ ждёт боя по челленджу и пока не выпадет.</div>
+        <div class="pool-filters" id="poolFilters">
+          <div class="fl"><span>Уровни</span><div class="chips" id="tierChips"></div></div>
+          <div class="fl"><span>Классы</span><div class="chips" id="typeChips"></div></div>
+          <label class="check"><input type="checkbox" id="onlyPrem"> Только премиум</label>
+        </div>
+        <div class="hint" id="poolHint" style="margin:0 0 8px">Клик по танку — убрать из рулетки или вернуть. ⏳ — ждёт боя по челленджу.</div>
         <div class="pool-grid" id="poolGrid"></div>
       </div>
 
-      <div class="card no-obs enter" style="--i:4">
+      <div class="card no-obs enter" style="--i:4" id="histCard">
         <div class="card-head">
           <h2>История</h2>
           <span class="sp"></span>
@@ -623,120 +817,174 @@ html.obs .lt-clip{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
           <button class="btn sm ghost" id="clearHist"><span class="bi">Очистить</span></button>
         </div>
         <div class="hist" id="hist"></div>
+        <button class="btn wide ghost" id="histMore"><span class="bi">Показать всю историю</span></button>
       </div>
     </div>
 
-    <aside class="no-obs" style="display:flex;flex-direction:column;gap:18px">
-      <div class="card enter" style="--i:2">
-        <h2>Ангар</h2>
-        <div id="authOut">
-          <label class="f" for="region">Сервер</label>
-          <select id="region"></select>
-          <button class="btn primary wide" id="loginBtn"><span class="bi">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="8" cy="15" r="4.5"/><path d="M11.5 11.5L20 3M16.5 6.5l3 3M14 9l2 2"/></svg>Войти через Wargaming</span></button>
-          <div class="hint">Рулетка возьмёт танки, которые <b>сейчас стоят у тебя в ангаре</b>.</div>
+    <!-- Справа — только то, что нужно во время стрима: строка статуса и короткое меню «Настроить».
+         Всё подробное — в «Настройках» (#settings, поверх рулетки). На узком экране обёртки .stage/.cockpit
+         «растворяются» (display:contents), порядок задаёт order -->
+    <div class="cockpit no-obs" id="cockpit">
+      <section class="card rail enter" id="rail" style="--i:2" aria-label="Статус">
+        <div class="rail-none" id="authNone">
+          <div><b>Ты не вошёл</b><span id="authNoneMeta">ангар не загружен</span></div>
+          <button class="btn sm" id="railLogin" hidden><span class="bi">Войти</span></button>
+          <label class="srv" id="regionRow">Сервер <select id="region"></select></label>
         </div>
         <div id="authIn" hidden>
           <div class="acct"><span class="acct-nick" id="acctNick"></span><span class="acct-meta" id="acctMeta"></span></div>
-          <div class="row" style="margin-top:12px">
-            <button class="btn primary" id="loadBtn"><span class="bi">Обновить ангар</span></button>
-            <button class="btn" id="logoutBtn"><span class="bi">Выйти</span></button>
+          <div class="rail-btns">
+            <button class="btn sm" id="loadBtn" title="Обновить ангар"><span class="bi">Обновить ангар</span></button>
+            <button class="btn sm ghost" id="logoutBtn"><span class="bi">Выйти</span></button>
           </div>
         </div>
-        <div class="statusline" id="status"></div>
-      </div>
-
-      <div class="card enter" style="--i:3" id="roomCard">
-        <div class="card-head"><h2>Комната</h2><span class="sp"></span><span class="counter" id="roomBadge"></span></div>
-        <div id="roomSolo">
-          <div class="hint" style="margin-top:0">Играй вместе с друзьями: они крутят рулетку у себя, их челленджи видны тебе и зрителям, результат проверяется сам после боя. Друзья входят по ссылке через Wargaming — только ники из твоего списка.</div>
-          <button class="btn primary wide" id="roomCreate"><span class="bi">Создать комнату</span></button>
+        <div class="statusline" id="status" role="status"></div>
+        <div class="rail-row" id="railRoom" hidden>
+          <i class="rail-dot" id="railDot"></i><b class="rr-t" id="railRoomText"></b><span class="counter" id="roomBadge"></span>
+          <span class="rr-m" id="railRoomMeta"></span>
+          <button class="btn sm" id="railInvite" hidden title="Скопировать ссылку для друзей"><span class="bi">Пригласить</span></button>
         </div>
-        <div id="roomOwner" hidden>
-          <div class="acct"><span class="acct-nick" id="roTitle"></span><span class="acct-meta" id="roMeta"></span></div>
-          <div class="room-links" id="roLinks"></div>
-          <details>
-            <summary>Админ-ссылка (секретная)</summary>
-            <div class="hint warn">⚠️ Никому не отправляй и не показывай на стриме: с этой ссылкой любой станет владельцем комнаты. Она нужна, чтобы открыть комнату на другом компьютере или в другом браузере.</div>
-            <div class="room-links" id="roAdmin"></div>
-          </details>
-          <label class="f" for="wlNick">Кто может войти</label>
-          <div class="wl" id="wlList"></div>
-          <div class="row" style="margin-top:8px">
-            <input type="text" id="wlNick" placeholder="Ник друга в World of Tanks" spellcheck="false" autocomplete="off">
-            <button class="btn" id="wlAdd"><span class="bi">Добавить</span></button>
-          </div>
-          <div class="hint" id="wlHint"></div>
-          <div class="row">
-            <div><label class="f" for="rmMax">Челленджей сразу</label><select id="rmMax"></select></div>
-            <div><label class="f" for="rmRerolls">Перекруток у друга</label><select id="rmRerolls"></select></div>
-          </div>
-          <button class="btn wide fail" id="roomReset"><span class="bi">Обнулить челленджи и серии</span></button>
-          <div class="hint">Удалит все спины комнаты — твои и друзей. Виджеты «Команда» и «Серия» начнут с нуля, список друзей и ссылки останутся.</div>
-          <button class="btn wide" id="roomLeave"><span class="bi">Выйти из комнаты</span></button>
-        </div>
-        <div id="roomFriend" hidden>
-          <div class="acct"><span class="acct-nick" id="rfTitle"></span><span class="acct-meta" id="rfMeta"></span></div>
-          <div class="hint" id="rfHint"></div>
-          <button class="btn primary wide" id="rfLogin"><span class="bi">Войти через Wargaming</span></button>
-          <button class="btn primary wide" id="rfJoin" hidden><span class="bi">Войти в комнату</span></button>
-          <div class="room-links" id="rfGame"></div>
-          <button class="btn ghost wide" id="rfLeave"><span class="bi">Играть одному</span></button>
-        </div>
-        <div class="statusline" id="roomStatus"></div>
-      </div>
-
-      <div class="card enter" style="--i:3" id="checkCard">
-        <h2>Проверка боёв</h2>
-        <div class="chips" id="checkMode">
-          <span class="chip" data-mode="wg" tabindex="0" role="button"><span>Через Wargaming</span></span>
-          <span class="chip" data-mode="game" tabindex="0" role="button"><span>Сразу из игры</span></span>
-        </div>
-        <div class="hint" id="checkHint"></div>
-        <div class="statusline" id="checkStatus"></div>
-      </div>
-
-      <div class="card enter" style="--i:3">
-        <h2>Фильтры</h2>
-        <label class="f">Уровни</label>
-        <div class="chips" id="tierChips"></div>
-        <label class="f">Классы</label>
-        <div class="chips" id="typeChips"></div>
-        <label class="check"><input type="checkbox" id="onlyPrem"> Только премиум-танки</label>
-      </div>
-
-      <div class="card enter" style="--i:4">
-        <h2>Челленджи</h2>
-        <div class="hint" style="margin-top:0">Каждый челлендж выпадает нормальным или хардкорным — вперемешку, хардкор помечен 🔥.</div>
-        <details>
-          <summary>Выбрать челленджи <span id="chCount"></span></summary>
-          <label class="f">Проверяются автоматически</label>
-          <div class="hint" style="margin-top:0">Рулетка сама посмотрит статистику после боя на выпавшем танке. Цифры здесь — для VIII уровня, в рулетке зависят от уровня танка и сложности.</div>
-          <div class="chlist" id="chAuto"></div>
-          <label class="f">Отмечаешь сам</label>
-          <div class="chlist" id="chManual"></div>
-          <label class="f" for="chCustom">Свои челленджи</label>
-          <div class="hint" style="margin-top:0">Одна строка — один челлендж, результат отмечаешь сам. Префикс <code class="k">[ЛТ,СТ]</code> — только для этих классов (ЛТ, СТ, ТТ, ПТ, САУ). Подстановки зависят от уровня танка и сложности: <code class="k">{dmg}</code> <code class="k">{frags}</code> <code class="k">{assist}</code> <code class="k">{block}</code> <code class="k">{spots}</code> <code class="k">{stuns}</code> <code class="k">{tier}</code></div>
-          <textarea id="chCustom" spellcheck="false" style="margin-top:10px;min-height:110px" placeholder="[ЛТ,СТ] Набрать {assist} урона по засвету"></textarea>
-          <button class="btn sm" id="chReset" style="margin-top:10px"><span class="bi">Сбросить</span></button>
-        </details>
+        <div class="statusline" id="roomStatus" role="status"></div>
+        <div class="statusline" id="checkStatus" hidden></div>
         <label class="check"><input type="checkbox" id="sound"> Звук в этом окне</label>
-      </div>
+      </section>
 
-      <div class="card enter" style="--i:5">
-        <h2>OBS</h2>
-        <div class="hint" style="margin-top:0" id="obsHint"></div>
-        <div class="hint" id="obsMode"></div>
-        <div class="obslink">
-          <input type="text" id="obsUrl" readonly>
-          <button class="btn" id="copyObs"><span class="bi">Копировать</span></button>
-        </div>
-        <div class="hint" id="obsWarn"></div>
-      </div>
-    </aside>
+      <section class="card quick enter" id="quick" style="--i:3" aria-labelledby="quickH">
+        <h2 id="quickH">Настроить</h2>
+        <a class="qrow" href="#settings/obs" id="qObsRow"><span class="qi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><span class="qt"><b>Виджеты для OBS</b><span id="qObs"></span></span><span class="qgo" aria-hidden="true">›</span></a>
+        <a class="qrow" href="#settings/game"><span class="qi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="6"/><path d="M7 12h4M9 10v4M15.5 11h.01M18 13h.01"/></svg></span><span class="qt"><b>Окно в игре</b><span id="qGame"></span></span><span class="qgo" aria-hidden="true">›</span></a>
+        <a class="qrow" href="#settings/room"><span class="qi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14c2.2.3 3.9 1.8 4.5 4.5"/></svg></span><span class="qt"><b>Комната и друзья</b><span id="qRoom"></span></span><span class="qgo" aria-hidden="true">›</span></a>
+        <a class="qrow" href="#settings/start"><span class="qi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span><span class="qt"><b>Быстрый старт</b><span id="qStart"></span></span><span class="qgo" aria-hidden="true">›</span></a>
+      </section>
+    </div>
   </div>
 </div>
-<div class="toasts" id="toasts"></div>
+<!-- Настройки: поверх рулетки на весь экран (рулетка под ним живёт как была, Пробел здесь не крутит).
+     #settings/start|room|obs|game|ch — прямая ссылка на раздел; Esc или «← К рулетке» — назад -->
+<div class="settings no-obs" id="settings" hidden>
+  <div class="set-top">
+    <a class="btn sm ghost" href="#" id="setBack"><span class="bi">← К рулетке</span></a>
+    <h1 class="set-title">Настройки</h1>
+    <span class="sp"></span>
+    <span class="kbdhint set-esc"><kbd>Esc</kbd> — назад</span>
+  </div>
+  <div class="set-body">
+    <nav class="set-nav" id="setNav" aria-label="Разделы настроек">
+      <a href="#settings/start" data-sec-link="start"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span>Быстрый старт</span></a>
+      <a href="#settings/room" data-sec-link="room"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14c2.2.3 3.9 1.8 4.5 4.5"/></svg><span>Комната и друзья</span></a>
+      <a href="#settings/obs" data-sec-link="obs"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span>Виджеты для OBS</span></a>
+      <a href="#settings/game" data-sec-link="game"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="6"/><path d="M7 12h4M9 10v4M15.5 11h.01M18 13h.01"/></svg><span>Окно в игре</span></a>
+      <a href="#settings/ch" data-sec-link="ch"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Челленджи</span></a>
+    </nav>
+    <div class="set-main">
+      <section class="set-sec" id="sec-start" aria-labelledby="h-start">
+        <h2 class="set-h" id="h-start" tabindex="-1">Быстрый старт</h2>
+        <p class="set-lead" id="guideLead"></p>
+        <ol class="guide" id="guide"></ol>
+      </section>
+      <section class="set-sec" id="sec-room" aria-labelledby="h-room" hidden>
+        <h2 class="set-h" id="h-room" tabindex="-1">Комната и друзья</h2>
+            <div id="roomCard">
+              <div id="roomSolo">
+                <h3 class="sec first">Играть с друзьями</h3>
+                <ol class="steps"><li>Создай комнату</li><li>Добавь ники друзей</li><li>Отправь им ссылку</li></ol>
+                <div class="hint">Друзья крутят у себя, их челленджи видны тебе и зрителям, итог проверяется сам. Войти смогут только ники из твоего списка.</div>
+                <button class="btn primary wide" id="roomCreate"><span class="bi">Создать комнату</span></button>
+                <div class="hint" id="roomCreateHint"></div>
+              </div>
+              <div id="roomOwner" hidden>
+                <div class="acct"><span class="acct-nick" id="roTitle"></span><span class="acct-meta" id="roMeta"></span></div>
+                <h3 class="sec">Пригласить друзей</h3>
+                <div class="room-links" id="roLinks"></div>
+                <h3 class="sec"><label for="wlNick" style="cursor:inherit">Кто может войти</label></h3>
+                <div class="wl" id="wlList"></div>
+                <div class="row" style="margin-top:8px">
+                  <input type="text" id="wlNick" placeholder="Ник друга в World of Tanks" spellcheck="false" autocomplete="off">
+                  <button class="btn" id="wlAdd"><span class="bi">Добавить</span></button>
+                </div>
+                <div class="statusline" id="wlStatus" role="status"></div>
+                <div class="hint" id="wlHint"></div>
+                <h3 class="sec">Правила комнаты</h3>
+                <div class="row">
+                  <div><label class="f" for="rmMax" style="margin-top:0">Челленджей сразу</label><select id="rmMax"></select></div>
+                  <div><label class="f" for="rmRerolls" style="margin-top:0">Перекруток у друга</label><select id="rmRerolls"></select></div>
+                </div>
+                <div class="statusline" id="rmStatus" role="status"></div>
+                <details class="danger" id="roDanger">
+                  <summary>Опасная зона</summary>
+                  <div class="room-links" id="roAdmin" style="margin-top:12px"></div>
+                  <button class="btn wide danger" id="roomReset"><span class="bi">Обнулить челленджи и серии</span></button>
+                  <div class="hint">Удалит все спины комнаты — твои и друзей. Виджеты «Команда» и «Серия» начнут с нуля, список друзей и ссылки останутся.</div>
+                  <button class="btn wide ghost" id="roomLeave"><span class="bi">Выйти из комнаты</span></button>
+                  <div class="hint">Комната останется: вернуться можно по админ-ссылке.</div>
+                </details>
+              </div>
+              <div id="roomFriend" hidden>
+                <div class="acct"><span class="acct-nick" id="rfTitle"></span><span class="acct-meta" id="rfMeta"></span></div>
+                <div class="hint" id="rfHint"></div>
+                <button class="btn ghost wide" id="rfLeave"><span class="bi">Играть одному</span></button>
+                <div class="hint">Твои спины в комнате останутся.</div>
+              </div>
+            </div>
+      </section>
+      <section class="set-sec wide" id="sec-obs" aria-labelledby="h-obs" hidden>
+        <h2 class="set-h" id="h-obs" tabindex="-1">Виджеты для OBS</h2>
+        <p class="set-lead">Выбери, что нужно на стриме, — у каждого виджета своя ссылка. Главные — «Команда» и «Серия».</p>
+        <ol class="steps how">
+          <li>В OBS: «Источники» → <b>+</b> → <b>«Браузер»</b>.</li>
+          <li>Вставь ссылку виджета и поставь <b>ширину и высоту</b>, как на карточке.</li>
+          <li>Фон прозрачный — виджет ложится прямо поверх игры. «Команда» и «Серия» подстраиваются под любой размер.</li>
+        </ol>
+        <div class="hint" id="obsWarn"></div>
+        <div class="hint" id="obsNote"></div>
+        <div class="wgal" id="obsGallery"></div>
+      </section>
+      <section class="set-sec wide" id="sec-game" aria-labelledby="h-game" hidden>
+        <h2 class="set-h" id="h-game" tabindex="-1">Окно в игре</h2>
+        <p class="set-lead">Челлендж и прогресс прямо в бою — через бесплатный мод WotStat «Виджеты».</p>
+            <h3 class="sec first">Как поставить</h3>
+            <ol class="steps">
+              <li>Поставь мод <b>WotStat «Виджеты»</b> — <a href="https://wotstat.info/widgets" target="_blank" rel="noopener">wotstat.info/widgets</a></li>
+              <li>Скопируй свою ссылку — у каждого игрока своя</li>
+              <li>В игре: «Добавить виджет» → вставь её. Ширина — около 360, высота подстроится сама</li>
+            </ol>
+            <div class="room-links" id="roGame" style="margin-top:12px"></div>
+            <div class="room-links" id="rfGame" style="margin-top:12px"></div>
+            <div id="gameSolo">
+              <div class="hint">Окно в игре работает в комнате — там у каждого игрока своя ссылка.</div>
+              <button class="btn primary wide" data-sec="room"><span class="bi">Создать комнату</span></button>
+            </div>
+            <div class="look-row" id="lookRow" data-look-row></div>
+            <h3 class="sec">Проверка боёв</h3>
+            <div id="checkCard">
+              <div class="seg" id="checkMode" role="radiogroup" aria-label="Проверка боёв">
+                <button type="button" role="radio" data-mode="wg">Через Wargaming</button>
+                <button type="button" role="radio" data-mode="game">Сразу из игры</button>
+              </div>
+              <div class="hint" id="checkHint"></div>
+              <div class="statusline" id="checkStatusHere" role="status" hidden></div>
+            </div>
+      </section>
+      <section class="set-sec" id="sec-ch" aria-labelledby="h-ch" hidden>
+        <h2 class="set-h" id="h-ch" tabindex="-1">Челленджи</h2>
+            <div class="hint" style="margin-top:0">Включено: <b id="chCount"></b>. Каждый челлендж выпадает нормальным или хардкорным — хардкор помечен 🔥.</div>
+            <div class="hint" id="chFriend" hidden>Тебе выпадают только те, что проверяются сами.</div>
+            <h3 class="sec">Проверяются сами</h3>
+            <div class="hint" style="margin-top:0">Цифры — для VIII уровня, в рулетке зависят от уровня танка и сложности.</div>
+            <div class="chlist" id="chAuto"></div>
+            <div id="chOwn">
+              <h3 class="sec">Отмечаешь сам</h3>
+              <div class="chlist" id="chManual"></div>
+              <h3 class="sec"><label for="chCustom" style="cursor:inherit">Свои челленджи</label></h3>
+              <div class="hint" style="margin-top:0">Одна строка — один челлендж, результат отмечаешь сам. Префикс <code class="k">[ЛТ,СТ]</code> — только для этих классов (ЛТ, СТ, ТТ, ПТ, САУ). Подстановки зависят от уровня танка и сложности: <code class="k">{dmg}</code> <code class="k">{frags}</code> <code class="k">{assist}</code> <code class="k">{block}</code> <code class="k">{spots}</code> <code class="k">{stuns}</code> <code class="k">{tier}</code></div>
+              <textarea id="chCustom" spellcheck="false" style="margin-top:10px;min-height:110px" placeholder="[ЛТ,СТ] Набрать {assist} урона по засвету"></textarea>
+            </div>
+            <button class="btn sm" id="chReset" style="margin-top:12px"><span class="bi">Сбросить</span></button>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <!-- ?v= — номер версии, чтобы браузер не держал старые скрипты из кэша после обновления -->
 <script src="js/catalog.js?v=10"></script>
@@ -943,6 +1191,7 @@ async function api(method, q) {
   return j.data;
 }
 
+let hangarLoading = false; // для заставки барабана: «Загружаю ангар…»
 async function loadHangar() {
   const id = S.accountId;
   if (!tokenValid() || !id) {
@@ -950,6 +1199,8 @@ async function loadHangar() {
     return setStatus('Войди через Wargaming, чтобы загрузить ангар', true);
   }
   $('#loadBtn').disabled = true;
+  const back = document.activeElement === $('#idleLoad');
+  hangarLoading = true; renderIdle();
   try {
     setStatus('Загружаю танки…');
     let mine = null, fromGarage = false;
@@ -1013,6 +1264,8 @@ async function loadHangar() {
     setStatus('Ошибка: ' + e.message, true);
   } finally {
     $('#loadBtn').disabled = false;
+    hangarLoading = false; renderIdle();
+    if (back && !$('#idleLoad').hidden) $('#idleLoad').focus();
   }
 }
 
@@ -1688,15 +1941,18 @@ function gameSync() {
   if (S.gameCheck && !gameSt.want) WR.game.start({ onStatus: st => { gameSt = st; renderCheck(); }, onResult: b => { gameResult(b).catch(e => console.warn('Зачёт из игры:', e)); } });
   else if (!S.gameCheck && gameSt.want) WR.game.stop();
 }
+// телефон или планшет: мод с игрой — на компьютере, до него отсюда не достать
+const TOUCH = matchMedia('(hover:none) and (pointer:coarse)').matches;
 function renderCheck() {
   const game = !!S.gameCheck;
   for (const c of $('#checkMode').children) {
     const on = (c.dataset.mode === 'game') === game;
-    c.classList.toggle('on', on); c.setAttribute('aria-pressed', on);
+    c.setAttribute('aria-checked', String(on)); c.tabIndex = on ? 0 : -1;
   }
-  $('#checkHint').innerHTML = game
-    ? 'Итог записывается сразу после боя по данным игры — твой и друзей, которые были с тобой в бою (мод друзьям не нужен). Нужен мод <b>WotStat «Виджеты»</b> на этом компьютере. Медали и твой опыт тоже берутся из игры; бой друга без тебя и опыт друзей проверит Wargaming.'
-    : 'Итог приходит из статистики Wargaming: обычно за секунды, иногда через пару минут. Работает у всех, мод не нужен.';
+  $('#checkHint').innerHTML = TOUCH && !game ? 'Итог — из статистики Wargaming: обычно за секунды, иногда через пару минут. «Сразу из игры» работает на компьютере, где запущена игра с модом.'
+    : !game ? 'Итог — из статистики Wargaming: обычно за секунды, иногда через пару минут. Мод не нужен.'
+    : isFriend() ? 'Твой итог — сразу после боя, по данным игры (и медали). Нужен мод <b>WotStat «Виджеты»</b> на этом компьютере. Остальное проверит Wargaming.'
+    : 'Итог — сразу после боя, по данным игры: твой и друзей, которые были с тобой в бою (мод друзьям не нужен). Медали и твой опыт — тоже из игры. Нужен мод <b>WotStat «Виджеты»</b> на этом компьютере. Что игра не видела — бой друга без тебя, опыт друзей, — проверит Wargaming.';
   const el = $('#checkStatus');
   let msg = '', ok = false;
   if (game) {
@@ -1705,11 +1961,10 @@ function renderCheck() {
     else {
       ok = true;
       const other = gameSt.pid && accStr() && gameSt.pid !== accStr();
-      msg = (other ? 'Игра на связи, но в ней другой аккаунт — свои бои проверит Wargaming' : gameSt.inBattle ? 'Игра на связи · идёт бой' : 'Игра на связи') + (gameNote ? ' · ' + gameNote : '');
+      msg = (other ? 'Игра на связи, но в ней другой аккаунт — свои бои проверит Wargaming' : gameSt.inBattle ? '⚡ Игра на связи · идёт бой' : '⚡ Игра на связи') + (gameNote ? ' · ' + gameNote : '');
     }
   }
-  el.textContent = msg; el.hidden = !msg;
-  el.classList.toggle('ok', ok); el.classList.remove('err');
+  for (const x of [el, $('#checkStatusHere')]) { x.textContent = msg; x.hidden = !msg; x.classList.toggle('ok', ok); x.classList.remove('err'); }
 }
 function setCheckMode(game) {
   if (!!S.gameCheck === !!game) return;
@@ -1812,12 +2067,14 @@ function addHistory(entry) {
 // ---------- Рендер панели ----------
 function renderAuth() {
   const on = tokenValid();
-  $('#authOut').hidden = on;
+  $('#authNone').hidden = on;
   $('#authIn').hidden = !on;
   $('#acctNick').textContent = S.nick || 'игрок';
-  $('#acctMeta').textContent = `Сервер ${(REGIONS[S.region] || REGIONS.eu).name} · ${hangar.length ? `${tanksWord(hangar.length)} в рулетке` : 'ангар не загружен'}`;
-  $('#who').textContent = hangar.length ? `${S.nick || 'игрок'} · ${tanksWord(hangar.length)}` : 'ангар не загружен';
-  renderRoom(); // кнопки комнаты зависят от входа
+  $('#acctMeta').textContent = `${(REGIONS[S.region] || REGIONS.eu).name} · ${hangar.length ? `${tanksWord(hangar.length)} в рулетке` : 'ангар не загружен'}`;
+  // не вошёл, но танки из прошлой загрузки есть — крутить можно, а «Войти» — маленькой кнопкой здесь
+  $('#authNoneMeta').textContent = hangar.length ? `танки из прошлой загрузки: ${hangar.length}` : 'ангар не загружен';
+  $('#railLogin').hidden = !hangar.length;
+  renderRoom(); // комната, вкладки, выбор сервера и заставка барабана зависят от входа
   renderCheck(); // строка «в игре другой аккаунт» зависит от входа
 }
 
@@ -1856,13 +2113,77 @@ function renderPool(animate = false) {
     </div>`;
   }).join('') || '<div class="empty-note">Здесь появятся твои танки</div>';
   $('#poolInfo').textContent = poolInfoText();
-  if (!current) {
-    $('#reelEmpty').hidden = false;
-    $('#reelEmpty').innerHTML = hangar.length
-      ? '<div class="idle"><span class="idle-k">Рулетка заряжена</span><b class="idle-t">Кто едет в бой?</b><span class="idle-h">Жми <kbd>Крутить</kbd> или <kbd>Пробел</kbd></span></div>'
-      : '<div class="idle"><span class="idle-k">Ангар пуст</span><b class="idle-t">Войди через Wargaming</b><span class="idle-h">карточка «Ангар» справа</span></div>';
-    if (hangar.length) $('#strip').innerHTML = '';
+  $('#poolFilters').hidden = $('#poolHint').hidden = !hangar.length;
+  $('#filtersToggle').hidden = !hangar.length;
+  const nf = (S.tiers.length < TIERS.length) + (S.types.length < Object.keys(TYPES).length) + !!S.onlyPrem;
+  $('#filtersToggle').firstElementChild.textContent = 'Фильтры' + (nf ? ` · ${nf}` : '');
+  if (!current && hangar.length) $('#strip').innerHTML = '';
+  renderIdle();
+}
+
+// Заставка барабана — что нужно сделать, чтобы крутить, и кнопка для этого: вход, вход в комнату, ещё раз,
+// играть одному, загрузить ангар, обновить страницу. Видна, пока нет спина на ленте или пока в комнате крутить нельзя.
+// Всё, что пришло извне (ник, текст ошибки), идёт только текстом — разметка лишь в «Жми КРУТИТЬ или ПРОБЕЛ»
+function renderIdle() {
+  const el = $('#reelEmpty');
+  const block = inRoom() ? roomSpinBlock() : '';
+  const show = !spinning && (!current || !!block);
+  el.hidden = !show;
+  if (!show) { $('#railLogin').hidden = false; return; }   // #railLogin внутри #authNone: виден, только пока не вошёл
+  const logged = tokenValid() && !!S.accountId;
+  const friend = isFriend();
+  const reg = RM.meta && REGIONS[RM.meta.region] ? RM.meta.region : '';
+  const roomName = (RM.meta && RM.meta.title) || 'Комната';
+  const joined = !!(RM.me && RM.me.acc === accStr());
+  let k, t, h = '', hHtml = '', cta = '', alt = '';   // cta: login | join | retry | load | reload; alt — запасная кнопка (выйти / играть одному)
+  if (inRoom() && RM.fatal) {
+    // комната сломалась: стримеру — обновить или выйти, другу — играть одному
+    k = roomName; t = 'Не получилось'; h = RM.fatal; cta = RM.fatalRetry ? 'reload' : ''; alt = 'leave';
+  } else if (inRoom() && !RM.ready) {
+    k = roomName; t = 'Подключаюсь…';
+  } else if (friend && !logged && !joined) {
+    k = roomName; t = 'Войди, чтобы крутить'; h = reg ? `Вход — на сервер комнаты ${reg.toUpperCase()}` : ''; cta = 'login';
+  } else if (!logged && !hangar.length) {
+    k = 'Ангар пуст'; t = 'Войди через Wargaming'; h = 'Рулетка возьмёт танки из твоего ангара'; cta = 'login';
+  } else if (inRoom() && !RM.spinsReady) {
+    k = roomName; t = 'Загружаю спины…';
+  } else if (RM.owner && !RM.claimed) {
+    k = roomName; t = 'Нет прав владельца'; h = 'Попробуй ещё раз — права проверятся заново'; cta = 'reload'; alt = 'leave';
+  } else if (friend && !joined) {
+    if (RM.joining) { k = roomName; t = 'Вхожу в комнату…'; }
+    else if ((RM.joinErr === 'NOT_WHITELISTED' || RM.kicked) && reg && reg !== S.region) {
+      // вошёл не на тот сервер — ник ищется на сервере комнаты, поможет только вход заново (login() сам переключит сервер)
+      k = roomName; t = 'Войди на сервер комнаты'; h = `Ты вошёл на ${String(S.region).toUpperCase()}, а комната — на ${reg.toUpperCase()}`; cta = 'login'; alt = 'leave';
+    } else if (RM.joinErr === 'NOT_WHITELISTED' || RM.kicked) {
+      k = RM.kicked ? 'Тебя убрали из комнаты' : 'Тебя нет в списке';
+      t = 'Попроси стримера добавить тебя';
+      h = `Ник ${S.nick || ''}${reg ? ' · сервер ' + reg.toUpperCase() : ''}`;
+      cta = 'retry'; alt = 'leave';
+    } else if (RM.joinErr) { k = roomName; t = 'Не получилось войти'; h = RM.joinErrText || ''; cta = 'retry'; alt = 'leave'; }
+    else { k = roomName; t = 'Ты ещё не в комнате'; cta = 'join'; }
+  } else if (!hangar.length) {
+    k = 'Ангар пуст';
+    if (hangarLoading) t = 'Загружаю ангар…';
+    else { t = 'Загрузи ангар'; h = 'В рулетку попадут танки, которые сейчас стоят у тебя в ангаре'; cta = 'load'; }
+  } else if (block) {
+    const [a, b] = block.split(' — ');   // «Нет прав владельца комнаты — обнови страницу»
+    k = roomName; t = a; h = b || '';
+  } else {
+    k = 'Рулетка заряжена'; t = 'Кто едет в бой?'; hHtml = 'Жми <kbd>Крутить</kbd><span class="kbd-only"> или <kbd>Пробел</kbd></span>';
   }
+  $('#idleK').textContent = k;
+  $('#idleT').textContent = t;
+  if (hHtml) $('#idleH').innerHTML = hHtml; else $('#idleH').textContent = h;
+  $('#idleH').hidden = !(h || hHtml);
+  $('#authOut').hidden = cta !== 'login';
+  $('#rfJoin').hidden = cta !== 'join' && cta !== 'retry';
+  $('#rfJoin').firstElementChild.textContent = cta === 'retry' ? 'Проверить ещё раз' : 'Войти в комнату';
+  $('#idleLoad').hidden = cta !== 'load';
+  $('#idleReload').hidden = cta !== 'reload';
+  $('#idleSolo').hidden = alt !== 'leave';
+  $('#idleSolo').firstElementChild.textContent = friend ? 'Играть одному' : 'Выйти из комнаты';
+  // «Войти» в строке статуса — только когда на барабане своей кнопки входа нет
+  $('#railLogin').hidden = cta === 'login' || (friend && !RM.ready);   // друг — только после подключения: вход на сервер комнаты
 }
 
 function fmtTime(ts) {
@@ -1883,18 +2204,22 @@ function histActions(h) {
 const chText = h => (h.challenge && h.challenge.text) || (Array.isArray(h.ch) ? h.ch[h.ch.length - 1] : h.ch) || '';
 
 // Строка спина (история и «Игроки комнаты»); live — отдельная строка статуса
+// картинка танка — только с серверов Wargaming (как отдаёт loadHangar): чужой адрес в спине друга не грузим
+const tankImg = u => (/^https:\/\/([\w-]+\.)*(worldoftanks\.(eu|com|asia)|wgcdn\.co|tanki\.su)\//.test(u || '') ? u : '');
+const ST_CLASS = ['pending', 'ok', 'fail', 'ambiguous', 'cancelled'];
 function spinRow(h, { isNew = false, live = false } = {}) {
   const t = h.tank || {}, txt = chText(h);
+  const sc = ST_CLASS.includes(h.status) ? h.status : 'wait';   // статус из базы — только как известное слово
   const res = h.result && h.result.text ? ` · ${h.result.text}${h.result.via === 'game' ? ' · ⚡ из игры' : ''}` : '';
   const line = live ? '' : h.status === 'ambiguous' ? (isFriend() ? ' · несколько боёв — отметит стример' : ' · несколько боёв — отметь сам') : res;
   const st = live ? statusLine(h.status, h.result && h.result.text) : '';
   return `
-    <div class="hitem rar-${RAR(t.tier)} st-${h.status || 'wait'} ${isNew ? 'new' : ''}">
-      <img src="${esc(t.img || '')}" alt="">
+    <div class="hitem rar-${RAR(t.tier)} st-${sc} ${isNew ? 'new' : ''}">
+      <img src="${esc(tankImg(t.img))}" alt="">
       <div style="min-width:0">
         <div class="h-t"><b>${ROMAN[t.tier] || ''}</b><span>${esc(t.name || '')}</span><time>${fmtTime(h.ts)}</time></div>
         <div class="c" title="${esc(txt + line)}">${esc(txt)}${esc(line)}</div>
-        ${st ? `<div class="c2 st-${h.status}">${esc(st)}</div>` : ''}
+        ${st ? `<div class="c2 st-${sc}">${esc(st)}</div>` : ''}
       </div>
       <div class="hside">${histActions(h)}<div class="s"><span>${HIST_ICON[h.status] || '—'}</span></div></div>
     </div>`;
@@ -1912,10 +2237,16 @@ function renderHistory(animFirst = false) {
     || `<div class="empty-note">${inRoom() ? 'В этой комнате ты ещё не крутил' : 'Пока пусто'}</div>`;
   const ok = list.filter(h => h.status === 'ok').length, fail = list.filter(h => h.status === 'fail').length;
   $('#histStats').textContent = ok + fail ? `✅ ${ok} · ❌ ${fail}` : '';
+  $('#histCard').classList.toggle('many', list.length > 8);
+  $('#histMore').firstElementChild.textContent = `Показать всю историю (${list.length})`;
 }
 
 function updateButtons() {
-  $('#spinBtn').disabled = spinning || rerollBusy || !hangar.length;
+  const why = inRoom() ? roomSpinBlock() : '';
+  $('#spinBtn').disabled = spinning || rerollBusy || !hangar.length || !!why;
+  // причину видно на заставке барабана, а если на ленте старый спин — здесь, у кнопки
+  $('#spinWhy').hidden = !why || !current || spinning;
+  $('#spinWhy').firstElementChild.textContent = why;
   const e = current && curEntry ? curEntry : null;
   const friend = isFriend();
   // ✅/❌ — для ручных челленджей и «несколько боёв»; автоматические проверятся сами. У друга — никогда (решает стример)
@@ -1927,7 +2258,8 @@ function updateButtons() {
   $('#okBtn').disabled = $('#failBtn').disabled = spinning || !manual;
   const waitOwner = friend && !!e && e.status === 'ambiguous';
   $('#autoNote').firstElementChild.textContent = waitOwner ? 'отметит стример' : 'проверится автоматически';
-  $('#autoNote').hidden = !e || manual || (e.status !== 'pending' && !waitOwner);
+  $('#autoNote').hidden = !e || manual || (e.status !== 'pending' && !waitOwner) || !$('#spinWhy').hidden;
+  renderIdle();
 }
 
 // ---------- Настройки челленджей ----------
@@ -1973,7 +2305,7 @@ function resetRM() {
   Object.assign(RM, {
     id: null, key: null, owner: false, claimed: false,
     meta: null, ready: false, spinsReady: false, players: {}, whitelist: {}, spins: {},
-    me: null, joining: false, fatal: '', conn: null, unsubs: [],
+    me: null, joining: false, joinErr: '', joinErrText: '', kicked: false, fatal: '', fatalRetry: false, conn: null, unsubs: [],
   });
 }
 resetRM();
@@ -2024,7 +2356,7 @@ function roomErr(e, toastIt = false, fatal = false) {
   console.warn('Комната:', e);
   if (e && e.code === 'RULES_MISSING') showRulesAlert(msg);
   roomSay(msg, true);
-  if (fatal) RM.fatal = msg;
+  if (fatal) { RM.fatal = msg; RM.fatalRetry = /^(NETWORK|TIMEOUT|RULES_MISSING)$|^auth\//.test((e && e.code) || ''); }
   if (toastIt) toast(msg);
   renderRoom();
 }
@@ -2099,7 +2431,8 @@ function roomSubscribe() {
   keep(WR.room.onMeta(id, m => {
     if (RM.id !== id) return;
     RM.meta = m; RM.ready = !!m;
-    if (!m) { RM.fatal = lost; roomSay(lost, true); }
+    if (m && $('#roomStatus').textContent === 'Подключаюсь к комнате…') roomSay('');
+    if (!m) { RM.fatal = lost; RM.fatalRetry = false; roomSay(lost, true); }
     else if (RM.fatal === lost) { RM.fatal = ''; roomSay(''); }
     roomRender();
   }, err));
@@ -2107,7 +2440,7 @@ function roomSubscribe() {
     if (RM.id !== id) return;
     RM.players = p || {};
     if (!RM.owner && RM.me && !RM.players[RM.me.acc]) {
-      RM.me = null;
+      RM.me = null; RM.kicked = true;
       roomSay('Стример убрал тебя из комнаты — крутить здесь больше нельзя', true);
     }
     roomRender();
@@ -2119,9 +2452,20 @@ function roomSubscribe() {
   keep(WR.room.onSpins(id, { limit: 300, onReady: spinsLoaded }, (ev, sp) => { if (RM.id === id) mergeSpin(ev, sp); }, err));
   keep(WR.room.onConnection(c => { if (RM.id === id) { RM.conn = c; renderRoom(); } }));
 }
+// «Попробовать ещё раз» на заставке: та же комната заново, без перезагрузки страницы (ключ из админ-ссылки в адресе уже стёрт)
+function retryRoom() {
+  if (!inRoom() || !window.WR || !WR.room) return location.reload();
+  const { id, key, owner } = RM;
+  roomStop();
+  Object.assign(RM, { id, key, owner });
+  store = roomStore;
+  roomStart();
+}
 function roomStop() {
   for (const off of RM.unsubs) { try { off(); } catch {} }
   resetRM();
+  wlSay('');
+  const rs = $('#rmStatus'); clearTimeout(rs._t); rs.textContent = ''; rs.classList.remove('err');
 }
 
 // Спин из базы -> в RM.spins. Объект сохраняем (на него ссылается curEntry), итог — через onSpinChanged
@@ -2163,7 +2507,7 @@ function roomSpinBlock() {
   if (!RM.spinsReady) return 'Загружаю спины комнаты…';
   if (!accStr()) return 'Войди через Wargaming, чтобы крутить в комнате';
   if (RM.owner && !RM.claimed) return 'Нет прав владельца комнаты — обнови страницу';
-  if (!RM.owner && !(RM.me && RM.me.acc === accStr())) return 'Сначала войди в комнату — карточка «Комната» справа';
+  if (!RM.owner && !(RM.me && RM.me.acc === accStr())) return 'Сначала войди в комнату';
   return '';
 }
 
@@ -2198,13 +2542,15 @@ async function joinRoom() {
   if (!inRoom() || RM.owner || RM.joining) return;
   if (!tokenValid() || !S.accountId) return renderRoom();
   const id = RM.id;
-  RM.joining = true; renderRoom();
+  const back = document.activeElement === $('#rfJoin');   // жали с клавиатуры — вернуть фокус, если кнопка снова нужна
+  RM.joining = true; RM.kicked = false; renderRoom();
   roomSay('Вхожу в комнату…');
   try {
     const roomRegion = RM.meta && REGIONS[RM.meta.region] ? RM.meta.region : '';
     const r = await WR.room.join(id, { acc: accStr(), nick: S.nick || '', region: roomRegion || S.region });
     if (RM.id !== id) return;
     RM.me = { acc: r.acc, nick: r.nick };
+    RM.joinErr = RM.joinErrText = ''; RM.kicked = false;
     roomSay(`Ты в комнате как ${r.nick}`);
   } catch (e) {
     if (RM.id !== id) return;
@@ -2212,19 +2558,25 @@ async function joinRoom() {
     const rr = RM.meta && REGIONS[RM.meta.region] ? RM.meta.region : '';
     const other = rr && rr !== S.region ? ` Сервер комнаты ${rr.toUpperCase()}, а ты вошёл на ${String(S.region).toUpperCase()} — войди через Wargaming ещё раз.` : '';
     const err = e && e.code === 'NOT_WHITELISTED'
-      ? Object.assign(new Error(`Ника ${S.nick || ''} нет в списке игроков этой комнаты — попроси стримера добавить его и нажми «Войти в комнату» ещё раз.${other}`), { code: e.code })
+      ? Object.assign(new Error(other ? other.trim() : `Ника ${S.nick || ''} нет в списке игроков этой комнаты — попроси стримера добавить его и нажми «Проверить ещё раз».`), { code: e.code })
       : e;
+    RM.joinErr = (e && e.code) || 'ERR'; RM.joinErrText = (err && err.message) || String(err);
     roomErr(err, true);
   } finally {
-    if (RM.id === id) { RM.joining = false; roomRender(); }
+    if (RM.id === id) {
+      RM.joining = false; renderRoom(); roomRender();
+      if (back && !$('#rfJoin').hidden) $('#rfJoin').focus();
+    }
   }
 }
 
+let roomCreating = false; // пока создаётся — вторым щелчком не создать вторую комнату
 async function createRoom() {
   if (inRoom()) return;
-  if (!tokenValid() || !S.accountId) return roomSay('Сначала войди через Wargaming — карточка «Ангар»', true);
-  const btn = $('#roomCreate');
-  btn.disabled = true;
+  if (!tokenValid() || !S.accountId) return roomSay('Сначала войди через Wargaming', true);
+  if (roomCreating) return;
+  roomCreating = true;
+  $('#roomCreate').disabled = true;
   roomSay('Создаю комнату…');
   try {
     const nick = S.nick || 'Стример';
@@ -2235,9 +2587,12 @@ async function createRoom() {
     store = roomStore; curEntry = null;
     await roomStart();
     toast('Комната создана — добавь друзей и отправь им ссылку');
+    openSettings('room');
+    // на телефоне фокус открыл бы клавиатуру поверх прокрутки к вкладкам
+    if (!TOUCH) setTimeout(() => { if ($('#wlNick').offsetParent) $('#wlNick').focus(); }, 50);
   } catch (e) {
     roomErr(e, true);
-  } finally { btn.disabled = false; }
+  } finally { roomCreating = false; renderRoom(); }
 }
 
 // Стример: забыть комнату здесь (вернуться — по админ-ссылке). Друг: играть одному.
@@ -2270,78 +2625,149 @@ async function resetRoomSpins() {
   } finally { btn.disabled = false; }
 }
 
-// Строка «подпись + адрес + Копировать»
-function linkRow(label, url, note = '') {
-  return `<label class="f">${label}</label>`
-    + `<div class="obslink"><input type="text" readonly value="${esc(url)}"><button class="btn sm" data-copy="${esc(url)}"><span class="bi">Копировать</span></button></div>`
-    + (note ? `<div class="hint">${note}</div>` : '');
+// Ссылка: название, размер, пояснение, адрес и «Копировать». masked — в поле ключ скрыт (админ-ссылка), копируется настоящая
+function linkItem(name, url, { size = '', note = '', masked = false } = {}) {
+  const shown = masked ? url.replace(/([?&]key=)[^&#]+/, '$1••••••••') : url;
+  return `<div class="lnk"><div class="lnk-h"><span class="lnk-n">${esc(name)}</span>${size ? `<span class="lnk-size">${size}</span>` : ''}</div>`
+    + (note ? `<div class="lnk-note">${note}</div>` : '')
+    + `<div class="obslink"><input type="text" readonly value="${esc(shown)}" aria-label="${esc(name)}: адрес">`
+    + `<button class="btn" data-copy="${esc(url)}"><span class="bi">Копировать</span><span class="vh">: ${esc(name)}</span></button></div></div>`;
 }
-function copyText(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('Ссылка скопирована'), () => toast('Не удалось скопировать — выдели адрес и нажми Ctrl+C'));
-  else toast('Не удалось скопировать — выдели адрес и нажми Ctrl+C');
+// Скопировать; итог — на самой кнопке («Скопировано ✓»), без кнопки — тостом.
+// field() — запасное поле, если рядом с кнопкой поля нет (rail «Пригласить»)
+function copyText(text, btn, field) {
+  // буфер обмена недоступен (док OBS, http по адресу в сети): настоящий адрес — в поле, выделить, copy по-старому.
+  // У скрытой админ-ссылки ключ виден только на это время: скопировалось — маска сразу обратно, нет — до ухода из поля
+  const fail = () => {
+    const inp = (btn && btn.parentElement && btn.parentElement.querySelector('input')) || (field ? field() : null);
+    const shown = inp ? inp.value : '';
+    if (inp) { inp.value = text; inp.focus(); inp.select(); }
+    let done = false;
+    try { done = !!inp && document.execCommand('copy'); } catch {}
+    if (inp && shown !== text) {
+      if (done) { inp.value = shown; if (btn && btn.isConnected) btn.focus(); }
+      else inp.addEventListener('blur', () => { inp.value = shown; }, { once: true });
+    }
+    if (done) ok(); else toast(inp ? 'Не удалось скопировать — адрес выделен, нажми Ctrl+C' : 'Не удалось скопировать — выдели адрес и нажми Ctrl+C');
+  };
+  const ok = () => {
+    if (!btn) return toast('Ссылка скопирована');
+    const lbl = btn.querySelector('.bi') || btn;
+    if (!btn.dataset.lbl) btn.dataset.lbl = lbl.textContent;
+    lbl.textContent = 'Скопировано ✓'; btn.classList.add('copied');
+    clearTimeout(btn._cp); btn._cp = setTimeout(() => { lbl.textContent = btn.dataset.lbl; btn.classList.remove('copied'); }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fail);
+  else fail();
 }
 
-// Карточка OBS: адрес основного виджета (в комнате — из комнаты)
-function renderObsCard() {
-  const dir = HAS_SERVER ? location.origin + location.pathname.replace(/[^/]*$/, '') : 'http://localhost:8080/';
+// Виджеты для OBS — примеры (img/w-*.webp, сняты с obs.html на выдуманных данных) и ссылки.
+// У стримера в комнате — ссылки комнаты; без комнаты — только «Барабан» с этого компьютера; другу раздела нет
+const WIDGETS = [
+  { k: 'team', link: 'obsTeam', name: 'Команда', size: '960×320', w: 960, img: 'img/w-team.webp', rec: true, wide: true,
+    note: 'Три танка в ряд: ты в центре, друзья по бокам, под каждым — челлендж и итог. Звук на выпадении.' },
+  { k: 'series', link: 'obsSeries', name: 'Серия', size: '560×300', w: 560, img: 'img/w-series.webp', rec: true,
+    note: 'Выполнения и провалы подряд у каждого игрока, проценты и серии.' },
+  { k: 'board', link: 'obsBoard', name: 'Таблица', size: '480×420', w: 480, img: 'img/w-board.webp',
+    note: 'Выполнено и провалено у каждого, места и серии. Только за сегодня — допиши <code class="k">&amp;period=today</code>.' },
+  { k: 'main', link: 'obsMain', name: 'Барабан', size: '760×320', w: 760, img: 'img/w-main.webp', wide: true,
+    note: 'Только твой спин крупно: лента рулетки и челлендж. Широкий (1920×460) — допиши <code class="k">&amp;size=big</code>.' },
+  { k: 'feed', link: 'obsFeed', name: 'Лента друзей', size: '480×600', w: 480, img: 'img/w-feed.webp',
+    note: 'Спины друзей и их итоги по мере появления.' },
+];
+function renderObsGallery() {
   const own = inRoom() && RM.owner && !!(window.WR && WR.room);
-  const friend = inRoom() && !RM.owner;
-  $('#obsUrl').value = own ? roomLinks().obsTeam : dir + 'obs.html';
-  $('#obsUrl').parentElement.hidden = friend;
-  $('#obsHint').innerHTML = own
-    ? 'Добавь <b>Источник → Браузер</b> с этим адресом: виджет <b>«Команда»</b>, ширина <b>960</b>, высота <b>320</b> — твой танк в центре, друзья по бокам. Вторая ссылка, <b>«Серия»</b> (560×300), — в карточке «Комната». Фон прозрачный.'
-    : friend
-      ? 'Тебе OBS не нужен: твои спины и итоги сами появятся на стриме у стримера.'
-      : 'Чтобы на стриме были ты и друзья, создай комнату в карточке <b>«Комната»</b> — здесь появится ссылка на виджет <b>«Команда»</b> (960×320), а там — на <b>«Серию»</b>.';
-  $('#obsMode').innerHTML = own || friend ? ''
-    : 'Пока комнаты нет, этот адрес — одиночный виджет (760×320): он берёт твои спины с локального сервера, держи <b>start.bat</b> открытым.';
+  const solo = !inRoom();
+  const local = (HAS_SERVER ? location.origin + location.pathname.replace(/[^/]*$/, '') : 'http://localhost:8080/') + 'obs.html';
+  $('#obsNote').innerHTML = solo
+    ? 'Без комнаты работает только «Барабан» — он берёт спины с этого компьютера, держи <b>start.bat</b> открытым. Остальным виджетам нужна комната.'
+    : '';
+  // карточки не пересоздаём, пока та же комната — чтобы не сбивать выделение и фокус
+  const key = own ? RM.id : solo ? 'solo' : 'friend';
+  if ($('#obsGallery').dataset.key === key) return;
+  $('#obsGallery').dataset.key = key;
+  const L = own ? roomLinks() : null;
+  $('#obsGallery').innerHTML = WIDGETS.map(w => {
+    const url = own ? L[w.link] : solo && w.k === 'main' ? local : '';
+    const tail = url
+      ? `<div class="obslink"><input type="text" readonly value="${esc(url)}" aria-label="${w.name}: адрес"><button class="btn" data-copy="${esc(url)}"><span class="bi">Копировать</span><span class="vh">: ${w.name}</span></button></div>`
+      : `<div class="wlock">Нужна комната — тогда здесь будет ссылка. <button class="btn sm" data-sec="room"><span class="bi">Создать комнату</span></button></div>`;
+    return `<article class="wcard${w.rec ? ' rec' : ''}${w.wide ? ' wide' : ''}">
+      <div class="wprev"><img src="${w.img}" alt="Пример виджета «${w.name}»" style="width:min(100%,${w.w}px)" loading="lazy" decoding="async"></div>
+      <div class="wbody"><div class="wh"><span class="wn">${w.name}</span><span class="lnk-size">${w.size}</span>${w.rec ? '<span class="wrec">главный</span>' : ''}</div>
+        <div class="wnote">${w.note}</div>${tail}</div></article>`;
+  }).join('');
 }
 
 function renderRoom() {
   const solo = !inRoom();
+  const logged = tokenValid() && !!S.accountId;
   $('#roomSolo').hidden = !solo;
   $('#roomOwner').hidden = solo || !RM.owner;
   $('#roomFriend').hidden = solo || RM.owner;
   $('#clearHist').hidden = !solo;   // спины комнаты отсюда не удаляются
-  $('#roomBadge').textContent = solo ? '' : RM.conn === false ? 'нет связи' : RM.owner ? 'ты стример' : RM.me ? 'ты в игре' : 'гость';
-  renderObsCard();
-  if (solo) return;
-  const title = (RM.meta && RM.meta.title) || 'Комната';
-  if (RM.owner) renderOwnerRoom(title); else renderFriendRoom(title);
+  $('#roomCreate').disabled = !logged || roomCreating;
+  $('#roomCreateHint').textContent = logged ? '' : 'Сначала войди через Wargaming.';
+  renderObsGallery();
+  if (!solo) {
+    const title = (RM.meta && RM.meta.title) || 'Комната';
+    if (RM.owner) renderOwnerRoom(title); else renderFriendRoom(title);
+  }
+  renderGameTab();
   renderLook();
+  renderRail();
+  renderSettings();
+  renderIdle();
+  $('#regionRow').hidden = isFriend();   // друг входит на сервер комнаты — выбирать нечего
+  renderCheck();                          // подсказка «Сразу из игры» у друга своя
+}
+
+// Строка статуса справа: комната (связь, роль, друзья внутри, «Пригласить»)
+function friendAccs() { return Object.keys(RM.whitelist || {}).filter(a => a !== accStr() && !(RM.players[a] && RM.players[a].owner)); }
+function renderRail() {
+  const solo = !inRoom();
+  $('#railRoom').hidden = solo;
+  if (solo) return;
+  const off = RM.conn === false || !!RM.fatal;
+  $('#railDot').className = 'rail-dot' + (off ? ' off' : !RM.ready ? ' wait' : '');
+  $('#railRoomText').textContent = (RM.meta && RM.meta.title) || 'Комната';
+  let meta;
+  if (RM.owner) {
+    const fr = friendAccs(), inside = fr.filter(a => RM.players[a]).length;
+    meta = fr.length ? `друзья в комнате: ${inside} из ${fr.length}` : 'друзей пока нет';
+  } else meta = `код ${RM.id}` + (RM.meta ? ` · сервер ${String(RM.meta.region || 'eu').toUpperCase()}` : '');
+  $('#railRoomMeta').textContent = meta;
+  $('#roomBadge').textContent = RM.conn === false ? 'нет связи' : RM.owner ? 'ты стример' : RM.me ? 'ты в комнате' : 'гость';
+  $('#railInvite').hidden = !RM.owner;
+  $('#railInvite').disabled = !RM.claimed;
+}
+// «Пригласить»: скопировать ссылку для друзей; если в списке никого — сразу к полю ника
+function invite(e) {
+  if (!inRoom() || !RM.owner || !window.WR || !WR.room) return;
+  copyText(roomLinks().friends, e && e.currentTarget, () => { openSettings('room'); return $('#roLinks input'); });
+  if (!friendAccs().length) { openSettings('room'); if (!TOUCH) setTimeout(() => { if ($('#wlNick').offsetParent) $('#wlNick').focus(); }, 60); }
 }
 
 function renderOwnerRoom(title) {
   const region = ((RM.meta && RM.meta.region) || 'eu');
-  const wl = Object.entries(RM.whitelist || {});
   $('#roTitle').textContent = title;
-  $('#roMeta').textContent = `Код ${RM.id} · сервер ${region.toUpperCase()} · в списке ${wl.length}`;
+  $('#roMeta').textContent = `Код ${RM.id} · сервер ${region.toUpperCase()}`;
   // ссылки не меняются, пока комната та же — не трогаем (чтобы не сбивать выделение)
   if ($('#roLinks').dataset.room !== RM.id && window.WR && WR.room) {
     // localhost друзьям не открыть, а OBS без start.bat — все ссылки ведут на сайт
     const local = localPanel();
     const L = roomLinks();
-    $('#roLinks').innerHTML = linkRow('Ссылка для друзей', L.friends, 'Отправь друзьям: откроют, войдут через Wargaming — и в игре, если ник есть в списке ниже.'
-        + (local ? ' Ссылки комнаты ведут на сайт рулетки (GitHub Pages) — там должна быть выложена эта версия.' : ''))
-      + linkRow('OBS: команда', L.obsTeam, 'Источник «Браузер» <b>960×320</b> — три танка в ряд: твой в центре, друзья по бокам, под каждым челлендж и итог.')
-      + linkRow('OBS: серия', L.obsSeries, '<b>560×300</b> — серии выполнений и провалов у каждого игрока.')
-      + linkRow('В игре (мод WotStat)', gameLink(), gameHint()) + LOOK_ROW
-      + `<details class="more-links"><summary>Другие виджеты</summary>`
-      + linkRow('OBS: барабан', L.obsMain, '<b>760×320</b> — только твой спин с барабаном. Широкий, как раньше (1920×460), — допиши <code class="k">&amp;size=big</code>.')
-      + linkRow('OBS: лента друзей', L.obsFeed, '<b>480×600</b> — спины друзей и их итоги по мере появления.')
-      + linkRow('OBS: таблица', L.obsBoard, '<b>480×420</b> — выполнено / провалено у каждого игрока.')
-      + `</details>`;
-    $('#roAdmin').innerHTML = L.admin ? linkRow('Админ-ссылка', L.admin) : '';
+    $('#roLinks').innerHTML = linkItem('Ссылка для друзей', L.friends, { note: 'Друг откроет её, войдёт через Wargaming и сможет крутить, если его ник есть в списке ниже.'
+        + (local ? ' Ссылки комнаты ведут на сайт рулетки (GitHub Pages) — там должна быть выложена эта версия.' : '') });
+    $('#roAdmin').innerHTML = L.admin ? linkItem('Админ-ссылка', L.admin, { masked: true, note: '⚠️ Только для тебя: с ней любой станет владельцем комнаты. Не показывай на стриме. Нужна, чтобы открыть комнату на другом компьютере или в другом браузере.' }) : '';
     $('#roLinks').dataset.room = RM.id;
   }
-  const rows = wl.map(([acc, w]) => ({ acc, nick: (w && w.nick) || acc, p: RM.players[acc] || null }))
-    .sort((a, b) => (+!!(b.p && b.p.owner) - +!!(a.p && a.p.owner)) || a.nick.localeCompare(b.nick, 'ru'));
-  $('#wlList').innerHTML = rows.map(x => {
-    const own = !!(x.p && x.p.owner);
-    const st = own ? 'стример' : x.p ? 'в комнате' : 'ещё не заходил';
-    return `<div class="wl-item ${x.p && !own ? 'on' : ''}"><span class="wl-nick">${esc(x.nick)}</span><span class="wl-st">${st}</span>`
-      + (own ? '' : `<button class="hbtn" data-wl-rm="${esc(x.acc)}" title="Убрать из комнаты">✖</button>`) + '</div>';
-  }).join('') || '<div class="hint" style="margin-top:0">Список пуст</div>';
+  // список друзей (себя не показываем — ты и так стример)
+  const rows = friendAccs().map(acc => ({ acc, nick: (RM.whitelist[acc] && RM.whitelist[acc].nick) || acc, p: RM.players[acc] || null }))
+    .sort((a, b) => a.nick.localeCompare(b.nick, 'ru'));
+  keepFocus($('#wlList'), ['data-wl-rm'], () => $('#wlList').innerHTML = rows.map(x => `<div class="wl-item ${x.p ? 'on' : ''}"><span class="wl-nick">${esc(x.nick)}</span><span class="wl-st">${x.p ? 'в комнате' : 'ещё не заходил'}</span>`
+    + `<button class="hbtn" data-wl-rm="${esc(x.acc)}" title="Убрать из комнаты" aria-label="Убрать ${esc(x.nick)} из комнаты">✖</button></div>`).join('')
+    || '<div class="hint" style="margin-top:0">Пока никого — добавь ник друга.</div>');
   $('#wlHint').textContent = `Ник ищется на сервере комнаты (${region.toUpperCase()}). Войти и крутить смогут только ники из этого списка.`;
   const setSel = (sel, v) => { if (document.activeElement !== sel && v != null) sel.value = String(v); };
   setSel($('#rmMax'), RM.meta ? RM.meta.maxActive : null);
@@ -2350,31 +2776,54 @@ function renderOwnerRoom(title) {
   $('#wlAdd').disabled = !RM.claimed;
 }
 
-// окно внутри игры: мод WotStat «Виджеты» → «Добавить виджет» → эта ссылка (своя у каждого игрока)
-function gameHint() {
-  return 'Мод <b>WotStat «Виджеты»</b> (wotstat.info/widgets) → в игре «Добавить виджет» → вставь ссылку. '
-    + 'Твой челлендж прямо в игре: в ангаре подскажет, тот ли танк выбран, в бою — прогресс вживую, после боя — итог. Ниже — друзья. Ширина ~360, высота подстроится сама.';
-}
+// «В игре»: ссылка для мода WotStat «Виджеты» — у стримера и у вошедшего друга (своя у каждого)
 function gameLink() { return roomLinks().game + (accStr() ? '&acc=' + encodeURIComponent(accStr()) : ''); }
+function renderGameTab() {
+  const solo = !inRoom();
+  $('#gameSolo').hidden = !solo;
+  $('#roGame').hidden = solo || !RM.owner;
+  $('#rfGame').hidden = solo || RM.owner;
+  if (solo || !window.WR || !WR.room) return;
+  // ссылка не меняется, пока та же комната и тот же игрок — не трогаем, чтобы не сбивать выделение
+  const note = 'Своя у каждого игрока. Окно только показывает: итог в комнату записывает проверка в панели.';
+  if (RM.owner) {
+    const key = RM.id + ':' + accStr();
+    if ($('#roGame').dataset.key !== key) { $('#roGame').innerHTML = linkItem('Ссылка для игры', gameLink(), { note }); $('#roGame').dataset.key = key; }
+  } else {
+    const me = RM.me && RM.me.acc === accStr() ? RM.me : null;
+    const key = me ? RM.id + ':' + accStr() : '-';
+    if ($('#rfGame').dataset.key !== key) {
+      $('#rfGame').innerHTML = me ? linkItem('Ссылка для игры', gameLink(), { note }) : '<div class="hint" style="margin-top:0">Ссылка появится, когда войдёшь в комнату.</div>';
+      $('#rfGame').dataset.key = key;
+    }
+  }
+}
+
 // Вид окна в игре — у каждого игрока свой (players/{acc}/look в комнате). Окно в игре меняется сразу,
-// ссылку в моде трогать не нужно. &look= в ссылке окна важнее этой настройки
-const LOOK_ROW = '<div class="look-row" data-look-row></div>';
-// картинки — настоящее окно в бою (2x, designs/previews → img/*.webp)
+// ссылку в моде трогать не нужно. &look= в ссылке окна важнее этой настройки.
+// Картинки — настоящее окно в бою (2x, designs/previews → img/*.webp)
 const LOOK_OPTS = [
   ['efir', 'Эфир', 'Лента рулетки в ангаре, крупный танк в бою', 'img/look-efir.webp', 720, 597],
   ['mini', 'Минимал', 'Компактная карточка — те же цифры, меньше места', 'img/look-mini.webp', 720, 300],
 ];
 function myLook() { const p = inRoom() ? RM.players[accStr()] : null; return p && p.look === 'mini' ? 'mini' : 'efir'; }
+// менять вид может только тот, кто в комнате с этого браузера: стример с правами или вошедший друг
+function lookEditable() { const p = inRoom() ? RM.players[accStr()] : null; return !!p && (RM.owner ? !!RM.claimed : !!(RM.me && RM.me.acc === accStr())); }
 function renderLook() {
   const cur = myLook();
+  const can = lookEditable();
   document.querySelectorAll('[data-look-row]').forEach(el => {
     if (!el.firstChild) {
-      el.innerHTML = '<label class="f">Вид окна в игре</label><div class="looks" role="radiogroup" aria-label="Вид окна в игре">'
+      el.innerHTML = '<h3 class="sec">Вид окна</h3><div class="looks" role="radiogroup" aria-label="Вид окна в игре">'
         + LOOK_OPTS.map(([k, n, d, src, w, h]) => `<button type="button" class="look" role="radio" data-look="${k}">`
           + `<img src="${src}" width="${w}" height="${h}" alt="Окно в игре — вид «${n}»" decoding="async">`
           + `<span class="lk-h"><span class="lk-n">${n}</span><span class="lk-ok">✓ выбран</span></span><span class="lk-d">${d}</span></button>`).join('')
-        + '</div><div class="hint">Меняется сразу — ссылку в моде трогать не нужно.</div>';
+        + '</div><div class="hint lk-note"></div>';
     }
+    el.querySelector('.lk-note').textContent = can ? 'Меняется сразу — ссылку в моде трогать не нужно.' : 'Вид выбирается в комнате — у каждого игрока свой.';
+    const g = el.querySelector('.looks');
+    g.setAttribute('aria-disabled', String(!can));
+    g.querySelectorAll('[data-look]').forEach(b => b.setAttribute('aria-disabled', String(!can)));
     if (el.dataset.cur === cur) return; // разметку не пересоздаём — фокус и наведение не сбиваются
     el.dataset.cur = cur;
     el.querySelectorAll('[data-look]').forEach(b => {
@@ -2385,7 +2834,7 @@ function renderLook() {
 }
 async function setLook(look) {
   const acc = accStr(), p = inRoom() && acc ? RM.players[acc] : null;
-  if (!p) return toast('Сначала войди в комнату');
+  if (!p || !lookEditable()) return toast('Сначала войди в комнату');
   if (myLook() === look) return;
   const prev = p.look;
   p.look = look; renderLook(); // сразу, не дожидаясь базы
@@ -2397,30 +2846,25 @@ async function setLook(look) {
 function renderFriendRoom(title) {
   const logged = tokenValid() && !!S.accountId;
   const me = RM.me && RM.me.acc === accStr() ? RM.me : null;
-  // ссылка не меняется, пока та же комната и тот же игрок — не трогаем, чтобы не сбивать выделение
-  const gkey = me && window.WR && WR.room ? RM.id + ':' + accStr() : '';
-  if ($('#rfGame').dataset.key !== gkey) {
-    $('#rfGame').innerHTML = gkey ? linkRow('В игре (мод WotStat)', gameLink(), gameHint()) + LOOK_ROW : '';
-    $('#rfGame').dataset.key = gkey;
-  }
   $('#rfTitle').textContent = title;
   $('#rfMeta').textContent = `Код ${RM.id}` + (RM.meta ? ` · сервер ${String(RM.meta.region || 'eu').toUpperCase()}` : '');
-  $('#rfLogin').hidden = logged;
-  $('#rfJoin').hidden = !logged || !!me || RM.joining || !!RM.fatal;
   const n = friendRerolls();
-  $('#rfHint').innerHTML = RM.fatal ? ''
+  $('#rfHint').innerHTML = RM.fatal ? esc(RM.fatal)
     : !logged ? 'Войди через Wargaming — проверю, есть ли твой ник в списке игроков этой комнаты.'
-    : me ? `Ты в игре как <b>${esc(me.nick)}</b>. Крути рулетку: челлендж увидят стример и зрители, после боя он проверится сам. Тебе выпадают только автоматические челленджи, ${n ? `перекрутить можно ${n} ${n >= 2 && n <= 4 ? 'раза' : 'раз'} за спин` : 'перекрутка выключена'}.`
+    : me ? `Ты в комнате как <b>${esc(me.nick)}</b>. Крути рулетку: челлендж увидят стример и зрители, после боя он проверится сам. Тебе выпадают челленджи, которые проверяются сами; ${n ? `перекрутить можно ${n} ${n >= 2 && n <= 4 ? 'раза' : 'раз'} за спин` : 'перекрутка выключена'}, челленджей сразу — до ${maxActive()}.`
     : RM.joining ? 'Вхожу в комнату…'
-    : 'Нажми «Войти в комнату».';
+    : (RM.joinErr === 'NOT_WHITELISTED' || RM.kicked) && RM.meta && REGIONS[RM.meta.region] && RM.meta.region !== S.region
+      ? `Комната на сервере ${esc(String(RM.meta.region).toUpperCase())}, а ты вошёл на ${esc(String(S.region).toUpperCase())} — войди через Wargaming ещё раз.`
+    : RM.kicked ? 'Стример убрал тебя из комнаты — крутить здесь больше нельзя.'
+    : RM.joinErr === 'NOT_WHITELISTED' ? `Ника ${esc(S.nick || '')} нет в списке этой комнаты — попроси стримера добавить тебя.`
+    : 'Ты ещё не в комнате.';
 }
 
-// Игроки комнаты: стример видит всех, друг — себя
 function roomPlayersList() {
   const accs = new Set([...Object.keys(RM.whitelist || {}), ...Object.keys(RM.players || {})]);
   let list = [...accs].map(acc => {
     const p = RM.players[acc] || null, w = RM.whitelist[acc] || null;
-    return { acc, nick: (p && p.nick) || (w && w.nick) || acc, owner: !!(p && p.owner), joined: !!p, region: (p && p.region) || '' };
+    return { acc, nick: (p && p.nick) || (w && w.nick) || acc, owner: !!(p && p.owner), joined: !!p, region: (p && typeof p.region === 'string' && p.region) || '' };
   });
   if (!RM.owner) list = list.filter(p => p.acc === accStr() && RM.me);
   return list.sort((a, b) => (+b.owner - +a.owner) || a.nick.localeCompare(b.nick, 'ru'));
@@ -2428,11 +2872,13 @@ function roomPlayersList() {
 
 function renderPlayers() {
   const card = $('#playersCard');
-  card.hidden = !inRoom();
-  if (!inRoom()) return;
+  card.hidden = !inRoom() || (isFriend() && !(RM.me && RM.me.acc === accStr()));
+  if (card.hidden) return;
+  card.querySelector('h2').textContent = isFriend() ? 'Твои челленджи' : 'Игроки комнаты';
   const all = Object.values(RM.spins).filter(shown);
   const list = roomPlayersList();
   let act = 0;
+  keepFocus($('#players'), ['data-sec', 'data-act', 'data-id'], () => {
   $('#players').innerHTML = list.map(p => {
     const mine = all.filter(s => String(s.acc) === p.acc);
     const active = mine.filter(isActive).sort((a, b) => (+b.ts || 0) - (+a.ts || 0));
@@ -2443,10 +2889,25 @@ function renderPlayers() {
       <div class="pl-head"><span class="pl-nick">${esc(p.nick)}</span>${p.owner ? '<span class="pl-tag">СТРИМЕР</span>' : ''}<span class="pl-meta">${esc(meta)}</span><span class="pl-cnt">⏳ ${active.length} / ${maxActive()}</span></div>
       ${active.length ? `<div class="hist">${active.map(s => spinRow(s, { live: true })).join('')}</div>` : '<div class="pl-empty">Нет активных челленджей</div>'}
     </div>`;
-  }).join('') || `<div class="empty-note">${RM.owner ? 'Добавь друзей в карточке «Комната» справа' : 'Войди в комнату, чтобы видеть свои челленджи'}</div>`;
+  }).join('') || `<div class="empty-note">${RM.owner ? 'Пока никого' : 'Войди в комнату, чтобы видеть свои челленджи'}</div>`;
+  if (RM.owner && !friendAccs().length) {
+    $('#players').insertAdjacentHTML('beforeend', '<div class="pl-empty pl-invite">Пока только ты — добавь ники друзей и отправь им ссылку. '
+      + '<button class="btn sm" data-sec="room"><span class="bi">Пригласить друзей</span></button></div>');
+  }
+  });
   $('#playersInfo').textContent = act ? `ждут боя: ${act}` : '';
 }
 
+// Перерисовка innerHTML без потери фокуса: та же кнопка (по data-атрибутам) снова в фокусе
+function keepFocus(box, attrs, paint) {
+  const a = document.activeElement;
+  const sel = box.contains(a) ? attrs.filter(n => a.hasAttribute(n)).map(n => `[${n}="${CSS.escape(a.getAttribute(n))}"]`).join('') : '';
+  paint();
+  if (sel && !box.contains(document.activeElement)) { const t = box.querySelector(sel); if (t) t.focus({ preventScroll: true }); }
+}
+// Итог действий со списком друзей — прямо под полем ника
+function wlSay(msg, err = false) { const el = $('#wlStatus'); el.textContent = msg || ''; el.classList.toggle('err', !!err); }
+const wlErr = e => (e && e.code === 'RULES_MISSING' ? roomErr(e, true) : wlSay((e && e.message) || String(e), true));
 // Добавить ник: account_id ищем через WG API (точное совпадение) на сервере комнаты
 async function wlAdd() {
   const inp = $('#wlNick'), nick = inp.value.trim();
@@ -2454,32 +2915,40 @@ async function wlAdd() {
   const region = (RM.meta && REGIONS[RM.meta.region] && RM.meta.region) || S.region;
   const btn = $('#wlAdd');
   btn.disabled = true;
-  roomSay(`Ищу ${nick}…`);
+  wlSay(`Ищу ${nick}…`);
   try {
     let a;
     try { a = await WR.tracker.findAccount({ apiBase: REGIONS[region].api, appId: S.appId, nick }); }
     catch (e) { throw new Error(`${nick}: ${e.message}`); }
     const acc = String(a.account_id);
-    if (RM.whitelist[acc]) { roomSay(`${a.nickname} уже в списке`); return; }
+    if (RM.whitelist[acc]) { wlSay(`${a.nickname} уже в списке`); return; }
     await WR.room.addToWhitelist(RM.id, { acc, nick: a.nickname });
     inp.value = '';
-    roomSay(`${a.nickname} добавлен — отправь ему ссылку для друзей`);
+    wlSay(`${a.nickname} добавлен — отправь ему ссылку для друзей`);
   } catch (e) {
-    roomErr(e, true);
+    wlErr(e);
   } finally { btn.disabled = !RM.claimed; }
 }
 async function wlRemove(acc) {
   const w = RM.whitelist[acc];
   if (!confirm(`Убрать ${(w && w.nick) || acc} из комнаты? Его незавершённые челленджи отменятся, остальные спины останутся, но крутить он больше не сможет.`)) return;
-  try { await WR.room.removeFromWhitelist(RM.id, acc); roomSay(`${(w && w.nick) || acc} убран из комнаты`); }
-  catch (e) { return roomErr(e, true); }
+  try { await WR.room.removeFromWhitelist(RM.id, acc); wlSay(`${(w && w.nick) || acc} убран из комнаты`); }
+  catch (e) { return wlErr(e); }
   // его активные челленджи иначе зависнут: в «Игроках комнаты» его больше нет
   const act = Object.values(RM.spins).filter(s => String(s.acc) === String(acc) && (s.status === 'pending' || s.status === 'ambiguous'));
   for (const s of act) await roomStore.resolve(s, { status: 'cancelled', result: { text: 'Игрок убран из комнаты', checkedAt: nowSrv(), by: 'manual' } }, { force: true });
 }
 async function setRoomMeta(patch) {
-  try { await WR.room.updateMeta(RM.id, patch); toast('Настройки комнаты сохранены'); }
-  catch (e) { roomErr(e, true); renderRoom(); }
+  const el = $('#rmStatus');
+  try {
+    await WR.room.updateMeta(RM.id, patch);
+    el.textContent = 'Сохранено ✓'; el.classList.remove('err');
+    clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ''; }, 2500);
+  } catch (e) {
+    if (e && e.code === 'RULES_MISSING') roomErr(e, true);
+    else { el.textContent = (e && e.message) || String(e); el.classList.add('err'); }
+    renderRoom();
+  }
 }
 
 // Обработчики карточки «Комната» (один раз)
@@ -2490,18 +2959,146 @@ function initRoomUI() {
   $('#roomLeave').onclick = leaveRoom;
   $('#roomReset').onclick = resetRoomSpins;
   $('#rfLeave').onclick = leaveRoom;
-  $('#rfLogin').onclick = login;
+  $('#idleSolo').onclick = leaveRoom;
+  $('#idleLoad').onclick = loadHangar;
+  $('#idleReload').onclick = retryRoom;
+  $('#railLogin').onclick = login;
+  $('#railInvite').onclick = invite;
   $('#rfJoin').onclick = joinRoom;
   $('#wlAdd').onclick = wlAdd;
   $('#wlNick').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); wlAdd(); } };
   $('#rmMax').onchange = e => setRoomMeta({ maxActive: +e.target.value });
   $('#rmRerolls').onchange = e => setRoomMeta({ friendRerolls: +e.target.value });
-  $('#roomCard').addEventListener('click', e => {
+  $('#roAdmin').addEventListener('copy', e => {
+    const b = $('#roAdmin [data-copy]'), inp = e.target;
+    if (b && inp && inp.tagName === 'INPUT' && inp.value !== b.dataset.copy && e.clipboardData) { e.preventDefault(); e.clipboardData.setData('text/plain', b.dataset.copy); }
+  });
+  // ссылки и список друзей — в разных разделах «Настроек»; слушаем на всей странице
+  document.addEventListener('click', e => {
+    if (!e.target.closest) return;
     const c = e.target.closest('[data-copy]');
-    if (c) return copyText(c.dataset.copy);
+    if (c) return copyText(c.dataset.copy, c);
     const r = e.target.closest('[data-wl-rm]');
     if (r) wlRemove(r.dataset.wlRm);
   });
+}
+
+// ---------- Настройки: поверх рулетки, #settings/раздел ----------
+// Последний открытый раздел помнится в этом браузере; у друга нет «Виджетов для OBS» (OBS ему не нужен)
+const UI_KEY = 'wotRoulette.ui.v1';
+const ui = Object.assign({ sec: '' }, loadJSON(UI_KEY, {}) || {});
+const SEC_ALL = ['start', 'room', 'obs', 'game', 'ch'];
+const setSecs = () => (isFriend() ? ['start', 'room', 'game', 'ch'] : SEC_ALL);
+const curSec = () => (setSecs().includes(ui.sec) ? ui.sec : 'start');
+let VIEW = 'home', shownSec = '';
+function route() {
+  const m = /^#settings(?:\/(\w+))?$/.exec(location.hash);
+  const was = VIEW;
+  VIEW = m ? 'settings' : 'home';
+  if (m && m[1] && setSecs().includes(m[1]) && ui.sec !== m[1]) { ui.sec = m[1]; saveJSON(UI_KEY, ui); }
+  $('#settings').hidden = VIEW !== 'settings';
+  document.documentElement.classList.toggle('set-open', VIEW === 'settings');
+  renderSettings();
+  if (VIEW === 'settings' && (was !== 'settings' || shownSec !== curSec())) {
+    shownSec = curSec();
+    $('#settings').scrollTop = 0;
+    // на телефоне меню разделов — полоса с прокруткой: открытый раздел должен быть в ней виден
+    const cur = $('#setNav [aria-current=page]'), nav = $('#setNav');
+    if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2;
+    $('#h-' + shownSec).focus({ preventScroll: true });   // клавиатура и диктор — сразу в начале раздела
+  }
+  if (VIEW === 'home' && was === 'settings') {
+    shownSec = '';
+    if ($('#settings').contains(document.activeElement)) document.activeElement.blur();   // Пробел снова крутит
+  }
+}
+// открыть раздел (синхронно: после этого его поля уже видны)
+function openSettings(sec) {
+  const target = '#settings' + (sec ? '/' + sec : '');
+  if (location.hash !== target) history.pushState(null, '', target);
+  route();
+}
+function closeSettings() {
+  if (VIEW !== 'settings') return;
+  history.pushState(null, '', location.pathname + location.search);
+  route();
+}
+function renderSettings() {
+  const secs = setSecs(), cur = curSec();
+  for (const a of document.querySelectorAll('#setNav [data-sec-link]')) {
+    const k = a.dataset.secLink;
+    a.hidden = !secs.includes(k);
+    if (k === cur) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+  for (const k of SEC_ALL) $('#sec-' + k).hidden = k !== cur;
+  const fr = isFriend();   // другу выпадают только автоматические — ручные и свои строки ему ни к чему
+  $('#chOwn').hidden = fr; $('#chFriend').hidden = !fr;
+  $('#qObsRow').hidden = fr;
+  renderGuide(); renderQuick();
+}
+// Быстрый старт: шаги с отметкой «готово» — что сделано, видно сразу
+function guideSteps() {
+  const logged = !!(tokenValid() && S.accountId);   // tokenValid() без входа даёт null — нужен честный false
+  if (isFriend()) {
+    const joined = !!(RM.me && RM.me.acc === accStr());
+    return [
+      { t: 'Войди через Wargaming', d: 'Рулетка возьмёт танки из твоего ангара. Вход — на сервер комнаты.', ok: logged, act: logged ? null : ['login', 'Войти'] },
+      { t: 'Войди в комнату', d: 'Стример должен добавить твой ник в список. Кнопка входа — на барабане.', ok: joined, act: joined ? null : ['home', 'К барабану'] },
+      { t: 'Поставь окно в игру', d: 'Мод WotStat «Виджеты» и твоя ссылка — челлендж и прогресс будут видны прямо в бою.', ok: null, act: ['game', 'Открыть'] },
+      { t: 'Крути!', d: 'Челлендж увидят стример и зрители, после боя он проверится сам.', ok: null, act: ['home', 'К рулетке'] },
+    ];
+  }
+  const room = inRoom() && RM.owner;
+  const nf = room ? friendAccs().length : 0;
+  return [
+    { t: 'Войди через Wargaming', d: 'Рулетка возьмёт танки, которые сейчас стоят у тебя в ангаре.', ok: logged, act: logged ? null : ['login', 'Войти'] },
+    { t: 'Создай комнату', d: 'Чтобы на стриме были и друзья. Без комнаты рулетка только твоя.', ok: room, act: room ? null : ['room', 'Создать'] },
+    { t: 'Добавь друзей и отправь им ссылку', d: !room ? 'После создания комнаты: ники друзей — в список, ссылку — им.' : nf ? `В списке: ${nf}. Отправь им ссылку для друзей.` : 'Впиши ники друзей и отправь им ссылку.', ok: nf > 0, act: ['room', 'Открыть'] },
+    { t: 'Выбери виджеты для OBS', d: 'Посмотри примеры и возьми нужные: «Команда» и «Серия» — главные.', ok: null, act: ['obs', 'Выбрать'] },
+    { t: 'Поставь окно в игру', d: 'Мод WotStat «Виджеты» — челлендж прямо в бою. Вид — «Эфир» или «Минимал».', ok: null, act: ['game', 'Открыть'] },
+    { t: 'Проверка боёв', d: S.gameCheck ? 'Сейчас — сразу из игры (мод на этом компьютере).' : 'Сейчас — через Wargaming, работает у всех. С модом можно «Сразу из игры».', ok: null, act: ['game', 'Настроить'] },
+  ];
+}
+function renderGuide() {
+  const steps = guideSteps();
+  const next = steps.findIndex(x => x.ok === false);
+  const done = steps.filter(x => x.ok === true).length, need = steps.filter(x => x.ok !== null).length;
+  $('#guideLead').textContent = isFriend() ? 'Что нужно другу стримера — пара минут.' : 'Шаги по порядку — и рулетка на стриме и в игре.';
+  const html = steps.map((x, i) => `<li class="gstep ${x.ok ? 'ok' : i === next ? 'next' : ''}">`
+    + `<span class="gnum"><span>${x.ok ? '✓' : i + 1}</span></span><span class="gtx"><b>${x.t}</b><span>${esc(x.d)}</span></span>`
+    + (x.act ? `<button class="btn sm${i === next ? ' primary' : ''}" data-gact="${x.act[0]}"><span class="bi">${x.act[1]}</span></button>` : '<span></span>') + '</li>').join('');
+  // перерисовка без потери фокуса на кнопке шага
+  if ($('#guide').dataset.html !== html) keepFocus($('#guide'), ['data-gact'], () => { $('#guide').innerHTML = html; $('#guide').dataset.html = html; });
+  $('#qStart').textContent = need ? `сделано ${done} из ${need}` : 'гайд по шагам';
+}
+// меню «Настроить» справа: по строке о каждом разделе
+function renderQuick() {
+  const own = inRoom() && RM.owner;
+  $('#qObs').textContent = own ? 'Команда, Серия и ещё 3 — с примерами' : inRoom() ? '' : 'без комнаты — только «Барабан»';
+  $('#qGame').textContent = `${myLook() === 'mini' ? 'Минимал' : 'Эфир'} · итог ${S.gameCheck ? 'сразу из игры' : 'через Wargaming'}`;
+  if (!inRoom()) $('#qRoom').textContent = 'создай, чтобы играть с друзьями';
+  else if (RM.owner) { const fr = friendAccs(), inside = fr.filter(a => RM.players[a]).length; $('#qRoom').textContent = fr.length ? `друзья в комнате: ${inside} из ${fr.length}` : 'добавь друзей'; }
+  else $('#qRoom').textContent = RM.me ? 'ты в комнате' : 'ты ещё не в комнате';
+}
+function initSettings() {
+  addEventListener('hashchange', route);
+  addEventListener('popstate', route);
+  $('#setBack').onclick = e => { e.preventDefault(); closeSettings(); };
+  $('#navSettings').onclick = e => { e.preventDefault(); if (VIEW === 'settings') closeSettings(); else openSettings(); };
+  // ссылки разделов и меню справа — без перезагрузки
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a[href^="#settings"]');
+    if (a && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); openSettings((a.getAttribute('href').split('/')[1]) || ''); }
+  });
+  // кнопки «Создать комнату», «Пригласить друзей»… в любом месте ведут в нужный раздел
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-sec]'); if (b) openSettings(b.dataset.sec); });
+  $('#guide').addEventListener('click', e => {
+    const b = e.target.closest('[data-gact]'); if (!b) return;
+    const a = b.dataset.gact;
+    if (a === 'login') login(); else if (a === 'home') closeSettings(); else openSettings(a);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && VIEW === 'settings' && !e.defaultPrevented) { e.preventDefault(); closeSettings(); } });
+  route();
 }
 
 // ---------- Инициализация ----------
@@ -2516,6 +3113,7 @@ function initPanel() {
 
   if (!HAS_SERVER) $('#obsWarn').innerHTML = '⚠️ Сейчас страница открыта как файл. Для OBS и входа запусти <b>start.bat</b>.';
   initRoomUI();
+  initSettings();
 
   $('#region').onchange = e => { S.region = e.target.value; S.token = null; S.accountId = null; save(); renderAuth(); };
   $('#loadBtn').onclick = loadHangar;
@@ -2524,15 +3122,30 @@ function initPanel() {
   $('#onlyPrem').onchange = e => { S.onlyPrem = e.target.checked; save(); renderPool(); };
   $('#sound').onchange = e => { S.sound = e.target.checked; save(); };
   $('#checkMode').onclick = e => { const c = e.target.closest('[data-mode]'); if (c) setCheckMode(c.dataset.mode === 'game'); };
+  // стрелки — как у радио-кнопок
+  $('#checkMode').onkeydown = e => {
+    if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    const other = [...$('#checkMode').children].find(b => b !== document.activeElement);
+    if (other) { setCheckMode(other.dataset.mode === 'game'); other.focus(); }
+  };
+  $('#filtersToggle').onclick = () => { const on = $('#poolCard').classList.toggle('show-filters'); $('#filtersToggle').setAttribute('aria-expanded', String(on)); };
+  // кнопка прячется сама — фокус на список, который она открыла (tabindex -1: Пробел по-прежнему крутит)
+  $('#histMore').onclick = () => { $('#histCard').classList.add('all'); const h = $('#hist'); h.tabIndex = -1; h.focus({ preventScroll: true }); };
   $('#chAuto').onchange = onChallengeToggle;
   $('#chManual').onchange = onChallengeToggle;
   $('#chCustom').oninput = e => { S.customManual = e.target.value; save(); updateChCount(); };
   $('#chReset').onclick = () => {
+    if (isFriend()) {
+      const auto = new Set(WR.catalog.list().filter(d => d.auto).map(d => d.id));
+      S.challengeOff = S.challengeOff.filter(id => !auto.has(id)); save(); renderChallengeSettings();
+      return toast('Челленджи сброшены');
+    }
     if (String(S.customManual || '').trim() && !confirm('Включить все челленджи и удалить свои строки?')) return;
     S.challengeOff = []; S.customManual = ''; save(); renderChallengeSettings();
     toast('Челленджи сброшены');
   };
-  $('#copyObs').onclick = () => { navigator.clipboard?.writeText($('#obsUrl').value).then(() => toast('Ссылка скопирована'), () => $('#obsUrl').select()); };
 
   $('#tierChips').onclick = e => {
     const el = e.target.closest('[data-tier]'); if (!el) return;
@@ -2550,7 +3163,7 @@ function initPanel() {
   };
   // фишки работают и с клавиатуры (Enter / Пробел), не запуская рулетку
   // (Пробел сюда доходит только после Tab — мышью нажатая фишка Пробел не перехватывает, см. ниже)
-  for (const id of ['#tierChips', '#typeChips', '#checkMode']) {
+  for (const id of ['#tierChips', '#typeChips']) {
     $(id).onkeydown = e => {
       if ((e.key === 'Enter' || e.code === 'Space') && e.target.classList.contains('chip')) {
         e.preventDefault(); e.stopPropagation(); e.target.click();
@@ -2606,6 +3219,8 @@ function initPanel() {
     const c = e.target.closest && e.target.closest('[data-look]');
     if (!c || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
     e.preventDefault();
+    if (e.repeat) return;
+    if (c.getAttribute('aria-disabled') === 'true') return toast('Сначала войди в комнату');
     const other = [...c.parentNode.querySelectorAll('[data-look]')].find(x => x !== c);
     if (other) { other.focus(); setLook(other.dataset.look); }
   });
@@ -2615,11 +3230,12 @@ function initPanel() {
   let kbNav = false;
   document.addEventListener('pointerdown', () => { kbNav = false; }, true);
   document.addEventListener('keydown', e => {
-    if (e.key === 'Tab' || /^(Arrow\w+|Home|End)$/.test(e.key)) kbNav = true;
+    if (e.key === 'Tab' || (/^(Arrow\w+|Home|End)$/.test(e.key) && e.target.closest && e.target.closest('[role=tablist],[role=radiogroup]'))) kbNav = true;
     if (e.code !== 'Space' || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (VIEW === 'settings') return;   // в «Настройках» Пробел — как обычно (рулетку оттуда не видно)
     const a = document.activeElement;
-    if (a && (a.isContentEditable || a.matches('textarea, select, input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit])'))) return; // тут пишут текст
-    const control = a && a !== document.body && a.matches('button, summary, a[href], input, [tabindex]:not([tabindex="-1"]), [role=button], [role=radio]');
+    if (a && (a.isContentEditable || a.matches('textarea, input:not([readonly]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit])'))) return; // тут пишут текст
+    const control = a && a !== document.body && a.matches('button, summary, a[href], input, select, [tabindex]:not([tabindex="-1"]), [role=button], [role=radio]');
     if (control && kbNav) return;
     e.preventDefault(); e.stopPropagation();
     if (!e.repeat) spin();
