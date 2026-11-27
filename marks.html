@@ -1,0 +1,1866 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="wotstat-widget:auto-height" content="true">
+<title>Отметки на стволе</title>
+<link rel="icon" href="data:,">
+<!--
+  «Отметки на стволе» в моде WotStat «Виджеты»: игрок и танк — из игры (только приём). Свёрстано в 380 px.
+  ?demo=loop|hangar|queue|battle|edge|mark|ended|after|result|nodata|first|max|low|dead|offmode|replay|offline
+  &tank=hacker|stk2|e100|is4|strv|ms1|<nation:Tag> &still=<мс> &speed=<x>; ?test=1 — без связи, window.mkMsg(obj).
+  Мод шлёт игре каждый кадр: в покое — ни анимаций, ни записей в DOM; только конечные твины ≤ 1,1 с.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&display=swap" rel="stylesheet">
+<style>
+:root{--text:#f3f3f8;--muted:#8d8da3;--dim:#5c5c70;
+  --a1:#f5a524;--a2:#ffd66b;--grad:linear-gradient(100deg,#e8970f 0%,#ffd66b 100%);--on-gold:#1f1504;
+  --grad-tab:linear-gradient(100deg,#d48a10 0%,#ffcf5c 100%);
+  --ok:#2ee59d;--ok2:#14b877;--fail:#ff3d5a;--fail2:#c0163a;--amb:#fff0c2;--amb2:#ffd66b;
+  --dn:linear-gradient(100deg,#9b1230,#e0294a);
+  --fd:Montserrat,Inter,system-ui,sans-serif;--fu:Inter,system-ui,sans-serif;
+  --mk-w:380px;--mk-pl:20px;--mk-pr:18px;--mk-cut:14px;
+  --mk-card:radial-gradient(70% 55% at 18% 0%,rgba(245,165,36,.14),transparent 70%),radial-gradient(60% 50% at 100% 100%,rgba(255,214,107,.05),transparent 70%),linear-gradient(180deg,rgba(31,28,33,.965),rgba(12,11,14,.965));
+  --mk-big:linear-gradient(100deg,#fff 0%,#fff1cc 38%,#ffc23d 100%);
+  --mk-big-max:linear-gradient(100deg,#fff 0%,#c9ffe9 45%,#2ee59d 100%);
+  --mk-label:#f4c35e;--mk-body:#c9cad8;--mk-note:#a9abbd;--mk-src:#7d8095;
+  --mk-assist:#bdf3ff;--mk-up:#2ee59d;--mk-down:#ff5c7a;
+  --mk-fill:linear-gradient(90deg,#6e3f06,#e8970f 45%,#ffd66b);--mk-fill-ok:linear-gradient(90deg,#0f8a5b,#2ee59d);
+  --mk-zone-plus:rgba(46,229,157,.10);--mk-zone-mark:rgba(255,236,180,.10);--ts:0 1px 3px rgba(0,0,0,.85)}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent!important;overflow:hidden}
+body{pointer-events:none;user-select:none;font:14px/1.45 var(--fu);color:var(--text);-webkit-font-smoothing:antialiased}
+#mk{width:380px}
+#mk,#mk *{animation:none!important;transition:none!important} /* движение — только твины на JS */
+#mkHint{margin:4px 14px 2px 22px;padding:6px 10px;border-radius:3px;background:rgba(12,12,18,.92);box-shadow:inset 0 0 0 1px rgba(245,165,36,.45);font:700 12px/1.3 var(--fu);color:var(--mk-label)}
+#mkHint[hidden],.mk [hidden]{display:none!important}
+/* оболочка как «Эфир» */
+.mk{--edge:rgba(255,255,255,.16);--eglow:none;position:relative;width:380px;isolation:isolate;color:var(--text);font:14px/1.45 var(--fu);text-align:left}
+.mk .sh{position:absolute;left:14px;right:14px;top:12px;bottom:-8px;z-index:-3;background:rgba(0,0,0,.55);filter:blur(14px)}
+.mk .bgp{position:absolute;inset:0;z-index:-2;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);background:var(--mk-card)}
+.mk::before{content:"";position:absolute;left:14px;right:0;top:0;height:3px;z-index:5;background:var(--grad);box-shadow:0 0 12px rgba(245,165,36,.6),0 0 3px rgba(255,214,107,.9)}
+.mk::after{content:"";position:absolute;left:0;right:14px;bottom:0;height:3px;z-index:5;background:var(--edge);box-shadow:var(--eglow)}
+.mk.s-ok{--edge:linear-gradient(90deg,var(--ok2),var(--ok));--eglow:0 0 12px rgba(46,229,157,.7)}
+.mk.s-bt{--edge:linear-gradient(90deg,#a8650e,#f5a524)}
+.mk .hl{position:absolute;inset:0;z-index:7;opacity:0;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);box-shadow:inset 0 0 0 2px var(--hlc,#ffd66b),inset 0 0 54px var(--hlg,rgba(245,165,36,.5))}
+.mk.s-ok .hl{--hlc:var(--ok);--hlg:rgba(46,229,157,.45)}
+.mk .hero{position:absolute;z-index:2}
+.mk .hero canvas,.mk .hero svg{position:absolute;left:0;top:0;overflow:visible}
+.mk .hero .ring .hot,.mk .hero .ring .fl,.mk .hero .ring .gl,.mk .chart .lq{transform-box:fill-box;transform-origin:center}
+.mk .lbl{display:flex;align-items:center;gap:8px;height:14px;font:800 italic 11px/1 var(--fd);letter-spacing:.17em;color:var(--mk-label);text-shadow:var(--ts);text-transform:uppercase;white-space:nowrap}
+.mk .lbl::before{content:"";flex:0 0 18px;height:3px;background:var(--grad);transform:skewX(-30deg)}
+/* вкладка-статус */
+.mk .tabs{position:absolute;left:22px;bottom:100%;margin-bottom:-2px;z-index:6;display:flex;gap:6px;max-width:280px}
+.mk .chipst{display:inline-flex;align-items:center;height:21px;padding:0 10px;border-radius:3px;transform:skewX(-12deg);font:900 italic 11px/1 var(--fd);letter-spacing:.08em;white-space:nowrap}
+.mk .chipst.brand{background:var(--grad-tab);color:var(--on-gold);box-shadow:0 3px 14px rgba(245,165,36,.35)}
+.mk .chipst.bt{background:var(--grad);color:var(--on-gold);box-shadow:0 3px 12px rgba(245,165,36,.35)}
+.mk .chipst.ok{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c}
+.mk .chipst.dn{background:var(--dn);color:#fff}
+.mk .chipst.mut{background:linear-gradient(100deg,#2b2c38,#3d3f4f);color:#c9cad8;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.mk .chipst.wait{background:rgba(245,165,36,.14);color:#ffd27a;box-shadow:inset 0 0 0 1px rgba(245,165,36,.5)}
+.mk .stamp{position:absolute;z-index:8;display:inline-flex;align-items:center;padding:7px 12px;border-radius:4px;transform:skewX(-14deg) rotate(-4deg);font:900 italic 15px/1 var(--fd);letter-spacing:.02em;white-space:nowrap;background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c;box-shadow:0 6px 18px rgba(46,229,157,.45)}
+.mk .stamp>span{display:inline-flex;align-items:center;gap:6px;transform:skewX(14deg)}
+.mk .tabs .stamp{position:relative;padding:5px 11px;font-size:12px}
+/* ангар */
+.mk .hg-top{position:relative}
+.mk .hg-top .l{position:absolute;left:20px;top:17px;z-index:3;width:226px}
+.mk .nm{display:flex;align-items:center;gap:6px;min-width:0;height:20px}
+.mk .tier{display:inline-flex;align-items:center;flex:0 0 auto;height:20px;padding:0 8px;border-radius:3px;transform:skewX(-12deg);background:var(--grad);color:var(--on-gold);font:900 italic 12px/1 var(--fd);letter-spacing:.03em;box-shadow:0 0 14px rgba(245,165,36,.35)}
+.mk .cls{display:inline-flex;align-items:center;flex:0 0 auto;height:20px;padding:0 6px;border-radius:3px;border:1px solid var(--cc,#aaa);background:var(--ccs,rgba(255,255,255,.08));color:var(--cc,#ddd);font:800 11px/1 var(--fu);letter-spacing:.06em}
+.c-lt{--cc:#3ddc84;--ccs:rgba(61,220,132,.14)}.c-st{--cc:#ffcf3f;--ccs:rgba(255,207,63,.14)}.c-tt{--cc:#ff6150;--ccs:rgba(255,97,80,.14)}.c-pt{--cc:#4aa8ff;--ccs:rgba(74,168,255,.14)}.c-spg{--cc:#c18cff;--ccs:rgba(193,140,255,.14)}
+.mk .name{min-width:0;padding-right:3px;margin-left:2px;font:900 italic 19px/1.08 var(--fd);letter-spacing:-.015em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 10px rgba(0,0,0,.75)}
+.mk .big{display:flex;align-items:baseline;font:900 italic 52px/.92 var(--fd);letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mk .hg-top .big{margin-top:13px}
+.mk .big b{font-weight:inherit;background:var(--mk-big);background-clip:text;color:transparent;padding-right:4px;filter:drop-shadow(0 3px 10px rgba(0,0,0,.55))}
+.mk .big i{font-style:normal;font-size:26px;letter-spacing:0;color:#ffc23d;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+.mk .big .ap{margin-right:3px}
+.mk .big.max b{background:var(--mk-big-max);background-clip:text}
+.mk .big.max i{color:var(--ok)}
+.mk .big.none b{background:none;color:#4a4b5c;-webkit-text-fill-color:#4a4b5c;filter:none}.mk .big.none i{color:#4a4b5c}
+.mk .sub,.mk .sub2{font:600 12.5px/1.4 var(--fu);color:var(--mk-body);text-shadow:var(--ts);white-space:nowrap}
+.mk .sub2{margin-top:9px}.mk .sub{margin-top:12px;font-weight:700}
+.mk .sub b,.mk .sub2 b{color:#fff;font-weight:800}.mk .sub em,.mk .sub2 em{font-style:normal;color:var(--mk-label);font-weight:800}.mk .sub2 .g{color:var(--ok);font-weight:800}
+.mk .sec{position:relative;z-index:3;padding:0 18px 0 20px}
+.mk .sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px}
+.mk .sec-h .tr{font:800 italic 12px/1 var(--fd);color:var(--mk-body);white-space:nowrap;font-variant-numeric:tabular-nums}
+.mk .sec-h .tr .g{color:var(--ok)}.mk .sec-h .tr .r{color:#ff7389}
+.mk svg.chart{display:block;margin-top:6px;overflow:visible}
+.mk .empty{margin-top:8px;padding:12px 14px;font:600 12.5px/1.4 var(--fu);color:var(--mk-note);background:rgba(255,255,255,.04);border-radius:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.mk .empty b{display:block;margin-bottom:3px;font:900 italic 14px/1.2 var(--fd);color:#fff}
+.mk .need{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.mk .need.n2{grid-template-columns:repeat(2,minmax(0,1fr))}.mk .need:empty{display:none}
+.mk .tile{position:relative;padding:8px 10px 9px 12px;min-width:0}
+.mk .tile::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:4px;transform:skewX(-12deg);background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.mk .tile.hot::before{background:linear-gradient(100deg,rgba(245,165,36,.2),rgba(255,214,107,.08));box-shadow:inset 0 0 0 1px rgba(255,214,107,.45)}
+.mk .tile small{display:block;font:800 italic 10.5px/1.15 var(--fd);letter-spacing:.06em;color:#9a9cb0;text-transform:uppercase;white-space:nowrap}
+.mk .tile small.sq{font-size:9.5px;letter-spacing:0} /* длинная подпись — плотнее */
+.mk .tile.hot small{color:var(--mk-label)}
+.mk .tile b{display:block;margin-top:5px;font:800 20px/1 var(--fu);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:#fff;white-space:nowrap}
+.mk .src{margin:8px 0 0;padding-bottom:14px;font:600 10.5px/1.3 var(--fu);color:var(--mk-src);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk .low{position:relative;z-index:3;padding:0 20px 16px}
+/* бой */
+.mk .bt-top{position:relative;height:122px}
+.mk .bt-top .l{position:absolute;left:20px;top:16px;width:170px;z-index:3}
+.mk .bt-top .big{margin-top:9px;font-size:40px}
+.mk .bt-top .big i{font-size:21px}
+.mk .big .bd{margin-left:8px;font:700 12.5px/1 var(--fu);letter-spacing:0;color:var(--mk-note);text-shadow:var(--ts)}
+.mk .row2{display:flex;align-items:center;gap:9px;margin-top:9px}
+.mk .dl{display:inline-flex;align-items:center;flex:0 0 auto;height:24px;padding:0 9px;border-radius:3px;transform:skewX(-12deg);font:900 italic 14px/1 var(--fd);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mk .dl.up{background:linear-gradient(100deg,var(--ok2),var(--ok));color:#03150c;box-shadow:0 3px 12px rgba(46,229,157,.32)}
+.mk .dl.dn{background:var(--dn);color:#fff;box-shadow:0 3px 12px rgba(224,41,74,.3)}
+.mk .dl.zero{background:rgba(255,255,255,.12);color:#e6e6ef}
+.mk .dnote{font:700 12.5px/1 var(--fu);color:var(--mk-note);white-space:nowrap;text-shadow:var(--ts)}
+.mk .dmg{position:relative;z-index:3;display:flex;align-items:center;gap:9px;height:34px;padding:0 18px 0 20px}
+.mk .tag{display:inline-flex;align-items:center;flex:0 0 auto;height:19px;padding:0 7px;border-radius:2px;transform:skewX(-12deg);background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);color:#d8d8e6;font:900 italic 10.5px/1 var(--fd);letter-spacing:.1em;white-space:nowrap}
+.mk .chipst>span,.mk .tier>span,.mk .dl>span,.mk .tag>span{transform:skewX(12deg)}
+.mk .num{display:inline-block;font:800 30px/1 var(--fu);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6);transform-origin:0 70%}
+.mk .popslot{position:relative;flex:1 1 auto;align-self:stretch}
+.mk .pop{position:absolute;left:4px;top:50%;margin-top:-9px;opacity:0;font:900 italic 17px/1 var(--fd);color:#fff0c4;white-space:nowrap;text-shadow:0 0 12px rgba(245,165,36,.85),0 1px 2px #000}
+.mk .pop.as{color:var(--mk-assist);text-shadow:0 0 12px rgba(80,200,255,.8),0 1px 2px #000}
+.mk .trkw{position:relative;z-index:3;padding:8px 18px 0 20px}
+.mk .trk{position:relative;height:14px;clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%);background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.05))}
+.mk .trk .zn{position:absolute;top:0;bottom:0}
+.mk .trk .zn.plus{background:var(--mk-zone-plus)}.mk .trk .zn.mark{background:var(--mk-zone-mark)}
+.mk .trk .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--mk-fill) 0 0/342px 100% no-repeat}
+.mk .trk .fill.ok{background:var(--mk-fill-ok) 0 0/342px 100% no-repeat}
+.mk .trk .tip{position:absolute;right:0;top:0;bottom:0;width:3px;background:#fff;box-shadow:0 0 8px #fff,0 0 14px var(--a2)}
+.mk .trk .gain{position:absolute;top:0;bottom:0;opacity:0;background:linear-gradient(90deg,rgba(255,255,255,.2),rgba(255,255,255,.95))}
+.mk .trk .shine{position:absolute;top:0;bottom:0;left:0;width:70px;opacity:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);transform:skewX(-20deg)}
+.mk .trk .nt{position:absolute;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:rgba(10,10,16,.9)}
+.mk .trk .nt.hot{width:3px;margin-left:-1.5px;background:var(--amb);box-shadow:0 0 6px rgba(255,214,107,.85)}
+.mk .nts{position:relative;height:24px}
+.mk .nts span{position:absolute;top:5px;transform:translateX(-50%);font:700 11.5px/1.25 var(--fu);color:var(--mk-note);white-space:nowrap;text-shadow:var(--ts)}
+.mk .nts span b{font:900 italic 12px/1.2 var(--fd);letter-spacing:.05em;color:#d8d8e6;text-transform:uppercase}
+.mk .nts span::before{content:"";position:absolute;left:50%;top:-6px;width:1px;height:5px;background:rgba(255,255,255,.35)}
+.mk .nts span.n{left:auto;right:0;transform:none;text-align:right}.mk .nts span.n::before{left:auto;right:0}
+.mk .nts span.n b{color:var(--amb)}.mk .nts span.ok b{color:var(--ok)}
+.mk .nts span.e.l{transform:translateX(calc(-100% + 4px))}.mk .nts span.e.l::before{left:auto;right:3px}
+.mk .foot{position:relative;z-index:3;min-height:16px;padding:2px 18px 13px 20px;font:600 12.5px/1.3 var(--fu);color:#b9bccb;text-shadow:var(--ts)}
+.mk .foot b{color:#fff;font-weight:800;font-variant-numeric:tabular-nums}
+.mk .foot .g{color:var(--ok);font-weight:800}.mk .foot .r{color:#ff7389;font-weight:800}
+.mk .foot .fp{display:block;margin-top:4px;font-size:11.5px;color:#8d8fa3}
+.mk .burst{position:absolute;left:0;top:0;width:0;height:0;z-index:9}
+.mk .burst i{position:absolute;left:-3px;top:-1.5px;width:9px;height:3px;border-radius:2px;opacity:0;background:#fff1cc;box-shadow:0 0 8px #f5a524}
+.mk .burst i.g{background:#fff;box-shadow:0 0 8px #fff0c2}
+.mk .burst b{position:absolute;left:-10px;top:-10px;width:20px;height:20px;border-radius:50%;border:2px solid #fff1cc;box-shadow:0 0 14px #f5a524;opacity:0}
+/* компактные */
+.mk .cmpb{position:relative;z-index:3;padding:18px 20px 19px}
+.mk .cmpb b{display:block;font:900 italic 18px/1.15 var(--fd);color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+.mk .cmpb span{display:block;margin-top:6px;font:600 12.5px/1.35 var(--fu);color:var(--mk-note)}
+</style>
+</head>
+<body>
+<main id="mk" aria-hidden="true"><div id="mkCard"></div><div id="mkHint" hidden></div></main>
+<script src="js/marks-moe.js?v=1"></script>
+<script src="js/marks-trace.js?v=3"></script>
+<script>
+(() => { // наружу — только крючки проверок
+'use strict';
+// ===== 0. Параметры и мелочи =====
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a) * t;
+const Q = new URLSearchParams(location.search);
+const DEMO = (() => { if (!Q.has('demo')) return ''; const v = String(Q.get('demo') || '').toLowerCase(); return v === '0' ? '' : !v || v === '1' ? 'loop' : v; })();
+const TEST = !DEMO && Q.get('test') === '1';
+const DEBUG = Q.get('debug') === '1';
+const MEM = !!(DEMO || TEST);                       // пример и проверки — без хранилища
+const SPEED = DEMO ? clamp(+Q.get('speed') || 1, .1, 8) : 1;
+const MO = window.WR && window.WR.moe;               // формулы и разбор — js/marks-moe.js
+const GM_APP = '1e984dbbdf7b1c1fbd284d4cadc0b17f';   // application_id панели, как в obs.html
+const WS_URL = 'ws://localhost:38200';
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const NS = 'http://www.w3.org/2000/svg';
+const log = s => { try { console.log('[marks] ' + s); } catch (e) {} }; // латиницей: в game.log кириллица нечитаема
+const dbg = s => { if (DEBUG) log(s); };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const tagKey = s => String(s || '').split(':').pop().toLowerCase();
+const html = s => { const t = document.createElement('template'); t.innerHTML = s.trim(); return t.content.firstElementChild; };
+// пишем в DOM, только если значение другое
+const setT = (el, s) => { s = String(s); if (el && el.textContent !== s) el.textContent = s; };
+const setH = (el, s) => { if (el && el._h !== s) { el._h = s; el.innerHTML = s; } };
+const setA = (el, k, v) => { v = String(v); if (el && el.getAttribute(k) !== v) el.setAttribute(k, v); };
+const setS = (el, k, v) => { if (el && el.style[k] !== v) el.style[k] = v; };
+const tog = (el, c, on) => { if (el && el.classList.contains(c) !== !!on) el.classList.toggle(c, !!on); };
+const hide = (el, h) => { if (el && el.hidden !== !!h) el.hidden = !!h; };
+const fI = v => MO.fmtInt(v), fP = (v, d = 2) => MO.fmtP(v, d), fD = (v, d = 2) => MO.fmtDelta(v, d);
+if (MEM && window.MK && MK.cache) MK.cache.use('memory');
+
+// ===== 1. Движение =====
+const EASE = { lin: t => t, out2: t => 1 - (1 - t) * (1 - t), out3: t => 1 - Math.pow(1 - t, 3),
+  inOut: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+  back: t => { const c1 = 2.2, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }, in2: t => t * t };
+// live — performance.now(); seek — время ставим руками (кадр примера)
+const CLK = { live: true, base: performance.now(), t: 0, now() { return this.live ? (performance.now() - this.base) * SPEED : this.t; } };
+const TW = new Set();
+let RAF = 0, lastStep = 0;
+const TIMERS = new Set(); let VQ = [], VN = 0;      // разовые таймеры: живые или виртуальные (seek)
+function later(ms, fn) {
+  ms = Math.max(0, ms || 0);
+  if (CLK.live) { const h = { fn }; h.id = setTimeout(() => { TIMERS.delete(h); fn(); }, ms / SPEED); TIMERS.add(h); return h; }
+  const h = { t: CLK.now() + ms, n: ++VN, fn }; VQ.push(h); return h;
+}
+function cancel(h) { if (!h) return; if (h.id != null) { clearTimeout(h.id); TIMERS.delete(h); } else { const i = VQ.indexOf(h); if (i >= 0) VQ.splice(i, 1); } }
+function stopTimers() { TIMERS.forEach(h => clearTimeout(h.id)); TIMERS.clear(); VQ = []; }
+function tween(dur, fn, o = {}) {
+  if (dur > 1100) { if (DEBUG) console.warn('[marks] effect clamped to 1100 ms: ' + dur); dur = 1100; } // каждый эффект ≤ 1,1 с
+  if (o.key) for (const t of TW) if (t.key === o.key) TW.delete(t);
+  if (TW.size >= 40) finishTw(TW.values().next().value);
+  const now = CLK.now(), tw = { t0: now + (o.delay || 0), born: now, dur, fn, ease: o.ease || EASE.out3, key: o.key || null, done: o.done || null };
+  TW.add(tw);
+  if (o.back) fn(tw.ease(0), 0);
+  if (CLK.live) { kick(); later((o.delay || 0) + dur + 80, () => { if (CLK.live && TW.size) step(CLK.now()); }); } // rAF стоит — итог всё равно встанет
+  return tw;
+}
+function finishTw(tw) { if (!tw) return; TW.delete(tw); try { tw.fn(tw.ease(1), 1); } catch (e) {} if (tw.done) try { tw.done(); } catch (e) {} }
+function step(now) {
+  lastStep = now;
+  for (const tw of TW) {
+    if (now < tw.t0) continue;
+    const k = tw.dur > 0 ? Math.min(1, (now - tw.t0) / tw.dur) : 1;
+    try { tw.fn(tw.ease(k), k); } catch (e) { TW.delete(tw); continue; }
+    if (k >= 1) {
+      TW.delete(tw);
+      if (tw.done) { // seek: продолжение — ровно с конца
+        if (CLK.live) tw.done(); else { const keep = CLK.t; CLK.t = Math.min(now, tw.t0 + tw.dur); tw.done(); CLK.t = keep; }
+      }
+    }
+  }
+}
+function kick() {
+  if (!CLK.live || RAF) return;
+  RAF = requestAnimationFrame(function loop() { RAF = 0; step(CLK.now()); if (TW.size && CLK.live) RAF = requestAnimationFrame(loop); });
+}
+const vlater = (ms, fn) => tween(0, () => {}, { delay: ms, ease: EASE.lin, done: fn }); // «позже» по часам эффектов
+function countTo(el, to, ms, fmt, o = {}) {
+  const from = el._shown == null ? to : el._shown;
+  el._target = to;
+  if (Math.abs(from - to) < 1e-9 || ms <= 0) { for (const t of TW) if (t.key === el) TW.delete(t); el._shown = to; setT(el, fmt(to)); return; }
+  tween(ms, e => { el._shown = e >= 1 ? to : lerp(from, to, e); setT(el, fmt(el._shown)); }, { key: el, ease: o.ease || EASE.out3, delay: o.delay || 0 });
+}
+function setNum(el, v, fmt) { for (const t of TW) if (t.key === el) TW.delete(t); el._shown = v; el._target = v; setT(el, fmt(v)); }
+// «+640»: взлетает и исчезает; живых ≤ 2
+function popText(host, txt, cls, o = {}) {
+  const live = host._pops || (host._pops = []);
+  while (live.length >= 2) { const old = live.shift(); for (const t of TW) if (t.key === old) TW.delete(t); old.remove(); }
+  const p = document.createElement('i'); p.className = 'pop' + (cls ? ' ' + cls : ''); p.textContent = txt; host.appendChild(p); live.push(p);
+  const dy = o.dy || 20;
+  tween(o.dur || 1050, (e, k) => {
+    const a = k < .18 ? k / .18 : k > .62 ? 1 - (k - .62) / .38 : 1;
+    const s = k < .18 ? lerp(.7, 1.12, k / .18) : k < .32 ? lerp(1.12, 1, (k - .18) / .14) : 1;
+    p.style.opacity = a.toFixed(3); p.style.transform = `translate3d(0,${(-dy * EASE.out3(k)).toFixed(2)}px,0) scale(${s.toFixed(3)})`;
+  }, { key: p, ease: EASE.lin, done: () => { p.remove(); const i = live.indexOf(p); if (i >= 0) live.splice(i, 1); } });
+}
+// «удар» масштаба; base — трансформация из CSS
+function bump(el, amp = .14, ms = 520, base = '') {
+  if (!el) return;
+  el._bk = el._bk || {};
+  tween(ms, (e, k) => { const s = 1 + amp * Math.sin(Math.PI * Math.min(1, k * 1.15)) * (1 - k * .35); el.style.transform = k >= 1 ? '' : `${base} scale(${s.toFixed(4)})`; }, { key: el._bk, ease: EASE.lin });
+}
+// вспышка 0 -> peak -> 0, в конце стиль снимаем
+function flash(el, peak = 1, ms = 900, rise = .16) {
+  if (!el) return;
+  tween(ms, (e, k) => { const a = k < rise ? k / rise : 1 - EASE.out2((k - rise) / (1 - rise)); el.style.opacity = k >= 1 ? '' : (peak * a).toFixed(3); }, { key: el, ease: EASE.lin });
+}
+// въезд (сдвиг dx и проявление), проявление, «хлопок» чипа 1.6 -> 1; в конце инлайн-стиль снимаем
+function slideIn(el, ms, dx, delay, om) {
+  if (el) tween(ms, (e, k) => { el.style.opacity = k >= 1 ? '' : Math.min(1, om ? k * om : e).toFixed(3); el.style.transform = k >= 1 ? '' : `translate3d(${(dx * (1 - e)).toFixed(2)}px,0,0)`; }, { ease: EASE.out3, back: true, delay });
+}
+const fadeIn = (el, ms, delay) => tween(ms, e => { el.style.opacity = e >= 1 ? '' : e.toFixed(3); }, { ease: EASE.out2, back: true, delay });
+const popIn = (el, delay) => el && tween(550, (e, k) => { el.style.opacity = k >= 1 ? '' : Math.min(1, k * 2).toFixed(3); el.style.transform = k >= 1 ? '' : `skewX(-12deg) scale(${lerp(1.6, 1, e).toFixed(3)})`; }, { ease: EASE.back, back: true, delay });
+function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
+
+// ===== 2. Хранилище =====
+function mkStore(kind) {
+  let ls = null; const mem = new Map();
+  if (!MEM) try { ls = window[kind]; ls.getItem('mk:probe'); } catch (e) { ls = null; }
+  const raw = { get: k => (ls ? ls.getItem(k) : mem.has(k) ? mem.get(k) : null), set: (k, v) => (ls ? ls.setItem(k, v) : mem.set(k, v)),
+    del: k => (ls ? ls.removeItem(k) : mem.delete(k)),
+    keys: () => { if (!ls) return Array.from(mem.keys()); const a = []; for (let i = 0; i < ls.length; i++) a.push(ls.key(i)); return a; } };
+  return {
+    get(k) { try { const v = raw.get(k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } },
+    set(k, v, again) { // нет места — давний танк прочь, ещё раз
+      let s = null;
+      try { s = JSON.stringify(v); raw.set(k, s); return true; } catch (e) { if (!again && s && ls && kind === 'localStorage' && dropOldest()) return this.set(k, v, true); return false; }
+    },
+    del(k) { try { raw.del(k); } catch (e) {} },
+    keys(pre) { try { return raw.keys().filter(k => k && k.indexOf(pre) === 0); } catch (e) { return []; } },
+    reset() { mem.clear(); },
+  };
+}
+const ST = mkStore('localStorage'), SS = mkStore('sessionStorage');
+
+// ===== 3. Модель =====
+const KEEP = new Set(['player.id', 'game.state', 'game.region', 'game.isInReplay', 'hangar.isInHangar', 'hangar.isInQueue', 'hangar.vehicle.info',
+  'dossier.current', 'moeInfo.isAvailable', 'moeInfo.current', 'battle.isInBattle', 'battle.arenaId', 'battle.arena', 'battle.period',
+  'battle.vehicle', 'battle.isAlive', 'battle.efficiency.damage', 'battle.efficiency.assist', 'battle.efficiency.stun']);
+const M0 = () => ({ on: false, pid: '', region: 'EU', realm: 'eu', lesta: false, replay: false, gstate: '', hv: null, dc: null, queue: false,
+  moeAvail: false, moeCur: null, hvAt: 0, hgTag: '', hgShown: false, rec: null, after: null, everInit: false, lostAt: 0, offline: false });
+const M = M0();
+let S = new Map(), bt = null, CARD = null;
+const TH = {};                                       // ручки разовых таймеров
+const PAGE_AT = Date.now();
+const DEMO_EPOCH = Date.UTC(2026, 10, 26, 17, 0, 0); // часы примера
+const wall = () => (DEMO ? DEMO_EPOCH + CLK.now() : Date.now());
+const KP = () => 'mk:v1:' + M.pid + ':';
+const AFTER_MS = 15 * 60000;
+
+function newRec(tag) { return { tag, cd: 0, name: '', short: '', lvl: 0, cls: '', marks: { n: 0, src: '', at: 0 }, marksApi: { v: null, at: 0 }, last: null, hist: [], res: [] }; }
+function loadRec(tag) {
+  const n = newRec(tag), r = M.pid ? ST.get(KP() + 't:' + tagKey(tag)) : null;
+  if (!r || typeof r !== 'object') return n;
+  const o = Object.assign(n, r);
+  if (!Array.isArray(o.hist)) o.hist = [];
+  if (!Array.isArray(o.res)) o.res = [];
+  if (!o.marks || typeof o.marks !== 'object') o.marks = { n: 0, src: '', at: 0 };
+  if (!o.marksApi || typeof o.marksApi !== 'object') o.marksApi = { v: null, at: 0 };
+  if (String(tag).indexOf(':') > 0) o.tag = tag;     // полный тег, если знаем
+  return o;
+}
+function saveRec(rec) {
+  if (!M.pid || !rec) return;
+  rec.hist = rec.hist.slice(-40); rec.res = rec.res.slice(-20);
+  ST.set(KP() + 't:' + tagKey(rec.tag), rec);
+  touchIdx(tagKey(rec.tag), rec.hist.length > 0);
+}
+function recInfo(rec, v) {
+  if (!rec || !v || typeof v !== 'object') return false;
+  let ch = false; const put = (k, x) => { if (x && rec[k] !== x) { rec[k] = x; ch = true; } };
+  put('name', v.localizedName); put('short', v.localizedShortName); put('lvl', +v.level || 0); put('cls', v.class);
+  return ch;
+}
+// [[tagKey, время, есть история]], ≤ 80 танков
+function touchIdx(tk, h) {
+  const key = KP() + 'idx'; let idx = ST.get(key); if (!Array.isArray(idx)) idx = [];
+  const old = idx.find(e => Array.isArray(e) && e[0] === tk);
+  idx = idx.filter(e => Array.isArray(e) && e[0] !== tk); idx.unshift([tk, wall(), h || (old && old[2]) ? 1 : 0]);
+  while (idx.length > 80) { const x = idx.pop(); ST.del(KP() + 't:' + x[0]); }
+  ST.set(key, idx);
+  clearMeta(idx.some(e => e[2]));
+}
+function dropOldest() {
+  if (!M.pid) return false;
+  try {
+    const key = KP() + 'idx', idx = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!Array.isArray(idx) || idx.length < 2) return false;
+    const x = idx.pop(); localStorage.removeItem(KP() + 't:' + x[0]); localStorage.setItem(key, JSON.stringify(idx));
+    return true;
+  } catch (e) { return false; }
+}
+// пункт «Очистить данные» — когда есть история
+function clearMeta(has) {
+  if (MEM) return;
+  let m = document.querySelector('meta[name="wotstat-widget:ready-to-clear-data"]');
+  if (has && !m) { m = document.createElement('meta'); m.name = 'wotstat-widget:ready-to-clear-data'; m.content = 'true'; document.head.appendChild(m); }
+  else if (!has && m) m.remove();
+}
+function upsert(rec, e) {
+  const i = e.a ? rec.hist.findIndex(x => x.a === e.a) : -1;
+  if (i >= 0) rec.hist[i] = Object.assign(rec.hist[i], e); else rec.hist.push(e);
+  rec.hist.sort((a, b) => (a.t || 0) - (b.t || 0));
+}
+const lastAt = rec => (rec && rec.last && rec.last.at) || (rec && rec.hist.length ? rec.hist[rec.hist.length - 1].t : 0) || 0;
+// база (4.3): досье или последняя запись — что новее
+function baseline(tag, rec) {
+  const b = MO.pickBase(tag, M.dc, rec && rec.last);
+  if (b) b.sameDay = MO.sameDay(lastAt(rec), wall(), M.lesta);
+  return b;
+}
+
+// ===== 4. Связь с игрой =====
+function mkConnect() {
+  let wait = 1500;
+  const open = () => {
+    let ws;
+    try { ws = new WebSocket(WS_URL); } catch (e) { setTimeout(open, wait); return; }
+    ws.onopen = () => { wait = 1500; };
+    ws.onmessage = ev => { const raw = String(ev.data); let m = null; try { m = JSON.parse(raw); } catch (e) {} if (m) mkMsg(m, raw); };
+    ws.onclose = () => { mkConnLost(); setTimeout(open, wait); wait = Math.min(15000, Math.round(wait * 1.6)); };
+  };
+  open();
+}
+function mkConnLost() {
+  if (M.on) M.lostAt = Date.now();
+  M.on = false;
+  if (bt && !bt.done) bt.partial = true;              // события могли пропустить
+}
+function mkMsg(m, raw) {
+  if (!m || typeof m !== 'object' || !MO) return;
+  if (m.type === 'init' && Array.isArray(m.states)) {
+    S = new Map();
+    for (const s of m.states) if (s && KEEP.has(s.path)) S.set(s.path, s.value);
+    if (S.get('battle.arenaId') != null) S.set('battle.arenaId', MO.bigId(raw, S.get('battle.arenaId')));
+    M.on = true; M.everInit = true; M.lostAt = 0; M.offline = false; hint(false);
+    if (bt && !bt.done) bt.partial = true;
+    evaluate('init');
+  } else if (m.type === 'state' && typeof m.path === 'string') {
+    if (!KEEP.has(m.path)) return;                    // позиция, прицел, клавиши — мимо
+    let v = m.value;
+    if (m.path === 'battle.arenaId' && v != null) v = MO.bigId(raw, v);
+    S.set(m.path, v);
+    if (m.path.indexOf('battle.efficiency.') === 0) coalesce(); else evaluate(m.path);
+  } else if (m.type === 'trigger' && typeof m.path === 'string') {
+    if (m.path === 'battle.onPlayerFeedback') feedback(m.value);
+    else if (m.path === 'battle.onBattleResult') result(m.value, raw);
+  }
+}
+
+// ===== 5. Автомат состояний =====
+function syncM() {
+  const pid = S.get('player.id'), p = pid != null && pid !== '' && pid !== 0 ? String(pid) : '';
+  if (p && p !== M.pid) {                             // другой аккаунт — всё заново
+    if (M.pid) { bt = null; M.hgTag = ''; M.hgShown = false; M.rec = null; M.after = null; }
+    M.pid = p;
+    const idx = ST.get(KP() + 'idx');                 // история уже есть — пункт «Очистить данные» сразу
+    clearMeta(Array.isArray(idx) && idx.some(e => Array.isArray(e) && e[2]));
+  }
+  M.region = String(S.get('game.region') || M.region || 'EU'); M.realm = MO.realm(M.region); M.lesta = MO.isLesta(M.region);
+  M.replay = S.get('game.isInReplay') === true;
+  M.gstate = String(S.get('game.state') || '');
+  const hv = S.get('hangar.vehicle.info'); M.hv = hv && typeof hv === 'object' && hv.tag ? hv : null;
+  const dc = S.get('dossier.current'); M.dc = dc && typeof dc === 'object' && dc.vehicleTag ? dc : null;
+  M.queue = S.get('hangar.isInQueue') === true;
+  M.moeAvail = S.get('moeInfo.isAvailable') === true;
+  const mc = S.get('moeInfo.current'); M.moeCur = mc && typeof mc === 'object' ? mc : null;
+}
+function evaluate(reason) {
+  syncM();
+  if (!M.pid) { render('auto'); return; }
+  if (S.get('battle.isInBattle') === true) {
+    const arena = S.get('battle.arenaId') != null ? String(S.get('battle.arenaId')) : '';
+    if (!bt || (bt.done && !(arena && bt.arena === arena)) || (arena && bt.arena && bt.arena !== arena)) startBattle(arena, reason === 'init');
+    else if (!bt.arena && arena) bt.arena = arena;
+    if (!bt.done) { btRefresh(); btTrack(); btCalc(); } // и цифры из init
+    render('auto');
+    return;
+  }
+  if (bt && !bt.done) endBattle();
+  if (M.gstate === 'hangar' && M.hv) { hangarEval(reason); return; }
+  render('auto');                                     // login/loading — держим вид
+}
+
+// ---- бой ----
+function startBattle(arena, fromInit) {
+  const saved = MEM ? null : SS.get('mk:bt');
+  if (saved && typeof saved === 'object' && !saved.done && arena && saved.arena === arena && typeof saved.at === 'number') {
+    bt = saved; bt.partial = true; bt.rec = null; M.after = null;  // перезагрузка посреди боя
+    if (bt.curve && bt.curve.kn) CURVES.set(tagKey(bt.tag), bt.curve); // кривая — та же, что в начале боя
+    if (bt.tag) btTank({ tag: bt.tag, localizedName: bt.name, localizedShortName: bt.short, level: bt.level, class: bt.cls }); // база, герой
+    return;
+  }
+  bt = { arena, tag: '', name: '', short: '', level: 0, cls: '', mode: '', mapName: '', at: wall(), endAt: 0, done: false, partial: !!fromInit,
+    counted: true, period: 'PREBATTLE', alive: true, deadAt: 0, hit: false, base: null, curve: null, kn: null, src: '', delta: 0, anchored: false, fit1: false,
+    eff: { damage: 0, assist: 0, stun: 0 }, R: 0, T: 0, C: 0, Cunc: 0, ast: 0, dmg: 0, L: null, goal: null, cross: 'none', marks: 0, logged: false, afterSet: false, rec: null };
+  M.after = null;                                     // новый бой — флаг «после боя» прочь
+}
+function btRefresh() {
+  const b = bt, veh = S.get('battle.vehicle');
+  const v = veh && typeof veh === 'object' && veh.tag ? veh : !b.tag && M.hv ? M.hv : null; // до battle.vehicle — танк из ангара
+  if (v && tagKey(v.tag) !== tagKey(b.tag)) btTank(v);
+  const ar = S.get('battle.arena');
+  if (ar && typeof ar === 'object') { if (ar.mode) b.mode = String(ar.mode); if (ar.localizedName) b.mapName = String(ar.localizedName); }
+  const pr = S.get('battle.period');
+  if (pr && typeof pr === 'object' && pr.tag) b.period = String(pr.tag);
+  const fresh = wall() - b.at < 20000;                // «мёртв» в отсчёте — хвост прошлого боя
+  if (S.get('battle.isAlive') === false && b.alive && (!fresh || b.hit)) { b.alive = false; b.deadAt = wall(); }
+  b.counted = !M.replay && (b.mode ? MO.counts(b.mode, b.level || 10) : !(b.level > 0 && b.level < 5));
+  if (!b.logged && b.tag && b.mode) {
+    b.logged = true;
+    const B = b.base;
+    log(`battle start arena=${b.arena} tag=${b.tag} mode=${b.mode} base=${B ? Math.round(B.A0 * 100) / 100 + '/' + B.P0 + '/' + B.b0 : '-'} src=${B ? B.src : '-'} curve=${b.src || 'none'}${b.partial ? ' partial' : ''}`);
+  }
+  btSaveSoon();
+}
+function btTank(v) {
+  const b = bt;
+  b.tag = String(v.tag); b.name = String(v.localizedName || ''); b.short = String(v.localizedShortName || b.name);
+  b.level = +v.level || 0; b.cls = String(v.class || '');
+  b.rec = loadRec(b.tag); recInfo(b.rec, v);
+  const low = b.level > 0 && b.level < 5;
+  if (!low && !CURVES.get(tagKey(b.tag))) ensureCurve(b.tag, true); // в бою — одна попытка
+  btSetup();
+  if (!low) heroLoad(b.tag).then(() => onHero(b.tag), () => onHero(b.tag));
+}
+// база, кривая, сдвиг, цель
+function btSetup() {
+  const b = bt;
+  if (!b || !b.tag) return;
+  const rec = b.rec || (b.rec = loadRec(b.tag));
+  b.base = baseline(b.tag, rec);
+  b.marks = MO.marksOf(rec, b.base ? b.base.P0 : null).n;
+  const cv = CURVES.get(tagKey(b.tag)) || null;
+  b.curve = cv; b.kn = null; b.src = cv ? cv.src : ''; b.delta = 0; b.anchored = false; b.fit1 = !!(cv && cv.fit1);
+  const g0 = b.goal;
+  if (b.base && cv) {
+    let kn = cv.kn;
+    const dl = MO.delta(kn, b.base.A0, b.base.P0, b.base.sameDay);
+    if (dl.est) { // |δ| > 1,5 — оценка через свою точку
+      const e = MO.fitEst([[b.base.A0, b.base.P0]]);
+      if (e) { kn = e.kn; b.src = 'est'; b.fit1 = true; b.anchored = true; log(`curve suspect tag=${b.tag} delta=${dl.raw.toFixed(2)} -> est`); }
+    } else { b.delta = dl.d; b.anchored = dl.anchored; }
+    if (b.src === 'est' && cv.src === 'est') b.anchored = true;
+    b.kn = kn;
+    b.goal = MO.goal({ kn, A0: b.base.A0, P0: b.base.P0, d: b.delta, marks: b.marks });
+  } else b.goal = b.base ? MO.goal({ kn: null, A0: b.base.A0, P0: b.base.P0, d: 0, marks: b.marks }) : null;
+  if (g0 && b.goal && (g0.type !== b.goal.type || g0.T !== b.goal.T)) b.cross = 'none';
+  btCalc();
+}
+function btTrack() { // 20 с — как есть, потом только рост
+  const b = bt, fresh = wall() - b.at < 20000;
+  for (const k of ['damage', 'assist', 'stun']) {
+    const v = S.get('battle.efficiency.' + k);
+    if (typeof v === 'number' && isFinite(v)) b.eff[k] = fresh ? v : Math.max(b.eff[k] || 0, v);
+  }
+}
+function btCalc() {
+  const b = bt;
+  if (!b) return;
+  const c = MO.combined(b.eff, b.R, b.T);
+  b.C = c.C; b.Cunc = c.Cunc; b.dmg = c.dmg; b.ast = c.ast;
+  if (!b.base) { b.L = null; return; }
+  const cv = b.curve, ageDays = cv && (cv.upd || cv.at) ? (wall() - (cv.upd || cv.at)) / 864e5 : 0;
+  b.L = MO.live({ kn: b.kn, src: b.src, A0: b.base.A0, P0: b.base.P0, d: b.delta, anchored: b.anchored, ageDays, fit1: b.fit1,
+    marks: b.marks, C: b.C, Cunc: b.Cunc, goal: b.goal, prev: b.cross });
+  b.cross = b.L.cross;
+}
+function coalesce() { if (!TH.co) TH.co = later(90, flush); } // пачка -> один «тик»
+function flush() {
+  TH.co = null;
+  if (!bt || bt.done || S.get('battle.isInBattle') !== true) return; // после выхода не читаем
+  btTrack(); btCalc(); btSaveSoon();
+  render('fx');
+}
+function feedback(v) {
+  if (!bt || bt.done || !v || typeof v !== 'object') return;
+  const d = v.data && typeof v.data === 'object' ? v.data : {}, n = +d.damage || 0;
+  if (v.type === 'radioAssist') { bt.R += n; coalesce(); }
+  else if (v.type === 'trackAssist') { bt.T += n; coalesce(); }
+  else if (v.type === 'receivedDamage') bt.hit = true;
+}
+function endBattle() {
+  const b = bt;
+  if (!b || b.done) return;
+  if (TH.co) { cancel(TH.co); TH.co = null; btTrack(); btCalc(); } // последняя пачка
+  b.done = true; b.endAt = wall();
+  const L = b.L;
+  if (b.counted && b.base && b.tag) {
+    const rec = loadRec(b.tag), A1r = L ? L.A1r : b.base.A0 + MO.K * (b.C - b.base.A0), P1 = L && L.P1 != null ? MO.floor2(L.P1) : null;
+    upsert(rec, { a: b.arena, t: b.endAt, map: b.mapName, C: b.C, A0: b.base.A0, A1: Math.round(A1r * 100) / 100, P0: b.base.P0, P1,
+      exact: false, pint: null, mk: null, src: 'live', bAfter: b.base.b0 + 1, gap: 0, dl: b.delta });
+    if (P1 != null) rec.last = { b: b.base.b0 + 1, A: A1r, P: P1, exact: false, src: 'live', at: b.endAt };
+    recInfo(rec, { localizedName: b.name, localizedShortName: b.short, level: b.level, class: b.cls });
+    saveRec(rec); b.rec = rec;
+    if (tagKey(M.hgTag) === tagKey(b.tag)) M.rec = rec;
+  }
+  btSave();
+  log(`battle end arena=${b.arena} C=${b.C} A1r=${L ? L.A1r.toFixed(2) : '-'} P1=${L && L.P1 != null ? MO.floor2(L.P1).toFixed(2) : '-'} band=${L ? L.band : '-'}${b.counted ? '' : ' not-counted'}`);
+}
+function btSaveSoon() { if (!TH.save && !MEM) TH.save = later(1000, btSave); } // в бою — не чаще раза в секунду
+function btSave() {
+  cancel(TH.save); TH.save = null;
+  if (!bt || MEM) return;
+  const o = Object.assign({}, bt); delete o.rec; delete o.kn; delete o.L;
+  SS.set('mk:bt', o);
+}
+
+// ---- ангар ----
+function hangarEval(reason) {
+  const tag = M.hv.tag;
+  if (bt && bt.done && !bt.afterSet) { // из боя на том же танке — «за бой ≈»
+    bt.afterSet = true;
+    if (bt.counted && bt.base && bt.L && bt.L.P1 != null && tagKey(tag) === tagKey(bt.tag))
+      M.after = { tag: bt.tag, arena: bt.arena, at: bt.endAt || wall(), state: 'pending', dP: bt.L.dP, P0: bt.base.P0, m0: bt.marks };
+  }
+  if (tagKey(tag) !== tagKey(M.hgTag)) {
+    if (!M.hgTag || reason === 'init') { commitTag(tag); return; }
+    cancel(TH.flap);                                  // дребезг тега — 250 мс
+    TH.flap = later(250, () => { TH.flap = null; if (M.hv && tagKey(M.hv.tag) === tagKey(tag) && tagKey(tag) !== tagKey(M.hgTag)) commitTag(M.hv.tag); });
+    return;
+  }
+  if (TH.flap) { cancel(TH.flap); TH.flap = null; }
+  if (M.rec && recInfo(M.rec, M.hv)) saveRec(M.rec);
+  dossierRefresh();
+  if (reason === 'moeInfo.current' || reason === 'moeInfo.isAvailable') gameCurveCheck(tag);
+  hangarRender('fx');
+}
+function commitTag(tag) {
+  M.hgTag = tag; M.hvAt = wall(); M.hgShown = false;
+  if (M.after && tagKey(M.after.tag) !== tagKey(tag)) M.after = null;   // другой танк — флаг снимаем
+  M.rec = loadRec(tag);
+  if (recInfo(M.rec, M.hv)) saveRec(M.rec);
+  if (!M.after) afterRestore(M.rec);
+  cancel(TH.dl1); cancel(TH.dl2);
+  TH.dl1 = later(700, () => { TH.dl1 = null; if (!M.hgShown) hangarRender('enter'); });
+  TH.dl2 = later(1500, () => { TH.dl2 = null; if (!M.hgShown) hangarRender('enter'); });
+  prepareTank(tag);
+  dossierRefresh();
+  hangarRender('enter');
+}
+// перезагрузка сразу после боя — «за бой ≈» по живой записи
+function afterRestore(rec) {
+  const e = rec && rec.hist.length ? rec.hist[rec.hist.length - 1] : null;
+  if (e && e.src === 'live' && e.P1 != null && e.P0 != null && wall() - (e.t || 0) < AFTER_MS)
+    M.after = { tag: rec.tag, arena: e.a, at: e.t, state: 'pending', dP: Math.round((e.P1 - e.P0) * 100) / 100, P0: e.P0, m0: MO.marksOf(rec, e.P0).n };
+}
+// первый показ: досье и (картинка или 700 мс), иначе 1500 мс
+function hangarRender(mode) {
+  if (!M.hv || M.gstate !== 'hangar' || S.get('battle.isInBattle') === true || tagKey(M.hv.tag) !== tagKey(M.hgTag)) return;
+  if (!M.hgShown) {
+    const el = wall() - M.hvAt, tk = tagKey(M.hgTag), lvl = +M.hv.level || 0, low = lvl > 0 && lvl < 5;
+    const dcOk = low || (M.dc && tagKey(M.dc.vehicleTag) === tk);
+    const heroOk = heroReady(M.hgTag) || el >= 700;
+    if (!((dcOk && heroOk && (FONTS_OK || el >= 700)) || el >= 1500)) return;
+    M.hgShown = true; mode = 'enter';
+  }
+  render(mode);
+}
+function prepareTank(tag) {
+  const lvl = +(M.hv && M.hv.level) || (M.rec && M.rec.lvl) || 0;
+  heroLoad(tag).then(() => onHero(tag), () => onHero(tag));
+  if (lvl > 0 && lvl < 5) return;                     // ниже V — ни сети, ни колец
+  ensureCurve(tag, false).then(() => apiMarks(tag));
+}
+// досье (5.7): точный %; пропуск — серая точка
+function dossierRefresh() {
+  const dc = M.dc, tag = M.hgTag, lvl = +(M.hv && M.hv.level) || 0;
+  if (!dc || !tag || tagKey(dc.vehicleTag) !== tagKey(tag) || (lvl > 0 && lvl < 5)) return; // ниже V — не храним
+  const b = +dc.battlesCount, A = +dc.movingAvgDamage, P = +dc.damageRating;
+  if (!isFinite(b) || !isFinite(A) || !isFinite(P)) return;
+  const rec = loadRec(tag), last = rec.last;
+  if (last && (b < last.b || (b === last.b && last.exact))) { M.rec = rec; return; }
+  const e = rec.hist.find(x => x.bAfter === b && !x.gap) || rec.hist.find(x => x.src === 'res' && !x.bAfter); // итог без счёта боёв — к этому досье
+  if (e) {
+    const est = e.P1;
+    e.P1 = MO.floor2(P); e.A1 = A; e.exact = true; e.bAfter = b;
+    if (est != null) rec.res.push({ dA: 0, dP: Math.round((P - est) * 100) / 100, src: e.src });
+  } else if (last && b > last.b && last.P != null && !rec.hist.some(x => x.src === 'live' && x.bAfter > last.b)) {
+    // бой без окна: +1 — обычная точка (ровно этот бой), больше — серый пропуск
+    rec.hist.push({ a: '', t: wall(), C: null, A0: last.A, A1: A, P0: last.P, P1: MO.floor2(P), exact: true, src: 'dossier', bAfter: b, gap: b - last.b > 1 ? b - last.b : 0, d: Math.round((P - last.P) * 100) / 100 });
+  }
+  rec.last = { b, A, P, exact: true, src: 'dossier', at: wall() };
+  recInfo(rec, M.hv);
+  saveRec(rec); M.rec = rec;
+  if (M.after && tagKey(M.after.tag) === tagKey(tag) && e && e.a === M.after.arena && M.after.state === 'pending') M.after.dP = Math.round((e.P1 - e.P0) * 100) / 100;
+  log(`dossier tag=${tag} b=${b} A=${A} P=${P}`);
+}
+
+// ---- итог боя (5.6) ----
+const RES_SEEN = new Set();
+function result(raw, rawText) {
+  if (!M.pid) return;
+  const r = MO.parseResult(raw, rawText, M.pid);
+  if (!r || !r.arena) return;
+  if (RES_SEEN.has(r.arena)) return;                  // повтор итога — без праздника
+  // чей бой: бой, запись с cd, карта id
+  let tag = bt && bt.arena === r.arena ? bt.tag : '';
+  if (!tag && r.cd) tag = tagByCd(r.cd);
+  if (!tag) { if (r.cd && r.counted) ST.set(KP() + 'orphan:' + r.cd, Object.assign({ t: wall() }, r)); return; }
+  RES_SEEN.add(r.arena);
+  const rec = loadRec(tag);
+  if (rec.hist.some(x => x.a === r.arena && x.src === 'res')) return;
+  let e = rec.hist.find(x => x.a === r.arena);
+  const wasLive = !!e;
+  const shownHere = M.gstate === 'hangar' && tagKey(M.hgTag) === tagKey(tag) && CARD && CARD.view === 'hg';
+  if (!r.counted) { // вне зачёта — запись прочь
+    if (e) { rec.hist = rec.hist.filter(x => x !== e); saveRec(rec); }
+    if (M.after && M.after.arena === r.arena) { M.after = null; if (shownHere) { M.rec = rec; render('quiet'); } }
+    log(`result arena=${r.arena} cd=${r.cd} not-counted bonus=${r.bonus}`);
+    return;
+  }
+  if (!e) { // боя нет в истории — «до» из итога
+    const A0 = MO.preAvg(r.A1, r.Cf), L0 = rec.last, cont = L0 && Math.abs(L0.A - A0) <= 1.5;
+    e = { a: r.arena, t: r.at || wall(), map: '', C: r.Cf, A0: Math.round(A0 * 100) / 100, A1: r.A1, P0: cont ? L0.P : null, P1: null, exact: false,
+      pint: r.Pint, mk: r.mk, src: 'res', bAfter: cont ? L0.b + 1 : 0, gap: 0, dl: 0 };
+    rec.hist.push(e); rec.hist.sort((a, b) => (a.t || 0) - (b.t || 0));
+  }
+  const cv = CURVES.get(tagKey(tag)) || null, m0 = MO.marksOf(rec, e.P0 != null ? e.P0 : null).n;
+  const P1 = MO.refineP1({ kn: cv ? cv.kn : null, A1: r.A1, d: e.dl || 0, Pint: r.Pint, P1: e.P1 });
+  const dA = MO.residual(e.A0, r.Cf, r.A1);
+  Object.assign(e, { C: r.Cf, A1: r.A1, P1, pint: r.Pint, mk: r.mk, src: 'res', exact: false });
+  rec.cd = r.cd || rec.cd;
+  rec.marks = { n: Math.max(rec.marks.n || 0, r.mk), src: 'res', at: wall() };
+  if (!rec.last || e.bAfter >= rec.last.b || !e.bAfter) {
+    if (!(rec.last && rec.last.exact && rec.last.b === e.bAfter)) rec.last = { b: e.bAfter || (rec.last ? rec.last.b : 0), A: r.A1, P: P1, exact: false, src: 'result', at: wall() };
+  }
+  // следующий бой подряд — от итога
+  const nx = rec.hist.find(x => x.bAfter && e.bAfter && x.bAfter === e.bAfter + 1 && x.src === 'live');
+  if (nx && cv) {
+    const p = MO.project(cv.kn, r.A1, P1, nx.C, nx.dl || 0);
+    Object.assign(nx, { A0: r.A1, P0: P1, A1: Math.round(p.A1r * 100) / 100, P1: p.show });
+    if (rec.last && rec.last.b === nx.bAfter && !rec.last.exact) Object.assign(rec.last, { A: p.A1r, P: p.show });
+  }
+  if (isFinite(dA)) rec.res.push({ dA, dP: 0, src: 'res' });
+  saveRec(rec);
+  log(`result arena=${r.arena} cd=${r.cd} Cf=${r.Cf} A1=${r.A1} Pint=${r.Pint} marks=${r.mkP}/${r.mkV == null ? '-' : r.mkV} dA=${isFinite(dA) ? dA : '-'}`);
+  if (tagKey(M.hgTag) === tagKey(tag)) M.rec = rec;
+  if (bt && !bt.done && tagKey(bt.tag) === tagKey(tag)) { bt.rec = rec; btSetup(); render('quiet'); return; } // уже в бою — тихо переякорим
+  if (shownHere) {
+    const m1 = MO.marksOf(rec, P1).n, P0 = e.P0 != null ? e.P0 : M.after && M.after.P0;
+    if (M.after && M.after.arena === r.arena || wasLive) {
+      M.after = { tag, arena: r.arena, at: wall(), state: 'confirmed', dP: P0 != null ? Math.round((P1 - P0) * 100) / 100 : 0, P0, up: m1 > m0, mk: m1, m0 };
+      render('confirm');
+    } else render('quiet');
+  }
+}
+function tagByCd(cd) {
+  for (const k of ST.keys(KP() + 't:')) { const r = ST.get(k); if (r && +r.cd === +cd) return r.tag || k.slice(k.lastIndexOf(':') + 1); }
+  const ids = ST.get('mk:v1:ids:' + M.realm);
+  if (ids && ids.map) for (const tk in ids.map) if (+ids.map[tk] === +cd) return tk;
+  return '';
+}
+// узнали cd — подцепить итог-сироту
+function learnCd(tag, cd) {
+  const rec = loadRec(tag);
+  if (+rec.cd === +cd) return;
+  rec.cd = +cd;
+  const o = ST.get(KP() + 'orphan:' + cd);
+  if (o && o.arena && !rec.hist.some(x => x.a === o.arena)) {
+    rec.hist.push({ a: o.arena, t: o.t || wall(), map: '', C: o.Cf, A0: Math.round(MO.preAvg(o.A1, o.Cf) * 100) / 100, A1: o.A1, P0: null, P1: null,
+      exact: false, pint: o.Pint, mk: o.mk, src: 'res', bAfter: 0, gap: 0 });
+    rec.hist.sort((a, b) => (a.t || 0) - (b.t || 0));
+    rec.marks = { n: Math.max(rec.marks.n || 0, o.mk || 0), src: 'res', at: wall() };
+  }
+  if (o) ST.del(KP() + 'orphan:' + cd);
+  saveRec(rec);
+  if (tagKey(M.hgTag) === tagKey(tag)) M.rec = rec;
+}
+
+// ===== 6. Пороги, id танка, отметки из API (сеть — только здесь) =====
+const CURVES = new Map();   // tagKey -> кривая | false; нет ключа — грузим
+const CPEND = new Map(), NETF = new Map(), RETRY = new Set(), POLT = new Map();
+let FETCH = (u, o) => fetch(u, o);
+async function getJSON(url, key) { // 8 с; повтор через 30 с, потом — нет
+  if (DEMO || !url) return null;
+  const st = NETF.get(key);
+  if (st && (st.n >= 2 || Date.now() < st.next)) return null;
+  let tm = 0;
+  try {
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    tm = setTimeout(() => { try { if (ctl) ctl.abort(); } catch (e) {} }, 8000);
+    const r = await FETCH(url, ctl ? { signal: ctl.signal } : {});
+    if (!r || !r.ok) throw new Error('http');
+    const j = await r.json();
+    if (j && j.status === 'error') throw new Error('api');
+    NETF.delete(key);
+    return j;
+  } catch (e) {
+    NETF.set(key, { n: (st ? st.n : 0) + 1, next: Date.now() + 30000 });
+    dbg('net fail ' + key);
+    return null;
+  } finally { clearTimeout(tm); }
+}
+function ensureCurve(tag, inBattle) {
+  const tk = tagKey(tag), have = CURVES.get(tk);
+  if (have && have.src !== 'est') return Promise.resolve(have);
+  if (DEMO) { const cv = demoCurve(tag); CURVES.set(tk, cv || false); return Promise.resolve(cv); } // пример: синхронно
+  if (CPEND.has(tk)) return CPEND.get(tk);
+  const p = curveChain(tag, inBattle).catch(e => { dbg('curve error ' + (e && e.message)); return null; }).then(cv => {
+    CPEND.delete(tk);
+    CURVES.set(tk, cv || false);
+    log(`curve tag=${tag} src=${cv ? cv.src : 'none'}`);
+    if ((!cv || cv.src === 'est') && !RETRY.has(tk) && Array.from(NETF.values()).some(s => s.n === 1)) { // сеть подвела — ещё раз
+      RETRY.add(tk);
+      later(30000, () => { if (CURVES.get(tk) === false || (CURVES.get(tk) || {}).src === 'est') { CURVES.delete(tk); ensureCurve(tag, false).then(() => onCurve(tag)); } });
+    }
+    onCurve(tag);
+    return cv;
+  });
+  CPEND.set(tk, p);
+  return p;
+}
+function gameCurve(tag) {
+  if (!M.moeAvail) return null;
+  const g = MO.parseMoeInfo(M.moeCur, tag);
+  return g ? { kn: g.kn, src: 'game', upd: wall(), at: wall(), fit1: false } : null;
+}
+function gameCurveCheck(tag) { // Lesta: узлы пришли позже
+  const g = gameCurve(tag), tk = tagKey(tag), have = CURVES.get(tk);
+  if (g && (!have || have.src !== 'game')) { CURVES.set(tk, g); onCurve(tag); }
+}
+async function curveChain(tag, inBattle) {
+  const g = gameCurve(tag);
+  if (g) return g;
+  const realm = M.realm, rec = loadRec(tag), now = wall();
+  let cd = +rec.cd || 0;
+  if (!cd) { cd = await idOf(tag, realm); if (cd) learnCd(tag, cd); }
+  let stale = null;
+  if (cd) {
+    const c = ST.get(`mk:v1:curve:${realm}:${cd}`), kn = c && MO.knots(c.k);
+    if (kn) {
+      const cv = { kn, src: c.src, upd: c.upd || 0, at: c.at || 0, fit1: false }, age = now - (c.at || 0);
+      if (age < 12 * 36e5) return cv;
+      if (age < 7 * 864e5) stale = cv;
+    }
+    if (inBattle && stale) return stale;
+    if (realm !== 'ru') { const w = await wgCurve(realm, cd); if (w) return w; }
+    const p = await polCurve(realm, cd); if (p) return p;
+  }
+  if (stale) return stale;
+  return estCurve(loadRec(tag));                      // свежая запись: досье пришло, пока ждали сеть
+}
+function curvePut(realm, cd, c) {
+  ST.set(`mk:v1:curve:${realm}:${cd}`, c);
+  const ks = ST.keys('mk:v1:curve:' + realm + ':');
+  if (ks.length > 200) ks.map(k => [k, (ST.get(k) || {}).at || 0]).sort((a, b) => a[1] - b[1]).slice(0, ks.length - 200).forEach(([k]) => ST.del(k));
+}
+async function wgCurve(realm, cd) {
+  const j = await getJSON(MO.url.mastery(realm, cd, GM_APP), 'wg:' + realm);
+  const r = j && MO.parseMastery(j, cd);
+  if (!r) return null;
+  const key = 'mk:v1:curveupd:' + realm, upd0 = +ST.get(key) || 0;
+  if (r.upd > upd0) { // WG обновил таблицы — старые прочь
+    if (upd0) for (const k of ST.keys('mk:v1:curve:' + realm + ':')) { const c = ST.get(k); if (c && c.src === 'wg' && (c.upd || 0) < r.upd) ST.del(k); }
+    ST.set(key, r.upd);
+  }
+  const at = wall();
+  curvePut(realm, cd, { k: r.k, src: 'wg', upd: r.upd || 0, at });
+  return { kn: r.kn, src: 'wg', upd: r.upd || at, at, fit1: false };
+}
+async function polCurve(realm, cd) { // poliroid — запасной, ≤ 1 раза в 12 ч
+  let t = POLT.get(realm);
+  if (!t) {
+    if (wall() - (+ST.get('mk:v1:polat:' + realm) || 0) < 12 * 36e5) return null;
+    const j = await getJSON(MO.url.pol(realm), 'pol:' + realm);
+    t = j && MO.parsePol(j);
+    if (!t) return null;
+    POLT.set(realm, t); ST.set('mk:v1:polat:' + realm, wall());
+  }
+  const k = t[String(cd)], kn = k && MO.knots(k);
+  if (!kn) return null;
+  const at = wall();
+  curvePut(realm, cd, { k, src: 'pol', upd: 0, at });
+  return { kn, src: 'pol', upd: at, at, fit1: false };
+}
+function estCurve(rec) { // свои точные (A, P) за 2 дня, ≤ 10
+  const today = MO.serverDay(wall(), M.lesta), pairs = [], seen = new Set();
+  const add = (A, P, t) => { const k = A + ':' + P; if (A > 0 && P > 0 && t && MO.serverDay(t, M.lesta) >= today - 1 && !seen.has(k)) { seen.add(k); pairs.push([A, P]); } };
+  if (rec.last && rec.last.exact) add(+rec.last.A, +rec.last.P, rec.last.at);
+  for (let i = rec.hist.length - 1; i >= 0 && pairs.length < 10; i--) { const e = rec.hist[i]; if (e.exact && e.A1 != null && e.P1 != null) add(+e.A1, +e.P1, e.t); }
+  const f = pairs.length ? MO.fitEst(pairs) : null;
+  return f ? { kn: f.kn, src: 'est', upd: 0, at: wall(), fit1: f.n === 1 } : null;
+}
+async function idOf(tag, realm) { // тег -> tank_id: кэш -> WG по нации -> poliroid
+  const tk = tagKey(tag), key = 'mk:v1:ids:' + realm, week = 7 * 864e5;
+  let ids = ST.get(key);
+  if (!ids || typeof ids !== 'object' || !ids.map) ids = { at: 0, map: {}, nat: {}, polv: 0 };
+  const fresh = x => x && wall() - x < week;
+  if (ids.map[tk] && fresh(ids.at)) return +ids.map[tk];
+  const nat = MO.nation(tag);
+  if (realm !== 'ru' && nat && !fresh(ids.nat && ids.nat[nat])) {
+    const m = MO.parseEncy(await getJSON(MO.url.ency(realm, nat, GM_APP), 'ency:' + realm + ':' + nat));
+    if (m) { Object.assign(ids.map, m); ids.nat = ids.nat || {}; ids.nat[nat] = wall(); ids.at = wall(); ST.set(key, ids); }
+    if (ids.map[tk]) return +ids.map[tk];
+  }
+  if (!fresh(ids.polv)) {
+    const m = MO.parsePolVeh(await getJSON(MO.url.polVeh(realm), 'polv:' + realm));
+    if (m) { Object.assign(ids.map, m); ids.polv = wall(); ids.at = wall(); ST.set(key, ids); }
+  }
+  return ids.map[tk] ? +ids.map[tk] : 0;
+}
+async function apiMarks(tag) { // отметки из WG API (7.3); нет ключа — неизвестно
+  if (DEMO || M.lesta || !M.pid) return;
+  const rec = loadRec(tag);
+  if (!rec.cd || (rec.marksApi && rec.marksApi.at && wall() - rec.marksApi.at < 864e5)) return;
+  const j = await getJSON(MO.url.ach(M.realm, M.pid, rec.cd, GM_APP), 'ach:' + M.realm);
+  if (!j) return;
+  const v = MO.parseAch(j, M.pid, rec.cd), r2 = loadRec(tag);
+  r2.marksApi = { v: v == null ? null : +v, at: wall() };
+  saveRec(r2);
+  if (tagKey(M.hgTag) === tagKey(tag)) { M.rec = r2; if (v != null) softRender(); }
+}
+function onCurve(tag) {
+  if (!CLK.live) return;                              // seek: всё уже синхронно
+  const tk = tagKey(tag);
+  if (bt && !bt.done && tagKey(bt.tag) === tk) { btSetup(); softRender(); return; }
+  if (tagKey(M.hgTag) === tk && M.hgShown) softRender();
+}
+// пришли данные — тихо и не посреди эффектов
+function softRender(force) {
+  if (!CLK.live) return;
+  if (TW.size) { if (!TH.soft) TH.soft = later(300, () => { TH.soft = null; softRender(force); }); return; }
+  if (force && CARD) CARD.key = '#';
+  render('quiet');
+}
+
+// ===== 7. Герой =====
+const HERO = new Map();     // tagKey -> {p, tr, err}
+function heroLoad(tag) {
+  const tk = tagKey(tag);
+  let h = HERO.get(tk);
+  if (h) return h.p;
+  if (!DEMO) for (const k of Array.from(HERO.keys())) if (k !== tagKey(M.hgTag) && k !== tagKey(bt && bt.tag)) HERO.delete(k);
+  h = { p: null, tr: null, err: false }; HERO.set(tk, h);
+  const t0 = performance.now();
+  h.p = (window.MK && MK.trace ? MK.trace(tag, { realm: M.lesta ? 'ru' : 'eu' }) : Promise.reject(new Error('no MK'))).then(r => {
+    h.tr = Object.assign({ img: r.img }, r.sil);
+    dbg(`hero tag=${tag} ms=${Math.round(performance.now() - t0)} cached=${r.cached} barrel=${r.sil.b.ok ? r.sil.b.m : 'none'}`);
+    return h.tr;
+  }, e => { h.err = true; dbg(`hero fail tag=${tag} ${e && e.code || ''}`); throw e; });
+  h.p.catch(() => {});
+  return h.p;
+}
+const heroReady = tag => { const h = HERO.get(tagKey(tag)); return !!(h && (h.tr || h.err)); };
+function onHero(tag) {
+  if (!CLK.live) return;
+  const tk = tagKey(tag);
+  if (M.gstate === 'hangar' && !M.hgShown && tagKey(M.hgTag) === tk) { hangarRender('enter'); return; }
+  const c = CARD;
+  if (!c || c.tk !== tk || c.hero || c.kind === 'cmp') return;
+  if (c.kind === 'hg') hgHero(c, c.vm, true); else btHero(c, c.vm, true);
+}
+let UID = 0;
+const bakeScale = () => Math.round(clamp((window.devicePixelRatio || 1) * (parseFloat($('#mk').style.zoom) || 1), 2, 3) * 4) / 4;
+// где окажутся кольца (без отрисовки): круг вокруг трёх колец — чтобы не легли под текст
+function heroLayout(tr, o) {
+  const { W, H, b } = tr, k = Math.min(o.tw / W, o.th / H);
+  const bx = o.x + (o.tw - W * k) * o.ax, by = o.y + (o.th - H * k) * o.ay;
+  let L = null;
+  if (b && b.ok && !o.noRings) {
+    const r0 = b.rings[0], r2 = b.rings[2], sm = (r0.s + r2.s) / 2;
+    L = { x: bx + (b.tip[0] - b.u[0] * sm) * k, y: by + (b.tip[1] - b.u[1] * sm) * k, R: Math.max(8, ((r2.s - r0.s) / 2 + r2.rw) * k + 3) };
+  }
+  return { k, bx, by, L, bottom: by + H * k };
+}
+// кольца не под текстом: первый сдвиг без пересечения
+function placeHero(tr, o, boxes, shifts) {
+  const hits = L => L && boxes.some(([x0, y0, x1, y1]) => { const cx = clamp(L.x, x0, x1), cy = clamp(L.y, y0, y1); return Math.hypot(L.x - cx, L.y - cy) < L.R + 6; });
+  for (const [dx, dy] of shifts || [[0, 0], [10, 6], [20, 12], [26, 22], [30, 34], [34, 46], [36, 58], [36, 70]]) {
+    const oo = Object.assign({}, o, { x: o.x + dx, y: o.y + dy }), lay = heroLayout(tr, oo);
+    if (!hits(lay.L)) return { o: oo, lay };
+  }
+  const last = (shifts || [[36, 70]]).slice(-1)[0], oo = Object.assign({}, o, { x: o.x + last[0], y: o.y + last[1] });
+  return { o: oo, lay: heroLayout(tr, oo) };
+}
+// печём раз: свечение, рендер в контуре, свет, лупа
+function bake(G, dead, s) {
+  const { tr, k, bx, by, pad, cw, ch, L, ok, far } = G, W = tr.W, H = tr.H, b = tr.b;
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(cw * s); cv.height = Math.ceil(ch * s); cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.imageSmoothingQuality = 'high'; // холст и так программный (CEF без GPU)
+  const P = new Path2D(tr.d), T = [s * k, 0, 0, s * k, s * (pad + bx), s * (pad + by)];
+  const off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height;
+  const ox = off.getContext('2d'); ox.setTransform(...T);
+  const gg = ox.createLinearGradient(0, 0, W, 0); gg.addColorStop(0, '#ffd25e'); gg.addColorStop(1, '#e08c0e'); ox.fillStyle = gg; ox.fill(P, 'evenodd');
+  ctx.save(); ctx.filter = `blur(${Math.round(15 * s)}px)`; ctx.globalAlpha = dead ? .12 : .4; ctx.drawImage(off, 0, 7 * s); ctx.restore();
+  off.width = off.height = 0;
+  const drawRender = f => { ctx.save(); ctx.clip(P, 'evenodd'); ctx.filter = f; ctx.drawImage(tr.img, -tr.ox, -tr.oy); ctx.restore(); };
+  const warm = (cx, cy, r, a) => {
+    ctx.save(); ctx.clip(P, 'evenodd'); ctx.globalCompositeOperation = 'soft-light';
+    const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r); rg.addColorStop(0, `rgba(255,196,90,${a})`); rg.addColorStop(1, 'rgba(255,170,60,0)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); ctx.restore();
+  };
+  ctx.save(); ctx.setTransform(...T);
+  drawRender(dead ? 'grayscale(1) brightness(.4) contrast(1.1)' : 'grayscale(.92) brightness(.64) contrast(1.28)');
+  if (!dead) {
+    warm(ok ? b.tip[0] : W * .2, ok ? b.tip[1] : H * .8, W * .55, .5);
+    ctx.save(); ctx.clip(P, 'evenodd'); ctx.globalCompositeOperation = 'screen';
+    const tg = ctx.createLinearGradient(0, 0, 0, H * .5); tg.addColorStop(0, 'rgba(235,235,255,.10)'); tg.addColorStop(1, 'rgba(235,235,255,0)');
+    ctx.fillStyle = tg; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+  ctx.restore();
+  if (L) {
+    ctx.save(); ctx.setTransform(s, 0, 0, s, 0, 0);
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowBlur = 18 * s; ctx.shadowOffsetY = 6 * s; ctx.beginPath(); ctx.arc(L.x, L.y, L.R, 0, Math.PI * 2); ctx.fillStyle = '#0c0d13'; ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(L.x, L.y, L.R, 0, Math.PI * 2); ctx.clip();
+    const gb = ctx.createRadialGradient(L.x - L.R * .3, L.y - L.R * .45, 0, L.x, L.y, L.R * 1.15); gb.addColorStop(0, '#2e2a3a'); gb.addColorStop(1, '#0b0b11');
+    ctx.fillStyle = gb; ctx.fillRect(L.x - L.R, L.y - L.R, 2 * L.R, 2 * L.R);
+    const zx = L.x + L.Z * (pad + bx - L.x), zy = L.y + L.Z * (pad + by - L.y);
+    ctx.setTransform(s * L.Z * k, 0, 0, s * L.Z * k, s * zx, s * zy);
+    drawRender(dead ? 'grayscale(1) brightness(.5) contrast(1.1)' : 'grayscale(.88) brightness(.86) contrast(1.25)');
+    if (!dead) warm(b.tip[0], b.tip[1], far * 2.4, .55);
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    const vg = ctx.createRadialGradient(L.x, L.y, L.R * .5, L.x, L.y, L.R); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.62)');
+    ctx.fillStyle = vg; ctx.fillRect(L.x - L.R, L.y - L.R, 2 * L.R, 2 * L.R);
+    ctx.restore();
+  }
+  try { ctx.getImageData(0, 0, 1, 1); } catch (e) {} // растр сразу, до твинов: первая выпечка (~0,2 с) не съест начало входа
+  return cv;
+}
+// кольцо — полоса, выгнутая к казённику
+function ringPath(s, rw, hw, bow) { const c = bow * hw, x0 = s - rw / 2, x1 = s + rw / 2; return `M${x0} ${-hw}Q${x0 + 2 * c} 0 ${x0} ${hw}L${x1} ${hw}Q${x1 + 2 * c} 0 ${x1} ${-hw}Z`; }
+function arc(cx, cy, r, a0, a1) {
+  const p = a => [cx + r * Math.cos(a * Math.PI / 180), cy + r * Math.sin(a * Math.PI / 180)], [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function ringDefs(id, upSign) {
+  return `<linearGradient id="${id}lit" x1="0" y1="${upSign < 0 ? 0 : 1}" x2="0" y2="${upSign < 0 ? 1 : 0}"><stop offset="0" stop-color="#fff"/><stop offset=".38" stop-color="#fff4d2"/><stop offset=".75" stop-color="#ffd25e"/><stop offset="1" stop-color="#e8970f"/></linearGradient>
+    <linearGradient id="${id}chg" x1="0" y1="${upSign < 0 ? 0 : 1}" x2="0" y2="${upSign < 0 ? 1 : 0}"><stop offset="0" stop-color="#ffc94a" stop-opacity=".95"/><stop offset="1" stop-color="#a8650e" stop-opacity=".85"/></linearGradient>
+    <radialGradient id="${id}gl"><stop offset="0" stop-color="#ffe6a0"/><stop offset=".5" stop-color="#f5a524" stop-opacity=".5"/><stop offset="1" stop-color="#c98512" stop-opacity="0"/></radialGradient>`;
+}
+// слои: свечение, основа, заряд, контур, огонь, вспышка
+function ringG(id, i, p, pg, cr, sw) {
+  return `<g class="ring"><path class="gl" d="${pg}" fill="url(#${id}gl)" opacity="0"/>
+    <path class="base" d="${p}" fill="#07080c" fill-opacity=".82" stroke="rgba(255,255,255,.32)" stroke-width="${sw[0]}"/>
+    <clipPath id="${id}c${i}"><rect class="cr" x="${cr.x}" y="${cr.y}" width="${cr.w}" height="0" data-hw="${cr.hw}" data-up="${cr.up}"/></clipPath>
+    <path class="chg" d="${p}" fill="url(#${id}chg)" clip-path="url(#${id}c${i})"/>
+    <path class="cho" d="${p}" fill="none" stroke="#ffd27a" stroke-opacity="0" stroke-width="${sw[1]}"/>
+    <path class="hot" d="${p}" fill="url(#${id}lit)" stroke="#fff" stroke-opacity=".75" stroke-width="${sw[2]}" opacity="0"/>
+    <path class="fl" d="${p}" fill="#fff" opacity="0"/></g>`;
+}
+// горят marks; следующее заряжено на prog; edge — полуогонь
+function ringAPI(root, ringPt, lf, heatEl) {
+  const R = $$('.ring', root);
+  const api = {
+    ringPt, rings: R.length,
+    set(marks, prog, fx, edge) {
+      R.forEach((g, i) => {
+        const on = i < marks, nx = i === marks, hot = $('.hot', g), gl = $('.gl', g), cr = $('.cr', g), cho = $('.cho', g);
+        const hw = +cr.dataset.hw, up = +cr.dataset.up, pr = nx && !on ? clamp(prog, 0, 1) : 0;
+        const charge = p => { setA(cr, 'height', (2 * hw * p).toFixed(3)); setA(cr, 'y', (up < 0 ? hw - 2 * hw * p : -hw).toFixed(3)); };
+        setA(cho, 'stroke-opacity', !on && nx ? .95 : 0);
+        const was = g._on, ed = nx && !!edge, ho = on ? 1 : ed ? .45 : 0, go = on ? .8 : ed ? .35 : 0;
+        g._on = on;
+        if (on && !was && fx) this.lightUp(i);
+        else if (fx && ((was && !on) || ed !== !!g._ed)) { // погасло или полуогонь — 650 мс
+          const h0 = +(hot.getAttribute('opacity') || 0), g0 = +(gl.getAttribute('opacity') || 0);
+          tween(650, e => { setA(hot, 'opacity', lerp(h0, ho, e).toFixed(3)); setA(gl, 'opacity', lerp(g0, go, e).toFixed(3)); }, { key: hot, ease: EASE.out3 });
+        } else if (!(on && was && fx)) { setA(hot, 'opacity', ho); setA(gl, 'opacity', go); }
+        g._ed = ed;
+        const p0 = g._p == null ? pr : g._p; g._p = pr;
+        if (fx && Math.abs(p0 - pr) > 1e-4 && !on) tween(650, e => charge(lerp(p0, pr, e)), { key: cr, ease: EASE.out3 }); else { for (const t of TW) if (t.key === cr) TW.delete(t); charge(pr); }
+      });
+    },
+    lightUp(i) {
+      const g = R[i]; if (!g) return;
+      const hot = $('.hot', g), gl = $('.gl', g), fl = $('.fl', g); g._on = true;
+      tween(950, (e, k) => {
+        setA(hot, 'opacity', Math.min(1, k * 3).toFixed(3));
+        setA(fl, 'opacity', (k >= 1 ? 0 : k < .14 ? k / .14 : 1 - EASE.out2((k - .14) / .86)).toFixed(3));
+        const s = k < .2 ? lerp(.6, 1.45, k / .2) : lerp(1.45, 1, EASE.out3((k - .2) / .8));
+        setA(gl, 'opacity', (k < .25 ? lerp(0, 1, k / .25) : lerp(1, .8, (k - .25) / .75)).toFixed(3));
+        gl.style.transform = k >= 1 ? '' : `scale(${s.toFixed(3)})`; fl.style.transform = k >= 1 ? '' : `scale(${(1 + .3 * (1 - k)).toFixed(3)})`;
+      }, { key: hot, ease: EASE.lin });
+      if (lf) flash(lf, .95, 750, .12);
+    },
+    heat(peak) { if (heatEl) flash(heatEl, peak, 760, .14); if (lf) flash(lf, .4, 620, .15); },
+    pop(i) { // кольцо крупно (×2,4) и обратно на ствол — 0,9 с, в конце атрибут снимаем
+      const g = R[i]; if (!g) return;
+      const cr = $('.cr', g), cx = +cr.getAttribute('x') + +cr.getAttribute('width') / 2;
+      tween(900, (e, k) => {
+        if (k >= 1) { g.removeAttribute('transform'); return; }
+        const z = k < .3 ? lerp(1, 2.4, EASE.out3(k / .3)) : lerp(2.4, 1, EASE.inOut((k - .3) / .7));
+        setA(g, 'transform', `translate(${cx.toFixed(3)} 0) scale(${z.toFixed(3)}) translate(${(-cx).toFixed(3)} 0)`);
+      }, { key: g, ease: EASE.lin });
+    },
+    dim(i) { const g = R[i]; if (!g) return; g._on = false; setA($('.hot', g), 'opacity', 0); setA($('.gl', g), 'opacity', 0); },
+  };
+  return api;
+}
+// герой: canvas + SVG (обводка, кольца, лупа)
+function heroBuild(tr, o) {
+  const id = 'h' + (++UID), pad = 44, W = tr.W, H = tr.H, b = tr.b || { ok: false };
+  const k = Math.min(o.tw / W, o.th / H), bx = o.x + (o.tw - W * k) * o.ax, by = o.y + (o.th - H * k) * o.ay;
+  const cw = o.w + 2 * pad, ch = o.h + 2 * pad, X = x => pad + bx + x * k, Y = y => pad + by + y * k;
+  const ok = !!b.ok && !o.noRings, u = b.u || [-1, 0], w = b.w || 0;
+  const ang = Math.atan2(-u[1], -u[0]) * 180 / Math.PI, upSign = Math.cos(ang * Math.PI / 180) > 0 ? -1 : 1;
+  const far = ok ? b.rings[2].s + b.rings[2].rw / 2 : 0, sC = ok && o.R ? Math.max(far * .5, far - (o.R / (o.Z * k)) * .88) : 0;
+  const L = ok && o.R ? { x: X(b.tip[0] - u[0] * sC), y: Y(b.tip[1] - u[1] * sC), R: o.R, Z: o.Z } : null;
+  const G = { tr, k, bx, by, pad, cw, ch, L, ok, far, dead: !!o.dead };
+  const el = document.createElement('div'); el.className = 'hero';
+  el.style.cssText = `left:${-pad}px;top:${-pad}px;width:${cw}px;height:${ch}px`;
+  let s = bakeScale(), cv = bake(G, G.dead, s); el.appendChild(cv);
+  const px = v => (v / k).toFixed(3), tank = `translate(${(pad + bx).toFixed(2)} ${(pad + by).toFixed(2)}) scale(${k.toFixed(5)})`;
+  const zoom = L ? `translate(${L.x.toFixed(2)} ${L.y.toFixed(2)}) scale(${L.Z}) translate(${(-L.x).toFixed(2)} ${(-L.y).toFixed(2)}) ` : '';
+  let rings = '';
+  if (ok) b.rings.forEach((r, i) => {
+    const hw = r.w / 2 + .16 * w, rw = r.rw * 1.12;
+    rings += ringG(id, i, ringPath(r.s, rw, hw, .2), ringPath(r.s, rw * 2.8, hw * 1.6, .2), { x: r.s - rw, y: upSign < 0 ? hw : -hw, w: rw * 2, hw, up: upSign }, [px(.7), px(.9), px(.6)]);
+  });
+  const heatTo = ok ? far + 2.4 * w : 0;
+  el.insertAdjacentHTML('beforeend', `<svg xmlns="${NS}" width="${cw}" height="${ch}" viewBox="0 0 ${cw} ${ch}"><defs>
+    <linearGradient id="${id}rim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${W}" y2="0"><stop offset="0" stop-color="#ffd66b"/><stop offset="1" stop-color="#e08c0e"/></linearGradient>
+    <linearGradient id="${id}rimf" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${H}"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="#fff" stop-opacity=".55"/><stop offset=".85" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <mask id="${id}rm" maskUnits="userSpaceOnUse" x="-20" y="-20" width="${W + 40}" height="${H + 40}"><rect x="-20" y="-20" width="${W + 40}" height="${H + 40}" fill="url(#${id}rimf)"/></mask>
+    <clipPath id="${id}clip"><path d="${tr.d}" clip-rule="evenodd"/></clipPath>
+    ${ringDefs(id, upSign)}
+    <radialGradient id="${id}heat"><stop offset="0" stop-color="#fff0c0" stop-opacity=".9"/><stop offset=".6" stop-color="#f5a524" stop-opacity=".35"/><stop offset="1" stop-color="#c98512" stop-opacity="0"/></radialGradient>
+    ${L ? `<mask id="${id}nl" maskUnits="userSpaceOnUse" x="0" y="0" width="${cw}" height="${ch}"><rect width="${cw}" height="${ch}" fill="#fff"/><circle cx="${L.x}" cy="${L.y}" r="${L.R + 1.5}" fill="#000"/></mask>
+    <clipPath id="${id}lc"><circle cx="${L.x}" cy="${L.y}" r="${L.R}"/></clipPath>
+    <linearGradient id="${id}lb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1cc"/><stop offset=".45" stop-color="#ffd66b"/><stop offset="1" stop-color="#e08c0e"/></linearGradient>` : ''}
+  </defs>
+  <g ${L ? `mask="url(#${id}nl)"` : ''}><g transform="${tank}">
+    <g id="${id}rimg"><path class="rim" d="${tr.d}" fill="none" stroke="url(#${id}rim)" stroke-width="${px(G.dead ? 1.1 : 2.3)}" stroke-linejoin="round" mask="url(#${id}rm)" clip-path="url(#${id}clip)" opacity="${G.dead ? .3 : 1}"/>
+      <path d="${tr.d}" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="${px(.8)}"/></g>
+    ${ok ? `<g id="${id}bar" class="bar" transform="translate(${b.tip[0].toFixed(2)} ${b.tip[1].toFixed(2)}) rotate(${ang.toFixed(3)})" opacity="${G.dead ? .6 : 1}">
+      <path class="heat" d="M${-.5 * w} ${-1.05 * w}L${heatTo} ${-1.05 * w}L${heatTo} ${1.05 * w}L${-.5 * w} ${1.05 * w}Z" fill="url(#${id}heat)" opacity="0"/>${rings}</g>` : ''}
+  </g></g>
+  ${L ? `<g class="lens"><g clip-path="url(#${id}lc)"><use href="#${id}rimg" transform="${zoom}${tank}"/>${ok ? `<use href="#${id}bar" transform="${zoom}${tank}"/>` : ''}</g>
+    <circle cx="${L.x}" cy="${L.y}" r="${L.R - 2.6}" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="1"/>
+    <circle cx="${L.x}" cy="${L.y}" r="${L.R + 1.7}" fill="none" stroke="rgba(0,0,0,.7)" stroke-width="1.4"/>
+    <circle cx="${L.x}" cy="${L.y}" r="${L.R}" fill="none" stroke="url(#${id}lb)" stroke-width="2.4"/>
+    <path d="${arc(L.x, L.y, L.R - 5.5, 198, 258)}" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/>
+    <path d="${arc(L.x, L.y, L.R - 5.5, 268, 280)}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="2" stroke-linecap="round"/>
+    <circle class="lf" cx="${L.x}" cy="${L.y}" r="${L.R}" fill="none" stroke="#fff" stroke-width="3" opacity="0"/></g>` : ''}</svg>`);
+  const svg = $('svg', el);
+  // точка кольца i на экране (в лупе — увеличенная)
+  const ringPt = i => {
+    const r = b.rings[i], px0 = X(b.tip[0] - u[0] * r.s), py0 = Y(b.tip[1] - u[1] * r.s);
+    return L ? { x: L.x + L.Z * (px0 - L.x) - pad, y: L.y + L.Z * (py0 - L.y) - pad } : { x: px0 - pad, y: py0 - pad };
+  };
+  const api = ok ? ringAPI(svg, ringPt, $('.lf', svg), $('.heat', svg)) : { rings: 0, set() {}, lightUp() {}, heat() {}, ringPt: () => ({ x: 0, y: 0 }) };
+  api.el = el; api.ok = ok; api.L = L; api.s = s; api.dead = G.dead; api.o = o;
+  // смерть — серый кадр за 400 мс
+  api.redead = (dead, fx) => {
+    if (G.dead === !!dead) return;
+    G.dead = !!dead; api.dead = G.dead;
+    const nv = bake(G, G.dead, s), old = cv; cv = nv;
+    const rim = $('.rim', svg), bar = $('.bar', svg);
+    if (rim) { setA(rim, 'stroke-width', px(G.dead ? 1.1 : 2.3)); setA(rim, 'opacity', G.dead ? .3 : 1); }
+    if (bar) setA(bar, 'opacity', G.dead ? .6 : 1);
+    if (!fx) { el.replaceChild(nv, old); return; }
+    nv.style.opacity = '0'; el.insertBefore(nv, svg);
+    tween(400, e => { nv.style.opacity = e >= 1 ? '' : e.toFixed(3); }, { ease: EASE.lin, done: () => old.remove() });
+  };
+  api.rebake = ns => { s = ns; api.s = ns; const nv = bake(G, G.dead, s); el.replaceChild(nv, cv); cv = nv; };
+  return api;
+}
+// значок-ствол: нет картинки или ствола
+function badgeBuild(x, y) {
+  const id = 'g' + (++UID), cyc = 16, S = [30, 46, 62];
+  let rings = '';
+  S.forEach((s, i) => { const p = ringPath(s, 12, 13, 0); rings += ringG(id, i, p, ringPath(s, 30, 20, 0), { x: s - 12, y: 13, w: 24, hw: 13, up: -1 }, [.8, 1, .7]); });
+  const el = document.createElement('div'); el.className = 'hero';
+  el.style.cssText = `left:${x}px;top:${y}px;width:170px;height:34px`;
+  el.innerHTML = `<svg xmlns="${NS}" width="170" height="34" viewBox="0 0 170 34"><defs>
+    <linearGradient id="${id}tb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2b36"/><stop offset="1" stop-color="#121219"/></linearGradient>
+    <linearGradient id="${id}rm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffd66b"/><stop offset="1" stop-color="#e08c0e"/></linearGradient>${ringDefs(id, -1)}
+    <radialGradient id="${id}heat"><stop offset="0" stop-color="#fff0c0" stop-opacity=".9"/><stop offset=".6" stop-color="#f5a524" stop-opacity=".35"/><stop offset="1" stop-color="#c98512" stop-opacity="0"/></radialGradient></defs>
+    <rect x="12" y="${cyc - 11}" width="150" height="22" rx="3" fill="url(#${id}tb)" stroke="url(#${id}rm)" stroke-width="1.4"/>
+    <rect x="2" y="${cyc - 15}" width="16" height="30" rx="3" fill="url(#${id}tb)" stroke="url(#${id}rm)" stroke-width="1.4"/>
+    <rect class="heat" x="0" y="0" width="90" height="34" fill="url(#${id}heat)" opacity="0"/>
+    <g transform="translate(0 ${cyc})">${rings}</g></svg>`;
+  const api = ringAPI($('svg', el), i => ({ x: x + S[i], y: y + cyc }), null, $('.heat', el));
+  api.el = el; api.ok = true; api.L = null; api.badge = true;
+  return api;
+}
+
+// ===== 8. Вид =====
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+const CLS = { lightTank: ['ЛТ', 'c-lt'], mediumTank: ['СТ', 'c-st'], heavyTank: ['ТТ', 'c-tt'], 'AT-SPG': ['ПТ', 'c-pt'], SPG: ['САУ', 'c-spg'] };
+const MC = document.createElement('canvas').getContext('2d');
+// ширины — measureText (rect под zoom неоднозначен)
+function textW(s, font, ls = 0) { MC.font = font; return MC.measureText(String(s)).width + ls * String(s).length; }
+function chipsW(lvl, cls) {
+  let w = 5;
+  if (ROMAN[lvl]) w += 16 + textW(ROMAN[lvl], '900 italic 12px Montserrat', .36) + 6;
+  if (CLS[cls]) w += 14 + textW(CLS[cls][0], '800 11px Inter', .66) + 6;
+  return w;
+}
+function fitName(name, short, lvl, cls) { // 19 → 17 → 15,5 px, короткое имя, многоточие
+  const avail = 226 - chipsW(lvl, cls);
+  for (const t of name === short || !short ? [name] : [name, short]) for (const px of [19, 17, 15.5]) if (textW(t, `900 italic ${px}px Montserrat`, -.015 * px) <= avail) return { txt: t, px };
+  return { txt: short || name, px: 15.5 };
+}
+const chipsHTML = vm => (ROMAN[vm.lvl] ? `<span class="tier"><span>${ROMAN[vm.lvl]}</span></span>` : '') + (CLS[vm.cls] ? `<span class="cls ${CLS[vm.cls][1]}">${CLS[vm.cls][0]}</span>` : '');
+const chipsTab = (list, fx) => ({ key: list.map(c => c.join(':')).join('|'), fx: fx || 'bump', html: list.map(([c, t]) => `<span class="chipst ${c}"><span>${esc(t)}</span></span>`).join('') });
+const stampTab = t => ({ key: 'stamp:' + t, fx: 'slam', stamp: true, html: `<span class="stamp"><span>${esc(t)}</span></span>` });
+const fmtBig = (v, rough) => (rough ? fP(v, 1) : fP(v));
+
+// ---- модели вида ----
+function hgVM() {
+  const tag = M.hgTag, tk = tagKey(tag), rec = M.rec || (M.rec = loadRec(tag));
+  const hv = M.hv && tagKey(M.hv.tag) === tk ? M.hv : null;
+  const name = (hv && hv.localizedName) || rec.name || tk, short = (hv && hv.localizedShortName) || rec.short || name;
+  const lvl = +(hv && hv.level) || rec.lvl || 0, cls = (hv && hv.class) || rec.cls || '';
+  const vm = { view: 'hg', tag, tk, name, short, lvl, cls, nameFit: fitName(name, short, lvl, cls) };
+  const after = M.after && tagKey(M.after.tag) === tk && wall() - M.after.at < AFTER_MS ? M.after : null;
+  vm.tab = hgTab(after, M.queue);
+  if (lvl > 0 && lvl < 5) { vm.low = true; vm.sub = 'low'; vm.key = 'hg|low|' + tk; return vm; }
+  const base = baseline(tag, rec), cvE = CURVES.get(tk), cv = cvE || null;
+  const mk = MO.marksOf(rec, base ? base.P0 : null);
+  vm.marks = mk.n; vm.sure = mk.sure; vm.base = base;
+  if (!base) { vm.sub = 'nodata'; vm.big = { none: true }; vm.s1 = 'Нет данных по танку'; vm.s2 = 'появятся после боя'; }
+  else if (!base.b0 && !base.A0) { vm.sub = 'fresh'; vm.big = { none: true }; vm.s1 = 'Боёв на танке ещё нет'; vm.s2 = 'процент растёт с первого боя'; }
+  else {
+    const P = base.P0, n = vm.marks;
+    vm.sub = n >= 3 ? 'max' : 'ok';
+    vm.big = { v: P, ap: !(base.exact || base.src === 'result'), max: n >= 3 && P >= 95 };
+    if (n >= 3) {
+      if (P >= 95) { vm.s1 = '<span class="g">3 отметки из 3</span>'; vm.s2 = `запас над 95%: <b>${fP(P - 95)}%</b>`; }
+      else { vm.s1 = '<b>3 отметки из 3</b>'; vm.s2 = `до 95% — <em>ещё ${fP(95 - P)}%</em>`; }
+    } else { vm.s1 = `<b>${n} ${MO.marksWord(n)} из 3</b>`; vm.s2 = `до ${MO.ordG(n + 1)} — <em>ещё ${fP(MO.T[n] - P)}%</em>`; }
+  }
+  vm.prog = MO.prog(vm.marks, base ? base.P0 : 0);
+  vm.okEdge = !!(vm.big && vm.big.max) || !!(after && after.up);
+
+  const pts = rec.hist.filter(e => e.P1 != null).slice(-20).map(e => ({
+    P1: +e.P1, P0: e.P0 != null ? +e.P0 : null, gap: !!e.gap, solid: !!(e.exact || e.src === 'res'),
+    d: e.gap ? (e.d != null ? +e.d : null) : e.P0 != null ? Math.round((e.P1 - e.P0) * 100) / 100 : null }));
+  vm.pts = pts; vm.nextT = vm.marks < 3 ? MO.T[vm.marks] : null;
+  vm.secLabel = pts.length >= 2 ? `${pts.length} ${MO.battlesWord(pts.length)} · ± за бой` : 'Последние бои';
+  if (pts.length >= 2) {
+    const a = pts[0].P0 != null ? pts[0].P0 : pts[0].P1, z = pts[pts.length - 1].P1, d = Math.round((z - a) * 100) / 100;
+    vm.trend = `${fP(a)} → ${fP(z)} <span class="${d >= 0 ? 'g' : 'r'}">${fD(d)}</span>`;
+  } else vm.trend = '';
+  vm.chartKey = pts.length >= 2 ? pts.map(p => p.P1 + ':' + p.d + (p.solid ? 's' : 'h') + (p.gap ? 'g' : '')).join(',') + '|' + vm.nextT : 'e' + pts.length + ':' + (pts[0] ? pts[0].d : '') + ':' + (base ? Math.round(base.A0) : '');
+  vm.empty = pts.length >= 2 ? null : pts.length === 1
+    ? { b: 'Первый бой записан' + (pts[0].d != null ? ': ' + fD(pts[0].d) + '%' : ''), t: 'График наберётся за несколько боёв. Средний урон+помощь сейчас — ' + fI(base ? base.A0 : 0) + '.' }
+    : { b: 'Здесь будет прогресс', t: 'После каждого случайного боя на этом танке — точка на графике: сколько процентов прибавил или потерял.' };
+  // плитки «сколько нужно»
+  vm.tiles = [];
+  if (base && (vm.sub === 'ok' || vm.sub === 'max')) {
+    let kn = cv ? cv.kn : null, d = 0;
+    if (kn) { const dl = MO.delta(kn, base.A0, base.P0, base.sameDay); if (dl.est) { const e = MO.fitEst([[base.A0, base.P0]]); kn = e ? e.kn : kn; } else d = dl.d; }
+    vm.tiles = MO.plan({ kn, A0: base.A0, P0: base.P0, d, marks: vm.marks, b: base.b0 });
+  }
+  vm.tilesKey = vm.tiles.map(t => t.label + ':' + t.v + (t.hot ? '*' : '')).join('|');
+  vm.src = after && after.state === 'pending' ? 'Итог боя придёт через минуту — цифры уточнятся'
+    : cvE === undefined ? '' : MO.srcLine(cv ? cv.src : 'none', cv ? cv.upd || cv.at || 0 : 0, vm.sure);
+  vm.key = 'hg|' + (vm.big.none ? 'none' : 'val') + '|' + tk;
+  return vm;
+}
+function hgTab(after, queue) {
+  if (queue) return chipsTab([['brand', 'ОТМЕТКИ'], ['wait', 'В ОЧЕРЕДИ']], 'pop');
+  if (after) {
+    if (after.state === 'pending') return chipsTab([['brand', 'ОТМЕТКИ'], ['wait', 'ЗА БОЙ ≈ ' + fD(after.dP) + '%']], 'pop');
+    if (after.up) return stampTab(`★ ${after.mk}-Я ОТМЕТКА ПОЛУЧЕНА`);
+    return chipsTab([['brand', 'ОТМЕТКИ'], [after.dP >= .005 ? 'ok' : after.dP <= -.005 ? 'dn' : 'mut', 'ЗА БОЙ ' + fD(after.dP) + '%']]);
+  }
+  return chipsTab([['brand', 'ОТМЕТКИ НА СТВОЛЕ']]);
+}
+function btVM() {
+  const b = bt, tk = tagKey(b.tag), g = b.goal || { type: 'none' };
+  const ended = b.done || b.period === 'AFTERBATTLE', dead = !b.alive, start = b.period !== 'BATTLE';
+  const vm = { view: 'bt', tag: b.tag, tk, kind: M.replay ? 'replay' : !b.counted ? 'offmode' : !b.base ? 'nobase' : !b.kn ? 'avg' : 'main', ended, dead };
+  vm.sub = vm.kind === 'replay' || vm.kind === 'offmode' ? vm.kind : ended ? 'ended' : vm.kind === 'nobase' ? 'nobase' : dead ? 'dead' : start ? 'start' : 'live';
+  vm.key = ['bt', vm.kind, tk, g.type, g.T || 0].join('|');
+  if (vm.kind === 'replay') { vm.tab = chipsTab([['mut', 'ЗАПИСЬ БОЯ']]); vm.title = 'Это запись боя'; vm.text = 'Отметки в записях не меняются'; return vm; }
+  if (vm.kind === 'offmode') { vm.tab = chipsTab([['mut', 'ВНЕ ЗАЧЁТА']]); vm.title = 'Отметки не меняются'; vm.text = 'Только случайные бои на V–XI уровне'; return vm; }
+  const L = b.L, C = b.C, A0 = b.base ? b.base.A0 : 0, sec = b.cross === 'secure';
+  const star = g.type === 'mark' ? `★ ${g.n}-Я ОТМЕТКА` : '★ +1% ЗА БОЙ';
+  vm.tab = ended ? chipsTab([['ok', 'БОЙ ОКОНЧЕН' + (sec ? ' · ' + (g.type === 'mark' ? star : '★ +1%') : '')]]) : sec ? stampTab(star)
+    : dead ? chipsTab([['mut', 'УНИЧТОЖЕН']]) : chipsTab([['bt', start ? 'НАЧАЛО БОЯ' : 'В БОЮ']]);
+  vm.C = C; vm.dmg = b.dmg; vm.ast = b.ast; vm.cross = b.cross; vm.goal = g; vm.partial = !!b.partial;
+  vm.edge = sec || (ended && (!L || L.dP == null || L.dP >= 0)) ? 'ok' : ended ? '' : 'bt';
+  if (vm.kind === 'nobase') {
+    vm.label = 'Урон + помощь'; vm.big = { v: C, int: true }; vm.dnote = '';
+    vm.foot = 'Нет данных досье — прогноз появится после первого боя с окном';
+    vm.ring = { marks: 0, prog: 0, edge: false };
+    return vm;
+  }
+  vm.even = A0; vm.maxC = g.maxC || Math.ceil(Math.max(A0 * 1.6, 1000));
+  vm.label = ended ? 'Итог боя' : 'После боя будет';
+  if (vm.kind === 'avg') { // кривой нет — средний и «в ноль»
+    const d = Math.round(L.A1r - A0);
+    vm.label = ended ? 'Средний за бой' : 'Средний после боя';
+    vm.big = { v: L.A1r, int: true }; vm.dP = d; vm.dcls = d >= 1 ? 'up' : d <= -1 ? 'dn' : 'zero'; vm.dtxt = (d >= 1 ? '+' : d <= -1 ? '−' : '±') + fI(Math.abs(d));
+    vm.dnote = C < A0 ? 'пока в минусе' : 'в плюсе';
+  } else {
+    vm.big = { v: L.P1, rough: L.rough, ap: L.rough }; vm.dP = L.dP; vm.band = L.bandText;
+    vm.dcls = L.dP >= .005 ? 'up' : L.dP <= -.005 ? 'dn' : 'zero'; vm.dtxt = fD(L.dP) + '%';
+    vm.dnote = L.dP <= -.005 ? 'пока в минусе' : L.dP >= .005 ? 'в плюсе' : 'ровно в ноль';
+  }
+  // нижняя строка — по ситуации
+  const gn = g.type === 'mark' ? g.T + '%' : '+1%';
+  let ft;
+  if (ended) ft = vm.kind === 'avg' ? `За бой средний <b>${vm.dtxt}</b> · точная цифра придёт с результатом боя`
+    : `За бой <span class="${L.dP >= 0 ? 'g' : 'r'}">${fD(L.dP)}%</span> · точная цифра придёт с результатом боя`;
+  else if (dead) ft = 'Танк уничтожен — точный итог придёт после боя';
+  else if (sec && g.type === 'mark') ft = `<span class="g">${MO.ord(g.n)} отметка будет!</span> Запас сверху: <b>${fD(L.over)}%</b>`;
+  else if (sec) ft = '<span class="g">Сильный бой: +1% и больше!</span> Дальше — только плюс';
+  else if (g.type === 'mark' && (b.cross === 'edge' || (L.left === 0 && C > 0))) ft = `На грани ${MO.ordG(g.n)} отметки — для запаса ещё <b>${fI(L.leftSafe)}</b>`;
+  else if (g.type === 'none') ft = C < A0 ? `До «в ноль» ещё <b>${fI(L.leftEven)}</b>` : 'В плюсе — процент растёт с каждым попаданием';
+  else if (C < A0) ft = `До «в ноль» ещё <b>${fI(L.leftEven)}</b> · до ${gn} — <b>${fI(L.left)}</b>`;
+  else ft = `До ${g.type === 'mark' ? g.to : '+1%'} ещё <b>${fI(L.left)}</b> урона+помощи`;
+  vm.foot = ft;
+  vm.extra = vm.kind === 'avg' ? 'Пороги недоступны — показываем средний' : '';
+  // цель-отметка: заряд уроном
+  vm.ring = g.type === 'mark' ? { marks: sec ? b.marks + 1 : b.marks, prog: sec ? 0 : L.prog, edge: b.cross === 'edge' }
+    : { marks: b.marks, prog: MO.prog(b.marks, L.P1 != null ? L.P1 : b.base.P0), edge: false };
+  return vm;
+}
+const offVM = () => ({ view: 'off', key: 'off', kind: 'off', tab: chipsTab([['brand', 'ОТМЕТКИ НА СТВОЛЕ']]), title: 'Нет связи с игрой', text: 'Нужен мод WotStat «Виджеты»' });
+const KEEP_VIEW = {};
+function vmNow() {
+  if (!M.pid) return M.offline ? offVM() : CARD && CARD.view !== 'off' ? KEEP_VIEW : null;
+  if (bt && (!bt.done || M.gstate === 'battle')) return btVM();
+  if (M.gstate === 'hangar' && M.hgTag && M.hgShown) return hgVM();
+  if (M.offline && !CARD) return offVM();
+  return CARD ? KEEP_VIEW : null;
+}
+
+// ---- сборка и обновление ----
+function render(mode) {
+  if (!MO) return;
+  const vm = vmNow();
+  if (vm === KEEP_VIEW) return;
+  if (!vm) { if (CARD) { TW.clear(); $('#mkCard').replaceChildren(); CARD = null; } return; }
+  if (!CARD || CARD.key !== vm.key) build(vm, mode !== 'quiet' && (mode === 'enter' || !CARD || CARD.view !== vm.view));
+  else apply(CARD, vm, mode === 'quiet' || mode === 'set' ? 'set' : mode === 'confirm' ? 'confirm' : 'fx');
+}
+let BUILDS = 0;
+function build(vm, enter) {
+  TW.clear(); BUILDS++;                               // пересборка гасит все твины
+  const c = vm.view === 'hg' ? hgBuild(vm) : vm.view === 'bt' && (vm.kind === 'main' || vm.kind === 'avg' || vm.kind === 'nobase') ? btBuild(vm) : cmpBuild(vm);
+  c.key = vm.key; c.view = vm.view; c.tk = vm.tk || ''; c.fontsStale = !FONTS_OK;
+  $('#mkCard').replaceChildren(c.el); CARD = c;
+  if (c.kind === 'hg') hgHero(c, vm, false); else if (c.kind === 'bt') btHero(c, vm, false);
+  apply(c, vm, 'set');
+  if (enter) (c.kind === 'hg' ? hgEnter : btEnter)(c, vm);
+  dbg('build ' + vm.key + (enter ? ' enter' : ''));
+}
+function apply(c, vm, mode) {
+  if (c.kind === 'hg') hgApply(c, vm, mode); else if (c.kind === 'bt') btApply(c, vm, mode); else tabApply(c, vm.tab, false);
+  c.vm = vm;
+}
+function tabApply(c, t, fx) {
+  const tab = c.r.tabs;
+  if (tab._k === t.key) return;
+  const had = tab._k != null; tab._k = t.key; tab.innerHTML = t.html;
+  if (!fx || !had) return;
+  const last = tab.lastElementChild;
+  if (t.fx === 'slam') slam(last);
+  else if (t.fx === 'pop') popIn(last);
+  else bump(last, .16, 520, 'skewX(-12deg)');
+}
+function slam(s) {
+  tween(640, (e, k) => { s.style.opacity = k >= 1 ? '' : Math.min(1, k * 2.4).toFixed(3); s.style.transform = k >= 1 ? '' : `skewX(-14deg) rotate(${lerp(-14, -4, e).toFixed(2)}deg) scale(${lerp(2.3, 1, e).toFixed(3)})`; }, { ease: EASE.back, back: true });
+}
+function shell(cls, top, inner) {
+  return html(`<div class="mk ${cls}" style="margin-top:${top}px"><div class="sh"></div><div class="bgp"></div><div class="hl"></div><div class="tabs"></div>${inner}</div>`);
+}
+
+// ---- ангар ----
+function hgBuild(vm) {
+  const el = shell('hg', 26, `<div class="hg-top" style="height:${vm.low ? 128 : 206}px"><div class="l">
+      <div class="nm">${chipsHTML(vm)}<span class="name" style="font-size:${vm.nameFit.px}px">${esc(vm.nameFit.txt)}</span></div>
+      ${vm.low ? '<div class="sub">Отметки дают <b>с V уровня</b></div>' : '<div class="big"><i class="ap" hidden>≈</i><b class="pv"></b><i class="u">%</i></div><div class="sub2"><span class="s1"></span><br><span class="s2"></span></div>'}
+    </div></div>
+    ${vm.low ? '<div class="low"><div class="empty"><b>Этот танк не участвует</b>Отметки на стволе — только с V по XI уровень и только в случайных боях. Выбери танк постарше — окно оживёт само.</div></div>'
+      : '<div class="sec"><div class="sec-h"><div class="lbl"></div><div class="tr"></div></div><div class="chw"></div><div class="need"></div><div class="src"></div></div>'}`);
+  const q = s => $(s, el);
+  return { kind: 'hg', el, hero: null, tank: null, r: { tabs: q('.tabs'), hl: q('.hl'), top: q('.hg-top'), l: q('.hg-top .l'), big: q('.big'), ap: q('.ap'), pv: q('.pv'), u: q('.big .u'),
+    s1: q('.s1'), s2: q('.s2'), lbl: q('.sec-h .lbl'), tr: q('.sec-h .tr'), chw: q('.chw'), need: q('.need'), src: q('.src') } };
+}
+function hgBoxes(vm) { // коробки текста (.hg-top)
+  const x = 20, nb = 37, big = vm.big || {}, sw = s => textW(String(s || '').replace(/<[^>]+>/g, ''), '800 12.5px Inter');
+  const out = [[x, 17, x + chipsW(vm.lvl, vm.cls) + textW(vm.nameFit.txt, `900 italic ${vm.nameFit.px}px Montserrat`, -.015 * vm.nameFit.px), nb]];
+  const by = nb + 13, bw = (big.ap ? textW('≈', '900 26px Montserrat') + 3 : 0) + textW(big.none ? '—' : fP(big.v), '900 italic 52px Montserrat', -1.82) + 4 + (big.none ? 0 : textW('%', '900 26px Montserrat'));
+  out.push([x, by, x + bw, by + 48]);
+  const sy = by + 57;
+  out.push([x, sy, x + sw(vm.s1), sy + 17.5], [x, sy + 17.5, x + sw(vm.s2), sy + 35]);
+  return out;
+}
+function hgHero(c, vm, late) {
+  const top = c.r.top, h = HERO.get(vm.tk), tr = h && h.tr;
+  if (vm.low) {
+    if (!tr) return;
+    c.hero = heroBuild(tr, { tw: 200, th: 150, x: 176, y: -24, ax: 1, ay: 0, w: 380, h: 140, dead: true, noRings: true });
+    top.appendChild(c.hero.el);
+  } else if (tr) {
+    const pl = placeHero(tr, { tw: 252, th: 214, x: 128, y: -4, ax: 1, ay: 0, w: 380, h: 232 }, hgBoxes(vm));
+    const need = Math.max(206, Math.ceil(pl.lay.bottom + 6), pl.lay.L ? Math.ceil(pl.lay.L.y + pl.lay.L.R + 10) : 0);
+    setS(top, 'height', need + 'px'); pl.o.h = need;
+    const H = heroBuild(tr, pl.o); top.appendChild(H.el);
+    if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, Math.round((need - 34) / 2)); top.appendChild(c.hero.el); }
+  } else if (h && h.err) { c.hero = badgeBuild(208, 99); top.appendChild(c.hero.el); }
+  else return;
+  if (late) { // картинка опоздала — выезжает одна
+    if (c.hero.set && !vm.low) c.hero.set(vm.marks, vm.prog, false, false);
+    [c.tank, c.hero].forEach(H => H && slideIn(H.el, 500, 36, 0, 2));
+  }
+}
+function hgApply(c, vm, mode) {
+  const r = c.r, fx = mode === 'fx', conf = mode === 'confirm';
+  if (!conf) tabApply(c, vm.tab, fx);
+  tog(c.el, 's-ok', vm.okEdge);
+  if (vm.low) return;
+  const big = vm.big;
+  tog(r.big, 'max', big.max); tog(r.big, 'none', big.none); hide(r.u, big.none); hide(r.ap, !big.ap || big.none);
+  if (big.none) setNum(r.pv, 0, () => '—');
+  else if (conf && r.pv._shown != null && Math.abs(r.pv._shown - big.v) > 1e-9) countTo(r.pv, big.v, 700, v => fP(v));
+  else if (fx && r.pv._shown != null && fP(r.pv._shown) !== fP(big.v)) countTo(r.pv, big.v, 700, v => fP(v)); // досье уточнило % — досчитать
+  else if (!(fx && r.pv._shown != null && fP(r.pv._shown) === fP(big.v))) setNum(r.pv, big.v, v => fP(v));
+  setH(r.s1, vm.s1); setH(r.s2, vm.s2);
+  setT(r.lbl, vm.secLabel); setH(r.tr, vm.trend);
+  if (r.chw._k !== vm.chartKey) {
+    r.chw._k = vm.chartKey;
+    r.chw.innerHTML = vm.pts.length >= 2 ? chartHTML(vm.pts, vm.nextT, conf) : `<div class="empty"><b>${esc(vm.empty.b)}</b>${esc(vm.empty.t)}</div>`;
+    if (conf && vm.pts.length >= 2) chartConfirm(r.chw);
+  }
+  if (r.need._k !== vm.tilesKey) {
+    r.need._k = vm.tilesKey; tog(r.need, 'n2', vm.tiles.length === 2);
+    const n = vm.tiles.length, room = (342 - 8 * (n - 1)) / n - 22; // ширина подписи в плитке
+    r.need.innerHTML = vm.tiles.map(t => `<div class="tile${t.hot ? ' hot' : ''}"><small${textW(t.label, '800 italic 10.5px Montserrat', .63) > room ? ' class="sq"' : ''}>${esc(t.label)}</small><b>${fI(t.v)}</b></div>`).join('');
+  }
+  setT(r.src, vm.src);
+  const H = c.hero;
+  if (H && H.set) {
+    if (conf) confirmRings(c, vm); else H.set(vm.marks, vm.prog, fx, false);
+  }
+  if (conf) confirmFx(c, vm);
+}
+// итог подтвердился (9.3)
+function confirmFx(c, vm) {
+  const a = M.after;
+  tabApply(c, vm.tab, false);
+  const last = c.r.tabs.lastElementChild;
+  if (a && a.up) slam(last);                           // вспышка рамки — в burst()
+  else if (last) bump(last, .16, 520, 'skewX(-12deg)');
+}
+function confirmRings(c, vm) {
+  const H = c.hero, a = M.after;
+  if (a && a.up && H.rings) { H.set(vm.marks, vm.prog, false, false); H.lightUp(vm.marks - 1); burst(c, vm.marks - 1); } // новая отметка
+  else H.set(vm.marks, vm.prog, true, false);           // прогноз ошибся — кольцо гаснет
+}
+function hgEnter(c, vm) {
+  const r = c.r;
+  [c.tank, c.hero].forEach(H => H && slideIn(H.el, 760, 36, 0, 1.6));
+  slideIn(r.l, 520, -14, 80);
+  if (vm.low) { const box = $('.low .empty', c.el); if (box) fadeIn(box, 420, 640); }
+  if (!vm.low && vm.big && !vm.big.none) { const v = vm.big.v, from = Math.max(0, v - 2.4); r.pv._shown = from; setT(r.pv, fP(from)); countTo(r.pv, v, 950, x => fP(x), { delay: 120 }); }
+  const ln = $('.chart .ln', c.el);
+  if (ln) {
+    const L = ln.getTotalLength();
+    tween(950, e => { ln.style.strokeDasharray = e >= 1 ? '' : L.toFixed(1); ln.style.strokeDashoffset = e >= 1 ? '' : (L * (1 - e)).toFixed(1); }, { ease: EASE.inOut, back: true, delay: 360 });
+    const fade = $$('.chart .ar, .chart .ls, .chart .lv, .chart .lh, .chart .lp', c.el);
+    tween(500, e => fade.forEach(f => { f.style.opacity = e >= 1 ? '' : e.toFixed(3); }), { ease: EASE.out2, back: true, delay: 900 });
+    $$('.chart .db', c.el).forEach((b, i) => tween(380, e => { b.style.transform = e >= 1 ? 'skewX(-12deg)' : `skewX(-12deg) scaleY(${Math.max(0, e).toFixed(3)})`; }, { ease: EASE.back, back: true, delay: 420 + i * 26 }));
+  }
+  $$('.need .tile, .sec .empty', c.el).forEach((t, i) => fadeIn(t, 420, 640 + i * 60));
+  const H = c.hero;
+  if (H && H.rings && !vm.low) for (let i = 0; i < vm.marks; i++) { H.dim(i); vlater(600 + 180 * i, () => H.lightUp(i)); } // горящие — по очереди
+  const a = M.after;
+  if (a && tagKey(a.tag) === vm.tk && a.state === 'pending') popIn(r.tabs.lastElementChild, 1900); // «за бой ≈» — в конце входа
+}
+// график (8.7): % после боя и ± за бой
+function chartHTML(pts, nextT, pendLast) {
+  const id = 'c' + (++UID), Wc = 342, Hc = 98, pl = 2, pr = 44, pt = 8, lineB = 62, barT = 70, barH = 26, n = pts.length;
+  let lo = Math.min(...pts.map(p => p.P1)), hi = Math.max(...pts.map(p => p.P1));
+  if (nextT != null && nextT > hi && nextT - hi < Math.max(1.6, (hi - lo) * .6)) hi = nextT;
+  if (hi - lo < .8) { const m = (hi + lo) / 2; lo = m - .4; hi = m + .4; }
+  const span = hi - lo; lo -= span * .14; hi += span * .08;
+  const X = i => pl + (n === 1 ? Wc - pl - pr : i * (Wc - pl - pr) / (n - 1)), Y = p => pt + (hi - p) / (hi - lo) * (lineB - pt);
+  const last = pts[n - 1], hollow = pendLast || !last.solid;
+  let line = '', seg = '';
+  pts.forEach((p, i) => { const s = X(i).toFixed(1) + ' ' + Y(p.P1).toFixed(1); if (i < n - 1 || !hollow) line += (i ? 'L' : 'M') + s; });
+  if (hollow) seg = `M${X(n - 2).toFixed(1)} ${Y(pts[n - 2].P1).toFixed(1)}L${X(n - 1).toFixed(1)} ${Y(last.P1).toFixed(1)}`;
+  let area = '';
+  pts.forEach((p, i) => { area += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.P1).toFixed(1); });
+  area += `L${X(n - 1).toFixed(1)} ${lineB}L${X(0).toFixed(1)} ${lineB}Z`;
+  const ds = pts.filter(p => p.d != null).map(p => Math.abs(p.d)), maxD = Math.max(.15, ...ds), bw = clamp((Wc - 46) / n - 5, 3, 9);
+  let bars = '';
+  pts.forEach((p, i) => {
+    if (p.d == null) return;
+    const hh = Math.max(1.5, Math.abs(p.d) / maxD * 12), up = p.d >= 0, y = barT + barH / 2, x = X(i) - bw / 2;
+    bars += `<rect class="db" x="${x.toFixed(1)}" y="${(up ? y - hh : y).toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}" rx="1" fill="${p.gap ? '#6b6e80' : up ? '#2ee59d' : '#ff5c7a'}" opacity="${up || p.gap ? .9 : .8}" style="transform-box:fill-box;transform-origin:center ${up ? 'bottom' : 'top'};transform:skewX(-12deg)"/>`;
+    if (p.gap) bars += `<text x="${X(i).toFixed(1)}" y="${(up ? y - hh - 3 : y + hh + 9).toFixed(1)}" text-anchor="middle" font-family="Inter" font-weight="800" font-size="9" fill="#8d8fa3">…</text>`;
+  });
+  const lx = X(n - 1), ly = Y(last.P1), tY = nextT != null && nextT <= hi && nextT >= lo ? Y(nextT) : null;
+  const lvY = tY != null && Math.abs(tY - ly) < 13 ? (ly > tY ? ly + 13 : ly - 5) : ly + 4;
+  return `<svg class="chart" width="${Wc}" height="${Hc}" viewBox="0 0 ${Wc} ${Hc}"><defs>
+    <linearGradient id="${id}l" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c98512"/><stop offset="1" stop-color="#ffd66b"/></linearGradient>
+    <linearGradient id="${id}a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5a524" stop-opacity=".26"/><stop offset="1" stop-color="#f5a524" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${pl}" x2="${Wc - pr + 6}" y1="${lineB + .5}" y2="${lineB + .5}" stroke="rgba(255,255,255,.08)"/>
+    ${tY != null ? `<line x1="${pl}" x2="${Wc - pr + 6}" y1="${tY.toFixed(1)}" y2="${tY.toFixed(1)}" stroke="#fff0c2" stroke-opacity=".7" stroke-dasharray="4 4"/>
+    <text x="${Wc}" y="${(tY + 4).toFixed(1)}" text-anchor="end" font-family="Montserrat" font-style="italic" font-weight="900" font-size="12" fill="#fff0c2">${nextT}%</text>` : ''}
+    <path class="ar" d="${area}" fill="url(#${id}a)"/>
+    <path class="ln" d="${line}" fill="none" stroke="url(#${id}l)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    ${seg ? `<path class="ls" d="${seg}" fill="none" stroke="#ffd66b" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="${hollow ? '3 4' : 'none'}"/>` : ''}
+    <circle class="lh" cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="9" fill="rgba(255,214,107,.22)"/>
+    <circle class="lq" cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="9" fill="rgba(255,214,107,.5)" opacity="0"/>
+    <circle class="lp" cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="4.6" fill="#fff" fill-opacity="${hollow ? 0 : 1}" stroke="#ffd66b" stroke-width="2.4"/>
+    <text class="lv" x="${(lx + 10).toFixed(1)}" y="${lvY.toFixed(1)}" font-family="Inter" font-weight="800" font-size="12.5" fill="#fff">${fP(last.P1)}</text>
+    <g class="bars">${bars}</g>
+    <line x1="${pl}" x2="${Wc - pr + 6}" y1="${barT + barH / 2}" y2="${barT + barH / 2}" stroke="rgba(255,255,255,.14)"/></svg>`;
+}
+function chartConfirm(host) { // точка заливается, ореол — один пульс
+  const lp = $('.lp', host), ls = $('.ls', host), lq = $('.lq', host);
+  if (ls) setA(ls, 'stroke-dasharray', 'none');
+  if (lp) tween(300, e => setA(lp, 'fill-opacity', e.toFixed(3)), { ease: EASE.out2 });
+  if (lq) tween(700, (e, k) => { lq.style.opacity = k >= 1 ? '' : (.6 * (1 - e)).toFixed(3); lq.style.transform = k >= 1 ? '' : `scale(${lerp(1, 1.8, e).toFixed(3)})`; }, { ease: EASE.out3 });
+}
+
+// ---- бой ----
+function btBuild(vm) {
+  const g = vm.goal || { type: 'none' }, nb = vm.kind === 'nobase';
+  const ev = nb ? 0 : clamp(vm.even / vm.maxC * 100, 0, 100), nd = g.type !== 'none' && !nb ? clamp(g.total / vm.maxC * 100, 0, 100) : 0;
+  let trk = '';
+  if (!nb) {
+    const eTxt = `<b>в ноль</b> ${fI(vm.even)}`, nTxt = nd ? `<b>${esc(g.label)}</b> ${fI(g.total)}` : '';
+    const eW = textW('В НОЛЬ', '900 italic 12px Montserrat', .6) + textW(' ' + fI(vm.even), '700 11.5px Inter'), nW = nd ? textW(g.label, '900 italic 12px Montserrat', .6) + textW(' ' + fI(g.total), '700 11.5px Inter') : 0;
+    const eL = nd && ev / 100 * 342 + eW / 2 + 10 > 342 - nW;       // подписи столкнулись
+    trk = `<div class="trkw"><div class="trk">
+        <div class="zn plus" style="left:${ev.toFixed(2)}%;right:${nd ? (100 - nd).toFixed(2) : 0}%"></div>${nd ? `<div class="zn mark" style="left:${nd.toFixed(2)}%;right:0"></div>` : ''}
+        <div class="fill"><div class="tip"></div></div><div class="gain"></div><div class="shine"></div>
+        <div class="nt" style="left:${ev.toFixed(2)}%"></div>${nd ? `<div class="nt hot" style="left:${nd.toFixed(2)}%"></div>` : ''}</div>
+      <div class="nts"><span class="e${eL ? ' l' : ''}" style="left:${ev.toFixed(2)}%">${eTxt}</span>${nd ? `<span class="n">${nTxt}</span>` : ''}</div></div>`;
+  }
+  const el = shell('bt s-bt', 64, `<div class="bt-top"><div class="l"><div class="lbl"></div>
+      <div class="big"><i class="ap" hidden>≈</i><b class="pv"></b><i class="u">%</i><span class="bd"></span></div>
+      <div class="row2"><span class="dl zero"><span class="dv"></span></span><span class="dnote"></span></div></div></div>
+    ${nb ? '' : '<div class="dmg"><span class="tag"><span>УРОН + ПОМОЩЬ</span></span><span class="num"></span><span class="popslot"></span></div>'}
+    ${trk}<div class="foot"><span class="ft"></span><span class="fp" hidden></span></div>`);
+  const q = s => $(s, el);
+  return { kind: 'bt', el, hero: null, tank: null, C: null, r: { tabs: q('.tabs'), hl: q('.hl'), top: q('.bt-top'), l: q('.bt-top .l'), lbl: q('.bt-top .lbl'), big: q('.big'), ap: q('.ap'),
+    pv: q('.pv'), u: q('.big .u'), bd: q('.big .bd'), dl: q('.dl'), dv: q('.dv'), dnote: q('.dnote'), num: q('.num'), pops: q('.popslot'), fill: q('.fill'), gain: q('.gain'), shine: q('.shine'),
+    ne: q('.nts .e'), nn: q('.nts .n'), ft: q('.foot .ft'), fp: q('.foot .fp') } };
+}
+function btBoxes(vm) { // самые широкие варианты текста
+  const x = 20, lw = 26 + textW('ПОСЛЕ БОЯ БУДЕТ', '800 italic 11px Montserrat', 1.87), big = vm.big || {};
+  const bw = textW(big.int ? '88 888' : '88,88', '900 italic 40px Montserrat', -1.4) + 4 + (big.int ? 0 : textW('%', '900 21px Montserrat')) + (big.ap ? textW('≈', '900 21px Montserrat') + 3 : 0)
+    + (vm.band != null ? 8 + Math.max(textW(vm.band, '700 12.5px Inter'), textW('±0,08', '700 12.5px Inter')) : 0);
+  const rw = 18 + textW('−8,88%', '900 italic 14px Montserrat') + 9 + Math.max(textW(vm.dnote || '', '700 12.5px Inter'), textW('пока в минусе', '700 12.5px Inter'));
+  return [[x, 16, x + lw, 30], [x, 39, x + bw, 76], [x, 85, x + rw, 109]];
+}
+function btHero(c, vm, late) {
+  const top = c.r.top, h = HERO.get(vm.tk), tr = h && h.tr;
+  if (tr) {
+    const pl = placeHero(tr, { tw: 184, th: 156, x: 196, y: -50, ax: 1, ay: 0, w: 380, h: 170, dead: vm.dead }, btBoxes(vm),
+      [[0, 0], [10, -4], [20, -8], [30, -10], [40, -12], [50, -14]]);
+    const H = heroBuild(tr, pl.o); top.appendChild(H.el);
+    if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, 18); top.appendChild(c.hero.el); }
+  } else if (h && h.err) { c.hero = badgeBuild(208, 18); top.appendChild(c.hero.el); }
+  else return;
+  if (late) { const R = vm.ring; if (R && c.hero.set) c.hero.set(R.marks, R.prog, false, R.edge); [c.tank, c.hero].forEach(H => H && slideIn(H.el, 500, 46, 0, 2)); }
+}
+function btApply(c, vm, mode) {
+  const r = c.r, fx = mode === 'fx', prev = c.vm || {};
+  tabApply(c, vm.tab, fx);
+  tog(c.el, 's-bt', vm.edge === 'bt'); tog(c.el, 's-ok', vm.edge === 'ok');
+  setT(r.lbl, vm.label);
+  const big = vm.big, fmtB = big.int ? fI : v => fmtBig(v, big.rough);
+  hide(r.u, !!big.int); hide(r.ap, !big.ap); setT(r.bd, vm.band || '');
+  const C = vm.C, C0 = c.C == null ? C : c.C, tick = fx && C > C0 && !vm.ended && vm.kind !== 'nobase';
+  c.C = C;
+  if (tick) countTo(r.pv, big.v, 700, fmtB); else setNum(r.pv, big.v, fmtB);
+  if (vm.kind !== 'nobase') {
+    if (tick) { countTo(r.num, C, 620, fI); bump(r.num, .13, 520); } else setNum(r.num, C, fI);
+    const cls = 'dl ' + vm.dcls;
+    if (r.dl.className !== cls) { r.dl.className = cls; if (tick && vm.dcls === 'up') bump(r.dl, .22, 520, 'skewX(-12deg)'); }
+    if (tick && vm.kind === 'main') countTo(r.dv, vm.dP, 700, v => fD(v) + '%'); else { setNum(r.dv, vm.dP, () => vm.dtxt); }
+    // полоса, блик, «+N», жар на стволе
+    const w0 = clamp(C0 / vm.maxC, 0, 1) * 100, w1 = clamp(C / vm.maxC, 0, 1) * 100;
+    tog(r.fill, 'ok', vm.cross === 'secure');
+    if (tick && w1 > w0) {
+      tween(720, e => setS(r.fill, 'width', lerp(w0, w1, e).toFixed(2) + '%'), { key: r.fill, ease: EASE.out3 });
+      setS(r.gain, 'left', w0.toFixed(2) + '%'); setS(r.gain, 'width', (w1 - w0).toFixed(2) + '%'); flash(r.gain, .95, 900, .08);
+      tween(640, (e, k) => { r.shine.style.opacity = k >= 1 ? '' : (e < .5 ? e * 2 : 2 - e * 2).toFixed(3); r.shine.style.transform = k >= 1 ? '' : `translate3d(${lerp(-80, 342, e).toFixed(1)}px,0,0) skewX(-20deg)`; }, { ease: EASE.inOut });
+      const kind = (vm.ast - (c.ast || 0)) > (vm.dmg - (c.dmg || 0)) ? 'as' : '';
+      popText(r.pops, '+' + fI(C - C0), kind, { dur: 1050, dy: 20 });
+      if (c.hero && c.hero.heat) c.hero.heat(kind ? .6 : .9);
+    } else { for (const t of TW) if (t.key === r.fill) TW.delete(t); setS(r.fill, 'width', w1.toFixed(2) + '%'); }
+    c.dmg = vm.dmg; c.ast = vm.ast;
+    tog(r.ne, 'ok', C >= vm.even); tog(r.nn, 'ok', vm.cross === 'secure');
+  } else hide(r.dl.parentNode, true);                 // без базы — только урон+помощь крупно
+  setT(r.dnote, vm.dnote);
+  setH(r.ft, vm.foot);
+  const fp = vm.partial ? 'Окно подключилось посреди боя — часть помощи могла не попасть' : vm.extra || '';
+  setT(r.fp, fp); hide(r.fp, !fp);
+  // кольца и смерть
+  const H = c.hero;
+  if (c.tank && c.tank.redead) c.tank.redead(vm.dead, fx);
+  if (H && H.redead) H.redead(vm.dead, fx);
+  const R = vm.ring;
+  if (H && H.set && R) H.set(R.marks, R.prog, fx, R.edge);   // новая горящая — lightUp внутри set
+  if (vm.cross === 'secure' && !c.celebrated) {        // праздник — раз за бой
+    c.celebrated = true;
+    if (fx && !vm.ended) { if (vm.goal.type === 'mark' && H && H.rings) burst(c, R.marks - 1); else flash(r.hl, 1, 1100, .12); }
+  }
+  if (fx && vm.ended && !prev.ended && prev.view === 'bt') flash(r.hl, .9, 1000, .15); // бой окончен
+}
+// искры, волна, вспышка рамки
+function burst(c, i) {
+  const H = c.hero;
+  if (!H || !H.ringPt) return;
+  if (H.pop) H.pop(i);
+  const p = H.ringPt(i), host = document.createElement('div');
+  host.className = 'burst'; host.style.left = p.x.toFixed(1) + 'px'; host.style.top = p.y.toFixed(1) + 'px';
+  H.el.parentNode.appendChild(host);
+  const R = rng(77 + i);
+  let left = 17;
+  const done = () => { if (--left <= 0) host.remove(); };
+  for (let j = 0; j < 16; j++) {
+    const a = j / 16 * Math.PI * 2 + R() * .3, d = 28 + R() * 36, s = .7 + R() * .7, it = document.createElement('i');
+    if (j % 3 === 0) it.className = 'g';
+    host.appendChild(it);
+    tween(760 + R() * 260, (e, k) => { it.style.opacity = (k < .1 ? k * 10 : 1 - EASE.in2(k)).toFixed(3); it.style.transform = `rotate(${(a * 180 / Math.PI).toFixed(1)}deg) translate3d(${(d * e).toFixed(2)}px,0,0) scale(${(s * (1 - .5 * k)).toFixed(3)},1)`; }, { ease: EASE.out3, done });
+  }
+  const ring = document.createElement('b'); host.appendChild(ring);
+  tween(720, (e, k) => { ring.style.opacity = (1 - k).toFixed(3); ring.style.transform = `scale(${(1 + 3.4 * e).toFixed(3)})`; }, { ease: EASE.out3, done });
+  flash(c.r.hl, 1, 1100, .12);
+}
+function btEnter(c) { // и для компактных: у них нет героя
+  [c.tank, c.hero].forEach(H => H && slideIn(H.el, 700, 46, 0, 2));
+  slideIn(c.r.l, 460, -12, 100);
+  flash(c.r.hl, .7, 900, .15);
+}
+// ---- компактные ----
+function cmpBuild(vm) {
+  const el = shell('cmp' + (vm.view === 'bt' ? ' s-bt' : ''), 26, `<div class="cmpb"><b>${esc(vm.title)}</b><span>${esc(vm.text)}</span></div>`);
+  return { kind: 'cmp', el, hero: null, r: { tabs: $('.tabs', el), hl: $('.hl', el), l: $('.cmpb', el) } };
+}
+function hint(on) { const h = $('#mkHint'); if (!h) return; if (on) setT(h, 'Нет связи с игрой · Нужен мод WotStat «Виджеты»'); hide(h, !on); }
+
+// ===== 9. Сторож покоя, масштаб, обслуживание =====
+const QUIET = new Set();
+function quietLog(who) { if (!QUIET.has(who) && QUIET.size < 20) { QUIET.add(who); console.warn('[marks] stopped an endless or too long animation: ' + who); } }
+function mkQuiet() {
+  const root = $('#mk'); let list = [];
+  try { list = root.getAnimations ? root.getAnimations({ subtree: true }) : document.getAnimations ? document.getAnimations() : []; } catch (e) {}
+  list.forEach(a => {
+    let t = null; try { t = a.effect && a.effect.getComputedTiming(); } catch (e) {}
+    if (!t) return;
+    const endless = t.iterations === Infinity || !isFinite(t.endTime);
+    if (!endless && !(t.endTime > 20000)) return;
+    try { if (endless) a.cancel(); else a.finish(); } catch (e) { try { a.cancel(); } catch (e2) {} }
+    const el = a.effect.target;
+    quietLog((a.animationName || a.transitionProperty || 'script') + ' @ ' + (el && (el.getAttribute && el.getAttribute('class') || el.tagName) || '?'));
+  });
+  if (TW.size && CLK.live) { // rAF встал — шагаем сами; > 5 с — до конца
+    const now = CLK.now();
+    if (now - lastStep > 1500) step(now);
+    for (const tw of Array.from(TW)) if (now - tw.born > 5000) { finishTw(tw); quietLog('tween'); }
+  }
+}
+function mkZoom() {
+  const z = String(Math.round(clamp((window.innerWidth || 380) / 380, .5, 3) * 1000) / 1000), st = $('#mk').style;
+  if (st.zoom !== z) st.zoom = z;
+}
+function rebakeCheck() { // сменился масштаб — перепечь
+  const c = CARD;
+  if (!c || TH.rb) return;
+  const s = bakeScale(), hs = [c.hero, c.tank].filter(h => h && h.rebake && Math.abs(h.s - s) >= .25);
+  if (hs.length) TH.rb = later(500, () => { TH.rb = null; if (!TW.size && CARD === c) hs.forEach(h => h.rebake(bakeScale())); });
+}
+function afterExpiry() { if (M.after && wall() - M.after.at > AFTER_MS) { M.after = null; render('quiet'); } }
+function offlineCheck() {
+  if (DEMO || TEST || M.on) return;
+  if (Date.now() - (M.lostAt || PAGE_AT) < 8000) return;
+  if (!CARD || CARD.view === 'off') { if (!M.offline) { M.offline = true; render('enter'); } }
+  else hint(true);
+}
+let FONTS_OK = false;
+const fontsP = (async () => {
+  // с кириллицей: иначе грузится только латиница
+  try { await Promise.all(['900 italic', '900', '800 italic'].map(w => w + ' 16px Montserrat').concat(['600', '700', '800'].map(w => w + ' 16px Inter')).map(f => document.fonts.load(f, 'Аяё1%≈±—'))); await document.fonts.ready; } catch (e) {}
+  FONTS_OK = true;
+  if (CARD && CARD.fontsStale) softRender(true);      // собран до шрифтов — пересобрать
+})();
+window.addEventListener('wotstat-widget-command', e => { if (e && e.detail === 'CLEAR_DATA') mkClear(); });
+function mkClear() { // история аккаунта прочь; кэши остаются
+  if (!M.pid || DEMO) return;
+  for (const k of ST.keys(KP())) ST.del(k);
+  M.after = null; M.rec = M.hgTag ? loadRec(M.hgTag) : null;
+  if (bt) bt.rec = null;
+  clearMeta(false); render('quiet'); log('clear data');
+}
+
+// ===== 10. Пример =====
+const KNOTS = { hacker: [1500, 2250, 2760, 3120, 3470, 3900, 4560, 6900], e100: [1700, 2500, 3020, 3380, 3760, 4180, 4850, 7400], stk2: [1650, 2480, 3000, 3350, 3720, 4160, 4880, 7100] };
+const DT = {
+  hacker: { tag: 'usa:A183_XM69_Hacker', name: 'XM69 Hacker', short: 'Hacker', level: 11, cls: 'mediumTank', k: KNOTS.hacker, A0: 3873, b: 412, mk: 1, seed: 11 },
+  stk2: { tag: 'japan:J52_STK_2', name: 'STK-2', short: 'STK-2', level: 11, cls: 'heavyTank', k: KNOTS.stk2, A0: 4152, b: 388, mk: 1, seed: 3 },
+  e100: { tag: 'germany:G56_E-100', name: 'E 100', short: 'E 100', level: 10, cls: 'heavyTank', k: KNOTS.e100, A0: 4205, b: 1240, mk: 2, seed: 21 },
+  is4: { tag: 'ussr:R90_IS_4M', name: 'ИС-4', short: 'ИС-4', level: 10, cls: 'heavyTank', k: KNOTS.hacker, A0: 3873, b: 412, mk: 1, seed: 5 },
+  strv: { tag: 'sweden:S11_Strv_103B', name: 'Strv 103B', short: 'Strv 103B', level: 10, cls: 'AT-SPG', k: KNOTS.hacker, A0: 3640, b: 530, mk: 1, seed: 7 },
+  ms1: { tag: 'ussr:R11_MS-1', name: 'МС-1', short: 'МС-1', level: 1, cls: 'lightTank', k: null, A0: 520, b: 150, mk: 0 },
+};
+function demoTank() {
+  const q = String(Q.get('tank') || 'hacker'), t = DT[q.toLowerCase()];
+  if (t) return t;
+  if (/^[a-z]+:[\w\-.]+$/i.test(q)) { const n = q.split(':')[1].replace(/^[A-Za-z]{1,3}\d+[A-Za-z]?_/, '').replace(/_/g, ' '); return { tag: q, name: n, short: n, level: 10, cls: 'heavyTank', k: KNOTS.hacker, A0: 3873, b: 412, mk: 1, seed: 9 }; }
+  return DT.hacker;
+}
+function demoCurve(tag) { const t = Object.values(DT).concat([demoTank()]).find(x => tagKey(x.tag) === tagKey(tag) && x.k); const kn = t && MO.knots(t.k); return kn ? { kn, src: 'demo', upd: DEMO_EPOCH, at: DEMO_EPOCH, fit1: false } : null; }
+// история примера (makeHistory концепта)
+function demoHistory(kn, n, endAvg, seed, shape, bEnd) {
+  const R = rng(seed), K = MO.K, Cs = [];
+  for (let i = 0; i < n; i++) {
+    const g = (R() + R() + R()) / 3 - .5, tr = (shape || (t => -.16 + .2 * t))(i / Math.max(1, n - 1));
+    Cs.push(Math.round(clamp(endAvg * (1.08 + 1.05 * g + tr), 420, endAvg * 2.3) / 7) * 7);
+  }
+  let w = 1, acc = 0;
+  for (let i = n - 1; i >= 0; i--) { acc += K * w * Cs[i]; w *= 1 - K; }
+  let A = (endAvg - acc) / w, P = MO.floor2(MO.f(kn, A));
+  return Cs.map((C, i) => {
+    const A1 = A + K * (C - A), P1 = i === n - 1 ? MO.floor2(MO.f(kn, endAvg)) : MO.floor2(MO.f(kn, A1));
+    const e = { a: 'demo' + i, t: DEMO_EPOCH - (n - i) * 2 * 36e5, map: '', C, A0: Math.round(A), A1: Math.round(A1), P0: P, P1, exact: true, pint: Math.floor(P1), mk: null, src: 'dossier', bAfter: bEnd - (n - 1 - i), gap: 0 };
+    A = A1; P = P1; return e;
+  });
+}
+function demoSeed(t, o = {}) {
+  const kn = t.k && MO.knots(t.k), rec = newRec(t.tag), A0 = o.A0 || t.A0, b = o.b || t.b;
+  recInfo(rec, dVeh(t));
+  rec.marks = { n: o.mk != null ? o.mk : t.mk, src: 'res', at: DEMO_EPOCH - 864e5 };
+  if (kn) {
+    rec.last = { b, A: A0, P: MO.floor2(MO.f(kn, A0)), exact: true, src: 'dossier', at: DEMO_EPOCH - 36e5 };
+    rec.hist = o.hist || demoHistory(kn, o.n != null ? o.n : 19, A0, o.seed || t.seed || 11, o.shape, b);
+  }
+  ST.set('mk:v1:1:t:' + tagKey(t.tag), rec);
+}
+const dVeh = t => ({ tag: t.tag, localizedName: t.name, localizedShortName: t.short, level: t.level, class: t.cls, role: 'None' });
+const dDos = (t, A, P, b) => ({ vehicleTag: t.tag, movingAvgDamage: A, damageRating: P, battlesCount: b });
+const dP0 = t => (t.k ? MO.floor2(MO.f(MO.knots(t.k), t.A0)) : 0);
+const st = (path, value) => ({ type: 'state', path, value }), tg = (path, value) => ({ type: 'trigger', path, value });
+const ARENA = '9223372036854775001';                  // 19 цифр > 2^53
+function dInit(t, o = {}) {
+  const s = { 'player.id': 1, 'game.state': o.state || 'hangar', 'game.region': 'EU', 'game.isInReplay': !!o.replay,
+    'hangar.isInHangar': !o.battle, 'hangar.isInQueue': false, 'hangar.vehicle.info': dVeh(t), 'dossier.current': o.dossier !== undefined ? o.dossier : dDos(t, t.A0, dP0(t), t.b),
+    'moeInfo.isAvailable': false, 'moeInfo.current': false, 'battle.isInBattle': !!o.battle, 'battle.arenaId': o.battle ? ARENA : null,
+    'battle.arena': o.battle ? { tag: '04_himmelsdorf', localizedName: 'Химмельсдорф', mode: o.mode || 'REGULAR', gameplay: 'ctf', team: 1 } : null,
+    'battle.period': o.battle ? { tag: 'BATTLE', endTime: 0, length: 420 } : null, 'battle.vehicle': o.battle ? dVeh(t) : null, 'battle.isAlive': o.battle ? true : null,
+    'battle.efficiency.damage': 0, 'battle.efficiency.assist': 0, 'battle.efficiency.stun': 0, 'battle.position': [0, 0, 0] };
+  return { type: 'init', states: Object.keys(s).map(path => ({ path, value: s[path] })) };
+}
+function dBattle(at, t, mode, ev) { // порядок как у игры (3.4)
+  ev.push([at, st('game.state', 'battle')], [at, st('battle.period', { tag: 'PREBATTLE', endTime: 0, length: 30 })],
+    [at, st('battle.efficiency.damage', 0)], [at, st('battle.efficiency.assist', 0)], [at, st('battle.efficiency.stun', 0)],
+    [at + 50, `{"type":"state","path":"battle.arenaId","value":${ARENA}}`],
+    [at + 50, st('battle.arena', { tag: '04_himmelsdorf', localizedName: 'Химмельсдорф', mode, gameplay: 'ctf', team: 1 })],
+    [at + 50, st('battle.vehicle', dVeh(t))], [at + 50, st('battle.isAlive', true)], [at + 50, st('battle.isInBattle', true)],
+    [at + 50, st('hangar.isInQueue', false)], [at + 50, st('dossier.current', dDos(t, t.A0, dP0(t), t.b))]);
+}
+function dHit(at, eff, kind, v, ev) {
+  ev.push([at, tg('battle.onPlayerFeedback', { type: kind, data: { damage: v, attackReason: 'shot', vehicle: null } })]);
+  ev.push([at, st('battle.efficiency.' + (kind === 'damage' ? 'damage' : 'assist'), kind === 'damage' ? (eff.d += v) : (eff.a += v))]);
+}
+function dResult(t) {
+  const o = { arenaUniqueID: ARENA, common: { bonusType: 1, arenaCreateTime: Math.round(DEMO_EPOCH / 1000), duration: 420, winnerTeam: 1 },
+    personal: { avatar: { accountDBID: 1, team: 1 }, 9999: { typeCompDescr: 9999, damageDealt: 4070, damageAssistedRadio: 1520, damageAssistedTrack: 310, damageAssistedStun: 0, movingAvgDamage: 3907, damageRating: 85, marksOnGun: 2 } },
+    vehicles: { 17: [{ accountDBID: 1, marksOnGun: 1 }], 18: [{ accountDBID: 555, marksOnGun: 3 }] } };
+  return JSON.stringify(tg('battle.onBattleResult', o)).replace(`"arenaUniqueID":"${ARENA}"`, `"arenaUniqueID":${ARENA}`);
+}
+// сценарии; стадия — после всех эффектов
+function demoScenario(name) {
+  const t = demoTank(), ev = [], sc = { name, tanks: [t.tag], ev, dur: 0, loop: false, seed: () => demoSeed(t) };
+  const eff = { d: 0, a: 0 };
+  if (['loop', 'hangar', 'queue', 'battle', 'edge', 'mark', 'ended', 'after', 'result'].indexOf(name) >= 0) {
+    ev.push([0, dInit(t)], [2600, st('hangar.isInQueue', true)]);
+    dBattle(4000, t, 'REGULAR', ev);
+    ev.push([4600, st('battle.period', { tag: 'BATTLE', endTime: 0, length: 420 })]);
+    dHit(5000, eff, 'damage', 640, ev); dHit(6300, eff, 'radioAssist', 1230, ev); dHit(7600, eff, 'damage', 480, ev); dHit(8900, eff, 'damage', 720, ev);
+    dHit(10200, eff, 'trackAssist', 310, ev); dHit(11500, eff, 'damage', 910, ev); dHit(12800, eff, 'damage', 1180, ev); dHit(14300, eff, 'damage', 140, ev);
+    dHit(15800, eff, 'radioAssist', 260, ev);
+    ev.push([17600, st('battle.period', { tag: 'AFTERBATTLE', endTime: 0, length: 420 })]);
+    for (const p of ['battle.arena', 'battle.arenaId', 'battle.vehicle', 'battle.isAlive', 'battle.period']) ev.push([19000, st(p, null)]);
+    ev.push([19000, st('battle.isInBattle', false)], [19000, st('battle.efficiency.damage', 0)], [19000, st('battle.efficiency.assist', 0)],
+      [19000, st('game.state', 'hangar')], [19000, st('hangar.vehicle.info', dVeh(t))], [19000, st('dossier.current', dDos(t, t.A0, dP0(t), t.b))]);
+    ev.push([22000, dResult(t)], [23000, st('dossier.current', dDos(t, 3907, 85.10, t.b + 1))]);
+    sc.dur = 29000; sc.loop = name === 'loop';
+    sc.at = { hangar: 2400, queue: 3800, battle: 14100, edge: 15600, mark: 17400, ended: 18700, after: 21600, result: 24400 }[name];
+  } else if (name === 'nodata') {
+    const T = DT.is4; sc.tanks = [T.tag]; sc.seed = () => {};
+    ev.push([0, dInit(T, { dossier: null })]); sc.at = sc.dur = 4000;
+  } else if (name === 'first') {
+    const T = DT.stk2; sc.tanks = [T.tag];
+    sc.seed = () => demoSeed(T, { A0: 3195, b: 1, mk: 0, hist: [{ a: 'demo0', t: DEMO_EPOCH - 2 * 36e5, map: '', C: 2712, A0: 3205, A1: 3195, P0: 60.85, P1: 60.57, exact: true, pint: 60, mk: 0, src: 'dossier', bAfter: 1, gap: 0 }] });
+    ev.push([0, dInit(T, { dossier: dDos(T, 3195, 60.57, 1) })]); sc.at = sc.dur = 2600;
+  } else if (name === 'max') {
+    const T = DT.e100; sc.tanks = [T.tag];
+    sc.seed = () => demoSeed(T, { A0: 4935, b: 412, mk: 3, seed: 21, shape: x => -.05 + .08 * x });
+    ev.push([0, dInit(T, { dossier: dDos(T, 4935, MO.floor2(MO.f(MO.knots(T.k), 4935)), 412) })]); sc.at = sc.dur = 2600;
+  } else if (name === 'low') {
+    const T = DT.ms1; sc.tanks = [T.tag]; sc.seed = () => {};
+    ev.push([0, dInit(T, { dossier: dDos(T, 520, 0, 150) })]); sc.at = sc.dur = 2600;
+  } else if (name === 'dead') {
+    ev.push([0, dInit(t)]); dBattle(600, t, 'REGULAR', ev); ev.push([1000, st('battle.period', { tag: 'BATTLE', endTime: 0, length: 420 })]);
+    dHit(1400, eff, 'damage', 640, ev); dHit(2400, eff, 'radioAssist', 1230, ev); dHit(3400, eff, 'damage', 480, ev);
+    ev.push([4400, tg('battle.onPlayerFeedback', { type: 'receivedDamage', data: { damage: 750, attackReason: 'shot' } })], [4400, st('battle.isAlive', false)]);
+    sc.at = sc.dur = 5800;
+  } else if (name === 'offmode') {
+    ev.push([0, dInit(t)]); dBattle(600, t, 'COMP7', ev); sc.at = sc.dur = 2400;
+  } else if (name === 'replay') {
+    ev.push([0, dInit(t, { battle: true, replay: true, state: 'battle' })]); sc.at = sc.dur = 2400;
+  } else if (name === 'offline') {
+    sc.seed = () => {}; ev.push([8000, () => { M.offline = true; render('enter'); }]); sc.at = sc.dur = 9200;
+  } else return null;
+  ev.sort((a, b) => a[0] - b[0]);
+  return sc;
+}
+function demoSend(x) {
+  if (typeof x === 'function') { x(); return; }
+  const raw = typeof x === 'string' ? x : JSON.stringify(x);
+  mkMsg(JSON.parse(raw), raw);                        // через JSON — как настоящая связь
+}
+function demoReset(sc) {
+  TW.clear(); stopTimers(); if (RAF) cancelAnimationFrame(RAF); RAF = 0;
+  for (const k in TH) TH[k] = null;
+  S = new Map(); Object.assign(M, M0()); bt = null; CARD = null; $('#mkCard').replaceChildren(); hint(false);
+  ST.reset(); SS.reset(); CURVES.clear(); CPEND.clear(); NETF.clear(); RES_SEEN.clear();
+  sc.seed();
+}
+function demoSeek(sc, ms) { // кадр ms: всё с нуля на виртуальных часах
+  CLK.live = false; CLK.t = 0; demoReset(sc);
+  let i = 0;
+  for (;;) {
+    let vi = -1;
+    for (let j = 0; j < VQ.length; j++) if (vi < 0 || VQ[j].t < VQ[vi].t || (VQ[j].t === VQ[vi].t && VQ[j].n < VQ[vi].n)) vi = j;
+    const vt = vi >= 0 ? VQ[vi].t : Infinity, et = i < sc.ev.length ? sc.ev[i][0] : Infinity, t = Math.min(vt, et);
+    if (!(t <= ms)) break;
+    CLK.t = t; step(t);
+    if (et <= vt) demoSend(sc.ev[i++][1]); else VQ.splice(vi, 1)[0].fn();
+  }
+  CLK.t = ms; step(ms);
+}
+function demoPlay(sc) {
+  CLK.live = false; CLK.t = 0; demoReset(sc);
+  CLK.live = true; CLK.base = performance.now();
+  for (const [t, x] of sc.ev) later(t, () => demoSend(x));
+  if (sc.loop) later(sc.dur, () => demoPlay(sc));
+}
+async function demoStart() {
+  const sc = demoScenario(DEMO) || demoScenario('loop');
+  const still = Q.has('still') ? +Q.get('still') : null;
+  // шрифты и обводка — заранее
+  await Promise.race([Promise.all([fontsP].concat(sc.tanks.map(t => heroLoad(t).catch(() => null)))), new Promise(r => setTimeout(r, 8000))]);
+  window.__duration = sc.dur; window.__seek = ms => demoSeek(sc, ms); window.__ready = true;
+  if (still != null && isFinite(still)) demoSeek(sc, still);
+  else if (DEMO !== 'loop' && sc.at != null) demoSeek(sc, sc.at);
+  else demoPlay(sc);
+  window.mkDemoReady = true;
+}
+
+// ===== 11. Старт =====
+if (!MO) log('js/marks-moe.js did not load');
+log('page ' + document.lastModified);
+mkZoom();
+window.addEventListener('resize', mkZoom);
+setInterval(() => { mkZoom(); mkQuiet(); afterExpiry(); offlineCheck(); rebakeCheck(); }, 2000);
+if (DEMO || TEST) { // крючки для проверок и примера
+  window.mkMsg = obj => mkMsg(obj, JSON.stringify(obj));
+  window.mkRaw = raw => mkMsg(JSON.parse(raw), raw);
+  window.MKT = { M, get bt() { return bt; }, get S() { return S; }, get card() { return CARD; }, get builds() { return BUILDS; }, ST, SS, CURVES, HERO, TW, setFetch: f => { FETCH = f; }, render, step, CLK, evaluate, loadRec,
+    boxes: vm => (vm.view === 'hg' ? hgBoxes(vm) : btBoxes(vm)), textW, heroLayout };
+}
+window.mkIdleProbe = ms => new Promise(res => {
+  let n = 0; const mo = new MutationObserver(l => { n += l.length; });
+  mo.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+  setTimeout(() => { mo.disconnect(); let anims = 0; try { anims = document.getAnimations().length; } catch (e) {} res({ mutations: n, anims, tweens: TW.size, raf: !!RAF }); }, ms);
+});
+if (DEMO) demoStart();
+else if (!TEST && MO) mkConnect();
+
+// автообновление (как obs.html), не посреди боя
+(function autoUpdate() {
+  if (!/^https?:$/.test(location.protocol) || TEST) return;
+  const docLM = Date.parse(document.lastModified);
+  const probe = () => fetch(location.pathname + '?_probe=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+    .then(r => (r.ok ? { tag: r.headers.get('etag') || '', lm: Date.parse(r.headers.get('last-modified') || '') } : null))
+    .catch(() => null);
+  const reload = () => {
+    if (S.get('battle.isInBattle') === true) return;
+    try {
+      const last = +sessionStorage.getItem('mkUpd') || 0;
+      if (Date.now() - last < 600000) return;          // не чаще раза в 10 минут
+      sessionStorage.setItem('mkUpd', String(Date.now()));
+    } catch (e) {}
+    const u = new URL(location.href);
+    u.searchParams.set('_v', String(Date.now()));
+    location.replace(u.toString());
+  };
+  let base = '';
+  const check = () => probe().then(v => {
+    if (!v) return;
+    if (isFinite(docLM) && isFinite(v.lm)) { if (v.lm > docLM + 1000) reload(); return; }
+    if (!v.tag) return;
+    if (!base) { base = v.tag; return; }
+    if (v.tag !== base) reload();
+  });
+  check();
+  setInterval(check, 120000);
+})();
+})();
+</script>
+</body>
+</html>
