@@ -2,7 +2,7 @@
 // Порт mk-trace.js (логика та же) + загрузка, поправки, кэш. Только считает: ни таймеров, ни анимаций.
 (function (root) {
 'use strict';
-const VER = 4, PFX = 'mk:v1:sil:', MAXN = 40, INF = 1e20;
+const VER = 12, PFX = 'mk:v1:sil:', MAXN = 40, INF = 1e20;
 const now = () => (root.performance ? root.performance.now() : Date.now());
 const rad = d => d * Math.PI / 180;
 // параметры для рендеров 1920×900, ствол под ≈138,6°
@@ -412,7 +412,7 @@ function layRings(res) {
       for (let s0 = start; s0 + span <= end; s0 += 1) {
         if (clean(s0, s0 + span)) { const d = Math.abs(s0 + span / 2 - mid); if (!best || d < best.d) best = { s0, d }; }
       }
-      if (best) first = best.s0;
+      if (best && best.d <= .18 * (end - start)) first = best.s0; // чистое далеко от середины — ставим на середину
     }
   }
   first += ringW / 2;
@@ -425,42 +425,157 @@ function layRings(res) {
   return res;
 }
 // ствол поверх корпуса: силуэт его не видит, а светотень цилиндра (поперёк ствола) та же, что на свободной части.
-// Образец — с чистой части за тормозом; идём от края силуэта вдоль оси, пока сечение на него похоже (разрыв ≤ 0,6 толщины) — дальше маска.
+// Образец — с чистой части за тормозом (ствол целиком на корпусе — с куска, найденного по краям в яркости). Идём вдоль
+// оси и подстраиваемся поперёк (ось «по камере» бывает чуть косой; у спаренных стволов не перескакиваем на соседний),
+// пока сечение похоже на образец. Провал перешагиваем, только если за ним снова ствол (хомут, кожух, эжектор);
+// иначе это маска — конец пушки. Кусок по краям бывает у самой башни — тогда сначала идём от него вперёд к дулу.
+// Ось, взятую по камере, потом поправляем по найденным центрам.
 function gunOverHull(Y, S, W, H, b) {
   b.gun = b.len || 0; b.cor = null;
-  if (!Y || !b.ok || b.method === 'rgb-edges' || b.method === 'fallback' || !(b.w > 0)) return b;
-  const u = b.u, n = [-u[1], u[0]], w = b.w, hw = w / 2, len = b.len || 0;
+  if (!Y || !b.ok || b.method === 'fallback' || !(b.w > 0)) return b;
+  const w = b.w, hw = w / 2, len = b.len || 0, rgb = b.method === 'rgb-edges', loose = rgb || b.method === 'extreme-point';
+  const u = b.u.slice(), n = [-u[1], u[0]], tip = b.tip.slice();
   const samp = (a, o) => {
-    const x = b.tip[0] - u[0] * a + n[0] * o - .5, y = b.tip[1] - u[1] * a + n[1] * o - .5;
+    const x = tip[0] - u[0] * a + n[0] * o - .5, y = tip[1] - u[1] * a + n[1] * o - .5;
     const x0 = Math.floor(x), y0 = Math.floor(y); if (x0 < 0 || y0 < 0 || x0 >= W - 1 || y0 >= H - 1) return NaN;
     const i0 = y0 * W + x0; if (!(S[i0] && S[i0 + 1] && S[i0 + W] && S[i0 + W + 1])) return NaN;
     const fx = x - x0, fy = y - y0;
     return (Y[i0] * (1 - fx) + Y[i0 + 1] * fx) * (1 - fy) + (Y[i0 + W] * (1 - fx) + Y[i0 + W + 1] * fx) * fy;
   };
   const K = 9, offs = Array.from({ length: K }, (_, i) => (-1 + 2 * i / (K - 1)) * .8 * hw);
-  const sect = s => { // нормированное сечение (без краёв) или null
-    const v = offs.map(o => samp(s, o)); if (v.some(x => x !== x)) return null;
+  const sect = (s, o0) => { // нормированное сечение (без краёв) или null
+    const v = offs.map(o => samp(s, o0 + o)); if (v.some(x => x !== x)) return null;
     const m = v.reduce((a, x) => a + x, 0) / K, d = v.map(x => x - m), sd = Math.sqrt(d.reduce((a, x) => a + x * x, 0) / K);
     return sd < 2 ? null : d.map(x => x / sd);                // плоское (нет светотени) — не сравниваем
   };
-  const s0 = b.brake ? b.brake + .6 * w : 1.2 * w;
+  const s0 = b.brake ? b.brake + .6 * w : rgb ? .4 * w : 1.2 * w;
   let s1 = Math.min(len - .5 * w, s0 + 8 * w);
   if (s1 - s0 < 2 * w) s1 = s0 + 2.5 * w;                     // свободной части нет (торчит один тормоз) — образец сразу за ним
   const acc = new Array(K).fill(0), smp = [];
-  for (let s = Math.round(s0); s <= s1; s++) { const q = sect(s); if (q) { smp.push(q); q.forEach((x, i) => { acc[i] += x; }); } }
+  for (let s = Math.round(s0); s <= s1; s++) { const q = sect(s, 0); if (q) { smp.push(q); q.forEach((x, i) => { acc[i] += x; }); } }
   if (smp.length < 1.5 * w) return b;
   const T = (() => { const m = acc.map(x => x / smp.length), mm = m.reduce((a, x) => a + x, 0) / K, d = m.map(x => x - mm), sd = Math.sqrt(d.reduce((a, x) => a + x * x, 0) / K) || 1; return d.map(x => x / sd); })();
-  const corr = q => q ? q.reduce((a, x, i) => a + x * T[i], 0) / K : -1;
+  const corr = q => q ? q.reduce((a, x, i) => a + x * T[i], 0) / K : NaN;
   const q0 = median(smp.map(corr));
   if (!(q0 >= .55)) return b;                                  // образец ненадёжный — только свободная часть
-  const thr = Math.max(.45, Math.min(.7, .8 * q0));
-  const sMax = Math.min(len + 2.5 * Math.max(len, 8 * w), 2 * Math.hypot(W, H));
-  const raw = new Float32Array(Math.ceil(sMax) + 8).fill(-1), C = new Float32Array(raw.length).fill(-1);
-  for (let s = 0; s < raw.length; s++) raw[s] = corr(sect(s));
-  for (let s = 0; s < raw.length; s++) { let a = 0, c = 0; for (let j = -3; j <= 3; j++) { const v = raw[s + j]; if (v !== undefined) { a += v; c++; } } C[s] = a / c; }
-  let good = Math.round(Math.max(s0, len - w)), s = good;
-  for (; s < sMax; s++) { if (C[s] >= thr) good = s; else if (s - good > (s < len + 1.5 * w ? 1.2 : .6) * w) break; } // у края корпуса — помехи, там разрыв длиннее
-  b.gun = Math.max(len, good); b.cor = C; b.corThr = thr;
+  const thr = Math.max(.45, Math.min(.7, .8 * q0)), lo = thr - .15;
+  // слежение: сечение в точке s со сдвигом o; сдвиг меняем на ±1, только если заметно лучше (окно вылезло за ствол — ищем до ±3)
+  const track = (from, to, dir) => {
+    const L = Math.abs(to - from) + 1, raw = new Float32Array(L).fill(NaN), OFF = new Float32Array(L);
+    let o = 0;
+    for (let i = 0; i < L; i++) {
+      const s = from + dir * i;
+      let c = corr(sect(s, o));
+      if (i > 0 && (i % 2 === 0 || c !== c)) {
+        let best = c === c ? c : -2, bo = o;
+        for (const d of [-1, 1, -2, 2, -3, 3]) {
+          if (Math.abs(d) > 1 && c === c) break;
+          const oo = o + d; if (Math.abs(oo) > .45 * w) continue;
+          const cc = corr(sect(s, oo));
+          if (cc === cc && cc > best + (c === c ? .04 : 0)) { best = cc; bo = oo; }
+        }
+        if (bo !== o && best >= lo) { o = bo; c = best; }
+      }
+      OFF[i] = o; raw[i] = c;
+    }
+    const C = new Float32Array(L).fill(-1);                    // сглаживание ±3, пустые (вне силуэта) не в счёт
+    for (let i = 0; i < L; i++) { let a = 0, k = 0, all = 0; for (let j = -3; j <= 3; j++) { const v = raw[i + j]; if (v === undefined) continue; all++; if (v === v) { a += v; k++; } } C[i] = k >= Math.max(1, all / 2) ? a / k : -1; }
+    return { raw, OFF, C };
+  };
+  // идти дальше — мягкий порог; провал перешагиваем, если за ним снова ствол (1,5 толщины, 80 % выше мягкого).
+  // Провал «слабый» (сечение всё ещё похоже, ≥ 0,3) — до 3 толщин (кожух, хомуты), «пустой» — до 1,2 (у края корпуса 1,6)
+  const follow = (C, i0, iMax, edge) => {
+    const runLen = 1.5 * w;
+    let good = i0, i = i0 + 1;
+    while (i < iMax) {
+      if (C[i] >= lo) { good = i++; continue; }
+      let gapMax = (i < edge ? 1.6 : 1.2) * w, sum = 0, k = 0;
+      for (let j = i; j < Math.min(iMax, i + 3 * w); j++) { if (C[j] >= lo) break; sum += C[j]; k++; }
+      if (k && sum / k >= .3) gapMax = 3 * w;
+      let rec = -1;
+      for (let t = i + 1; t <= good + gapMax && t < iMax; t++) {
+        if (C[t] < thr) continue;
+        let ok = 0, all = 0;
+        for (let j = t; j < t + runLen && j < iMax; j++) { all++; if (C[j] >= lo) ok++; }
+        if (all >= runLen - 1 && ok >= .8 * all) { rec = t; break; }
+      }
+      if (rec < 0) break;
+      i = rec;
+    }
+    return good;
+  };
+  // кусок по краям в яркости бывает у самой башни: вперёд по стволу, потом по дульному устройству, пока ствол торчит из корпуса
+  if (rgb && !b._fwd) {
+    const fMax = Math.round(Math.min(3 * Math.max(len, 8 * w), Math.hypot(W, H)));
+    const F = track(0, -fMax, -1), eBar = follow(F.C, 0, fMax, 0);
+    let e = eBar;
+    if (eBar > w) {                                            // дальше — дуло: точка оси в силуэте, а рядом сбоку пусто
+      for (let i = eBar + 1, miss = 0; i < fMax && miss < 3; i++) {
+        const s = -i, inside = samp(s, F.OFF[eBar]) === samp(s, F.OFF[eBar]);
+        const free = !(samp(s, F.OFF[eBar] + 1.7 * w) === samp(s, F.OFF[eBar] + 1.7 * w)) || !(samp(s, F.OFF[eBar] - 1.7 * w) === samp(s, F.OFF[eBar] - 1.7 * w));
+        if (inside && free) { e = i; miss = 0; } else miss++;
+      }
+    }
+    // вперёд по силуэту, держась середины ствола (кусок по краям бывает сбоку от оси): в каждом шаге — сплошной кусок силуэта
+    // поперёк (±1,6 толщины) у прежнего центра, его середина — новый центр; кончик должен торчать в пустоту с обеих сторон
+    const inS = (a, o) => samp(a, o) === samp(a, o);
+    let last = 0, cen = 0, cLast = 0, freeN = 0, tot = 0;
+    const WD = new Float32Array(fMax + 1), FR = new Uint8Array(fMax + 1);
+    const runAt = (s, c) => { // куски силуэта поперёк (±1,6 толщины): похожий на ствол (не шире 2,6) — ближайший к c; иначе широкий (корпус)
+      const lim = 1.6 * w, a0 = Math.round(c - lim), a1 = Math.round(c + lim), runs = [];
+      for (let o = a0, st = null; o <= a1 + 1; o++) {
+        const v = o <= a1 && inS(s, o);
+        if (v && st === null) st = o; else if (!v && st !== null) { runs.push({ lo: st, hi: o - 1, free: st > a0 && o - 1 < a1 }); st = null; }
+      }
+      if (!runs.length) return null;
+      const thin = runs.filter(r => r.hi - r.lo <= 2.6 * w);
+      if (thin.length) return thin.reduce((p, q) => Math.abs((q.lo + q.hi) / 2 - c) < Math.abs((p.lo + p.hi) / 2 - c) ? q : p);
+      return runs.reduce((p, q) => (q.hi - q.lo > p.hi - p.lo ? q : p));
+    };
+    for (let i = 1, miss = 0; i < fMax && miss <= 3; i++) {
+      const R = runAt(-i, cen);
+      if (!R) { miss++; continue; }
+      if (R.hi - R.lo <= 2.6 * w) cen += Math.max(-1, Math.min(1, (R.lo + R.hi) / 2 - cen)); // над корпусом (широко) — центр не трогаем
+      last = i; cLast = cen; miss = 0; WD[i] = R.hi - R.lo + 1; FR[i] = R.free ? 1 : 0;
+    }
+    for (let j = Math.max(1, last - Math.round(1.5 * w)); j <= last; j++) { tot++; const R = runAt(-j, cLast); if (R && R.free) freeN++; }
+    if (last > Math.max(e, eBar) + w && last > 1.5 * w && freeN >= .6 * tot && b.bodyW) {
+      // от кончика назад: свободная часть (торчит из корпуса), её толщина, дульное устройство (шире ствола)
+      let k = last, gaps = 0;
+      while (k > 0 && gaps <= 3) { if (FR[k]) gaps = 0; else gaps++; k--; }
+      const ws = []; for (let j = k + 1; j <= last; j++) if (FR[j] && WD[j] <= 2.6 * w) ws.push(WD[j]);
+      const wBar = median(ws) || w;
+      let br = 0; for (let j = last; j > k && WD[j] > 1.3 * wBar; j--) br = last - j + 1;
+      if (br > 4.5 * wBar) br = 0;
+      const nt = [tip[0] + u[0] * last + n[0] * cLast, tip[1] + u[1] * last + n[1] * cLast];
+      Object.assign(b, { tip: nt, brake: br, len: Math.max(br + 1, last - k), profile: null, method: 'rgb-fwd', _fwd: true, fwd: last, _minGun: last + len });
+      return gunOverHull(Y, S, W, H, b);
+    }
+    if (eBar > w) {
+      const o = F.OFF[eBar];
+      b.tip = [tip[0] + u[0] * e + n[0] * o, tip[1] + u[1] * e + n[1] * o];
+      b.len = len + e; b.brake = e - eBar > .3 * w ? e - eBar : 0; b._fwd = true; b.fwd = e;
+      return gunOverHull(Y, S, W, H, b);
+    }
+  }
+  const sMax = Math.round(Math.min(len + 3 * Math.max(len, 12 * w), 2 * Math.hypot(W, H)));
+  const { raw, OFF, C } = track(0, sMax, 1);
+  const good = follow(C, Math.round(Math.max(s0, len - w)), sMax, len + 1.5 * w);
+  b.gun = Math.max(len, good, b._minGun || 0); b.cor = C; b.corThr = lo;
+  // ось «по камере» или по короткому куску — поправить по центрам найденного ствола (наклон до 7°)
+  if (b.gun > len + 4 * w && (loose || b.gun > 2 * len)) {
+    let m = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+    for (let t = Math.ceil(s0); t <= b.gun; t++) if (raw[t] >= lo) { m++; sx += t; sy += OFF[t]; sxx += t * t; sxy += t * OFF[t]; }
+    const den = m * sxx - sx * sx;
+    if (m > 3 * w && den > 0) {
+      const k = (m * sxy - sx * sy) / den, a = (sy - k * sx) / m;
+      if (Math.abs(k) < .12 && Math.abs(a) < .6 * w) {
+        const nu = [u[0] - n[0] * k, u[1] - n[1] * k], L = Math.hypot(nu[0], nu[1]);
+        b.tip = [tip[0] + n[0] * a, tip[1] + n[1] * a]; b.u = [nu[0] / L, nu[1] / L]; b.n = [-b.u[1], b.u[0]];
+        b.angle = Math.atan2(b.u[1], b.u[0]) * 180 / Math.PI; b.axisFix = +k.toFixed(4);
+      }
+    }
+  }
   return b;
 }
 
