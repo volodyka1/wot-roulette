@@ -74,7 +74,7 @@ body{pointer-events:none;user-select:none;font:14px/1.45 var(--fu);color:var(--t
 .mk .cls{display:inline-flex;align-items:center;flex:0 0 auto;height:20px;padding:0 6px;border-radius:3px;border:1px solid var(--cc,#aaa);background:var(--ccs,rgba(255,255,255,.08));color:var(--cc,#ddd);font:800 11px/1 var(--fu);letter-spacing:.06em}
 .c-lt{--cc:#3ddc84;--ccs:rgba(61,220,132,.14)}.c-st{--cc:#ffcf3f;--ccs:rgba(255,207,63,.14)}.c-tt{--cc:#ff6150;--ccs:rgba(255,97,80,.14)}.c-pt{--cc:#4aa8ff;--ccs:rgba(74,168,255,.14)}.c-spg{--cc:#c18cff;--ccs:rgba(193,140,255,.14)}
 .mk .name{min-width:0;padding-right:3px;margin-left:2px;font:900 italic 19px/1.08 var(--fd);letter-spacing:-.015em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 10px rgba(0,0,0,.75)}
-.mk .big{display:flex;align-items:baseline;font:900 italic 52px/.92 var(--fd);letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mk .big{display:flex;align-items:baseline;font:900 italic 48px/.92 var(--fd);letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mk .hg-top .big{margin-top:13px}
 .mk .big b{font-weight:inherit;background:var(--mk-big);background-clip:text;color:transparent;padding-right:4px;filter:drop-shadow(0 3px 10px rgba(0,0,0,.55))}
 .mk .big i{font-style:normal;font-size:26px;letter-spacing:0;color:#ffc23d;text-shadow:0 2px 8px rgba(0,0,0,.6)}
@@ -924,15 +924,44 @@ function heroLayout(tr, o) {
   }
   return { k, bx, by, L, bottom: by + H * k };
 }
-// кольца не под текстом: первый вариант без пересечения; [сдвиг вниз, масштаб] — меньше к правому верхнему углу, за рамку не выходим
-const PLACE_HG = [[0, 1], [0, .94], [6, .94], [0, .88], [8, .88], [0, .82], [12, .82], [18, .76]], PLACE_BT = [[0, 1], [0, .94], [0, .88], [0, .82], [0, .76]];
-function placeHero(tr, o, boxes, cands) {
-  const hits = L => L && boxes.some(([x0, y0, x1, y1]) => { const cx = clamp(L.x, x0, x1), cy = clamp(L.y, y0, y1); return Math.hypot(L.x - cx, L.y - cy) < L.R + 6; });
-  const at = ([dy, sc]) => Object.assign({}, o, { tw: o.tw * sc, th: o.th * sc, x: o.x + o.tw * (1 - sc) * o.ax, y: o.y + o.th * (1 - sc) * o.ay + dy });
-  for (const c of cands) { const oo = at(c), lay = heroLayout(tr, oo); if (!hits(lay.L)) return { o: oo, lay }; }
-  const oo = at(cands[cands.length - 1]);
+// силуэт растром (до 160 px шириной, раз на танк): по нему проверяем, не лёг ли танк на текст
+function silMask(tr) {
+  if (tr._m) return tr._m;
+  const s = Math.min(.25, 160 / tr.W), w = Math.max(1, Math.ceil(tr.W * s)), h = Math.max(1, Math.ceil(tr.H * s)), a = new Uint8Array(w * h);
+  try {
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const x = cv.getContext('2d', { willReadFrequently: true }); x.scale(s, s); x.fill(new Path2D(tr.d), 'evenodd');
+    const d = x.getImageData(0, 0, w, h).data;
+    for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3] > 60 ? 1 : 0;
+    cv.width = cv.height = 0;
+  } catch (e) { a.fill(1); }                               // не смогли — считаем, что танк занимает всю коробку
+  return (tr._m = { s, w, h, a });
+}
+function hitsText(tr, lay, boxes, m) { // есть точка силуэта в коробке текста (с полем m)
+  const M = silMask(tr), f = M.s / lay.k;
+  for (const [x0, y0, x1, y1] of boxes) {
+    const i0 = Math.max(0, Math.floor((x0 - m - lay.bx) * f)), i1 = Math.min(M.w - 1, Math.ceil((x1 + m - lay.bx) * f));
+    const j0 = Math.max(0, Math.floor((y0 - m - lay.by) * f)), j1 = Math.min(M.h - 1, Math.ceil((y1 + m - lay.by) * f));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (M.a[j * M.w + i]) return true;
+  }
+  return false;
+}
+// место танку: самый крупный вариант, где ни силуэт, ни кольца не ложатся на текст. Перебор: масштаб (к своему углу),
+// подъём над рамкой или ниже — ствол под текстом (вправо не свешиваем: окно в игре ровно по карточке — свес обрежется). Ничего не подошло — самый маленький
+const PLACE_HG = { sc: [1, .95, .9, .85, .8, .75, .7, .65, .6, .55], dy: [0, -12, -24, -36, -48, 12, 24, 36], dx: [0] },
+  PLACE_BT = { sc: [1, .95, .9, .85, .8, .75, .7, .65, .6], dy: [0, -8, -16], dx: [0] };
+function placeHero(tr, o, boxes, P) {
+  const ringHit = L => L && boxes.some(([x0, y0, x1, y1]) => { const cx = clamp(L.x, x0, x1), cy = clamp(L.y, y0, y1); return Math.hypot(L.x - cx, L.y - cy) < L.R + 6; });
+  const at = (sc, dy, dx) => Object.assign({}, o, { tw: o.tw * sc, th: o.th * sc, x: o.x + o.tw * (1 - sc) * o.ax + dx, y: o.y + o.th * (1 - sc) * o.ay + dy });
+  for (const sc of P.sc) for (const dy of P.dy) for (const dx of P.dx) {
+    const oo = at(sc, dy, dx), lay = heroLayout(tr, oo);
+    if (!ringHit(lay.L) && !hitsText(tr, lay, boxes, 5)) return { o: oo, lay };
+  }
+  const oo = at(P.sc[P.sc.length - 1], P.dy[P.dy.length - 1], P.dx[P.dx.length - 1]);
   return { o: oo, lay: heroLayout(tr, oo) };
 }
+// над карточкой — место под танк, который вышел за верх (с ореолом)
+const popRoom = (c, lay, min) => setS(c.el, 'margin-top', Math.max(min, Math.ceil(-lay.by + 16)) + 'px');
 // печём раз: свечение, рендер в контуре, свет, лупа
 function bake(G, dead, s) {
   const { tr, k, bx, by, pad, cw, ch, L, ok, far } = G, W = tr.W, H = tr.H, b = tr.b;
@@ -1341,9 +1370,9 @@ function hgBuild(vm) {
 function hgBoxes(vm) { // коробки текста (.hg-top)
   const x = 20, nb = 37, big = vm.big || {}, sw = s => textW(String(s || '').replace(/<[^>]+>/g, ''), '800 12.5px Inter');
   const out = [[x, 17, x + chipsW(vm.lvl, vm.cls) + textW(vm.nameFit.txt, `900 italic ${vm.nameFit.px}px Montserrat`, -.015 * vm.nameFit.px), nb]];
-  const by = nb + 13, bw = (big.ap ? textW('≈', '900 26px Montserrat') + 3 : 0) + textW(big.none ? '—' : fP(big.v), '900 italic 52px Montserrat', -1.82) + 4 + (big.none ? 0 : textW('%', '900 26px Montserrat'));
-  out.push([x, by, x + bw, by + 48]);
-  const sy = by + 57;
+  const by = nb + 13, bw = (big.ap ? textW('≈', '900 26px Montserrat') + 3 : 0) + textW(big.none ? '—' : fP(big.v), '900 italic 48px Montserrat', -1.68) + 4 + (big.none ? 0 : textW('%', '900 26px Montserrat'));
+  out.push([x, by, x + bw, by + 44]);
+  const sy = by + 53;
   out.push([x, sy, x + sw(vm.s1), sy + 17.5], [x, sy + 17.5, x + sw(vm.s2), sy + 35]);
   return out;
 }
@@ -1351,12 +1380,12 @@ function hgHero(c, vm, late) {
   const top = c.r.top, hb = $('.hbox', c.el), h = HERO.get(vm.tk), tr = h && h.tr;
   if (vm.low) {
     if (!tr) return;
-    c.hero = heroBuild(tr, { tw: 204, th: 140, x: 176, y: -20, ax: 1, ay: 0, w: 380, h: 128, dead: true, noRings: true });
+    c.hero = heroBuild(tr, { tw: 204, th: 140, x: 172, y: -20, ax: 1, ay: 0, w: 380, h: 128, dead: true, noRings: true });
     hb.appendChild(c.hero.el);
   } else if (tr) {
-    const pl = placeHero(tr, { tw: 258, th: 216, x: 122, y: -22, ax: 1, ay: 0, w: 380, h: 232 }, hgBoxes(vm), PLACE_HG);
+    const pl = placeHero(tr, { tw: 258, th: 216, x: 118, y: -22, ax: 1, ay: 0, w: 380, h: 232, pad: 88 }, hgBoxes(vm), PLACE_HG);
     const need = Math.max(160, Math.ceil(pl.lay.bottom + 8), pl.lay.L ? Math.ceil(pl.lay.L.y + pl.lay.L.R + 10) : 0);
-    setS(top, 'height', need + 'px'); pl.o.h = need;
+    setS(top, 'height', need + 'px'); pl.o.h = need; popRoom(c, pl.lay, 44);
     const H = heroBuild(tr, pl.o); hb.appendChild(H.el);
     if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, Math.round((need - 34) / 2)); hb.appendChild(c.hero.el); }
   } else if (h && h.err) { c.hero = badgeBuild(208, 99); hb.appendChild(c.hero.el); }
@@ -1492,7 +1521,7 @@ function btBuild(vm) {
         <div class="nt" style="left:${ev.toFixed(2)}%"></div>${nd ? `<div class="nt hot" style="left:${nd.toFixed(2)}%"></div>` : ''}</div>
       <div class="nts"><span class="e${eL ? ' l' : ''}" style="left:${ev.toFixed(2)}%">${eTxt}</span>${nd ? `<span class="n">${nTxt}</span>` : ''}</div></div>`;
   }
-  const el = shell('bt s-bt', 60, `<div class="bt-top"><div class="l"><div class="lbl"></div>
+  const el = shell('bt s-bt', 76, `<div class="bt-top"><div class="l"><div class="lbl"></div>
       <div class="big"><i class="ap" hidden>≈</i><b class="pv"></b><i class="u">%</i><span class="bd"></span></div>
       <div class="row2"><span class="dl zero"><span class="dv"></span></span><span class="dnote"></span></div></div></div>
     ${nb ? '' : '<div class="dmg"><span class="tag"><span>УРОН + ПОМОЩЬ</span></span><span class="num"></span><span class="popslot"></span></div>'}
@@ -1512,7 +1541,8 @@ function btBoxes(vm) { // самые широкие варианты текст�
 function btHero(c, vm, late) {
   const top = c.r.top, hb = $('.hbox', c.el), h = HERO.get(vm.tk), tr = h && h.tr;
   if (tr) {
-    const pl = placeHero(tr, { tw: 220, th: 156, x: 160, y: -44, ax: 1, ay: 1, w: 380, h: 122, pad: 64, dead: vm.dead }, btBoxes(vm), PLACE_BT);
+    const pl = placeHero(tr, { tw: 220, th: 156, x: 156, y: -44, ax: 1, ay: 1, w: 380, h: 122, pad: 80, dead: vm.dead }, btBoxes(vm), PLACE_BT);
+    popRoom(c, pl.lay, 76);
     const H = heroBuild(tr, pl.o); hb.appendChild(H.el);
     if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, 18); hb.appendChild(c.hero.el); }
   } else if (h && h.err) { c.hero = badgeBuild(208, 18); hb.appendChild(c.hero.el); }
