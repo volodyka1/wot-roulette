@@ -41,7 +41,7 @@ body{pointer-events:none;user-select:none;font:14px/1.45 var(--fu);color:var(--t
 .mk{--edge:rgba(255,255,255,.16);--eglow:none;position:relative;width:380px;isolation:isolate;color:var(--text);font:14px/1.45 var(--fu);text-align:left}
 .mk .sh{position:absolute;left:14px;right:14px;top:12px;bottom:-8px;z-index:-3;background:rgba(0,0,0,.55);filter:blur(14px)}
 .mk .bgp{position:absolute;inset:0;z-index:-2;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);background:var(--mk-card)}
-.mk::before{content:"";position:absolute;left:14px;right:0;top:0;height:3px;z-index:5;background:var(--grad);box-shadow:0 0 12px rgba(245,165,36,.6),0 0 3px rgba(255,214,107,.9)}
+.mk::before{content:"";position:absolute;left:14px;right:0;top:0;height:3px;z-index:1;background:var(--grad);box-shadow:0 0 12px rgba(245,165,36,.6),0 0 3px rgba(255,214,107,.9)}
 .mk::after{content:"";position:absolute;left:0;right:14px;bottom:0;height:3px;z-index:5;background:var(--edge);box-shadow:var(--eglow)}
 .mk.s-ok{--edge:linear-gradient(90deg,var(--ok2),var(--ok));--eglow:0 0 12px rgba(46,229,157,.7)}
 .mk.s-bt{--edge:linear-gradient(90deg,#a8650e,#f5a524)}
