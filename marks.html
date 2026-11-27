@@ -47,6 +47,8 @@ body{pointer-events:none;user-select:none;font:14px/1.45 var(--fu);color:var(--t
 .mk.s-bt{--edge:linear-gradient(90deg,#a8650e,#f5a524)}
 .mk .hl{position:absolute;inset:0;z-index:7;opacity:0;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);box-shadow:inset 0 0 0 2px var(--hlc,#ffd66b),inset 0 0 54px var(--hlg,rgba(245,165,36,.5))}
 .mk.s-ok .hl{--hlc:var(--ok);--hlg:rgba(46,229,157,.45)}
+.mk .hbox,.mk .fxbox{position:absolute;inset:0;pointer-events:none}
+.mk .hbox{z-index:2}.mk .fxbox{z-index:9}
 .mk .hero{position:absolute;z-index:2}
 .mk .hero canvas,.mk .hero svg{position:absolute;left:0;top:0;overflow:visible}
 .mk .hero .ring .hot,.mk .hero .ring .fl,.mk .hero .ring .gl,.mk .chart .lq{transform-box:fill-box;transform-origin:center}
@@ -922,14 +924,13 @@ function heroLayout(tr, o) {
   }
   return { k, bx, by, L, bottom: by + H * k };
 }
-// кольца не под текстом: первый сдвиг без пересечения
-function placeHero(tr, o, boxes, shifts) {
+// кольца не под текстом: первый вариант без пересечения; [сдвиг вниз, масштаб] — меньше к правому верхнему углу, за рамку не выходим
+const PLACE_HG = [[0, 1], [0, .94], [6, .94], [0, .88], [8, .88], [0, .82], [12, .82], [18, .76]], PLACE_BT = [[0, 1], [0, .94], [0, .88], [0, .82], [0, .76]];
+function placeHero(tr, o, boxes, cands) {
   const hits = L => L && boxes.some(([x0, y0, x1, y1]) => { const cx = clamp(L.x, x0, x1), cy = clamp(L.y, y0, y1); return Math.hypot(L.x - cx, L.y - cy) < L.R + 6; });
-  for (const [dx, dy] of shifts || [[0, 0], [10, 6], [20, 12], [26, 22], [30, 34], [34, 46], [36, 58], [36, 70]]) {
-    const oo = Object.assign({}, o, { x: o.x + dx, y: o.y + dy }), lay = heroLayout(tr, oo);
-    if (!hits(lay.L)) return { o: oo, lay };
-  }
-  const last = (shifts || [[36, 70]]).slice(-1)[0], oo = Object.assign({}, o, { x: o.x + last[0], y: o.y + last[1] });
+  const at = ([dy, sc]) => Object.assign({}, o, { tw: o.tw * sc, th: o.th * sc, x: o.x + o.tw * (1 - sc) * o.ax, y: o.y + o.th * (1 - sc) * o.ay + dy });
+  for (const c of cands) { const oo = at(c), lay = heroLayout(tr, oo); if (!hits(lay.L)) return { o: oo, lay }; }
+  const oo = at(cands[cands.length - 1]);
   return { o: oo, lay: heroLayout(tr, oo) };
 }
 // печём раз: свечение, рендер в контуре, свет, лупа
@@ -940,8 +941,11 @@ function bake(G, dead, s) {
   const P = new Path2D(tr.d), T = [s * k, 0, 0, s * k, s * (pad + bx), s * (pad + by)];
   const off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height;
   const ox = off.getContext('2d'); ox.setTransform(...T);
+  ox.fillStyle = '#000'; ox.fill(P, 'evenodd');
+  ctx.save(); ctx.filter = `blur(${Math.round(9 * s)}px)`; ctx.globalAlpha = dead ? .4 : .62; ctx.drawImage(off, 0, 9 * s); ctx.restore();
+  ox.save(); ox.setTransform(1, 0, 0, 1, 0, 0); ox.clearRect(0, 0, off.width, off.height); ox.restore();
   const gg = ox.createLinearGradient(0, 0, W, 0); gg.addColorStop(0, '#ffd25e'); gg.addColorStop(1, '#e08c0e'); ox.fillStyle = gg; ox.fill(P, 'evenodd');
-  ctx.save(); ctx.filter = `blur(${Math.round(15 * s)}px)`; ctx.globalAlpha = dead ? .12 : .4; ctx.drawImage(off, 0, 7 * s); ctx.restore();
+  ctx.save(); ctx.filter = `blur(${Math.round(12 * s)}px)`; ctx.globalAlpha = dead ? .12 : .5; ctx.drawImage(off, 0, 2 * s); ctx.restore();
   off.width = off.height = 0;
   const drawRender = f => { ctx.save(); ctx.clip(P, 'evenodd'); ctx.filter = f; ctx.drawImage(tr.img, -tr.ox, -tr.oy); ctx.restore(); };
   const warm = (cx, cy, r, a) => {
@@ -1048,7 +1052,7 @@ function ringAPI(root, ringPt, lf, heatEl) {
 }
 // герой: canvas + SVG (обводка, кольца, лупа)
 function heroBuild(tr, o) {
-  const id = 'h' + (++UID), pad = 44, W = tr.W, H = tr.H, b = tr.b || { ok: false };
+  const id = 'h' + (++UID), pad = o.pad || 44, W = tr.W, H = tr.H, b = tr.b || { ok: false };
   const k = Math.min(o.tw / W, o.th / H), bx = o.x + (o.tw - W * k) * o.ax, by = o.y + (o.th - H * k) * o.ay;
   const cw = o.w + 2 * pad, ch = o.h + 2 * pad, X = x => pad + bx + x * k, Y = y => pad + by + y * k;
   const ok = !!b.ok && !o.noRings, u = b.u || [-1, 0], w = b.w || 0;
@@ -1069,6 +1073,7 @@ function heroBuild(tr, o) {
   const heatTo = ok ? far + 2.4 * w : 0;
   el.insertAdjacentHTML('beforeend', `<svg xmlns="${NS}" width="${cw}" height="${ch}" viewBox="0 0 ${cw} ${ch}"><defs>
     <linearGradient id="${id}rim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${W}" y2="0"><stop offset="0" stop-color="#ffd66b"/><stop offset="1" stop-color="#e08c0e"/></linearGradient>
+    <linearGradient id="${id}ol" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${H}"><stop offset="0" stop-color="#fff1cc"/><stop offset=".4" stop-color="#ffd66b"/><stop offset="1" stop-color="#d48a10"/></linearGradient>
     <linearGradient id="${id}rimf" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${H}"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="#fff" stop-opacity=".55"/><stop offset=".85" stop-color="#fff" stop-opacity="0"/></linearGradient>
     <mask id="${id}rm" maskUnits="userSpaceOnUse" x="-20" y="-20" width="${W + 40}" height="${H + 40}"><rect x="-20" y="-20" width="${W + 40}" height="${H + 40}" fill="url(#${id}rimf)"/></mask>
     <clipPath id="${id}clip"><path d="${tr.d}" clip-rule="evenodd"/></clipPath>
@@ -1080,7 +1085,7 @@ function heroBuild(tr, o) {
   </defs>
   <g ${L ? `mask="url(#${id}nl)"` : ''}><g transform="${tank}">
     <g id="${id}rimg"><path class="rim" d="${tr.d}" fill="none" stroke="url(#${id}rim)" stroke-width="${px(G.dead ? 1.1 : 2.3)}" stroke-linejoin="round" mask="url(#${id}rm)" clip-path="url(#${id}clip)" opacity="${G.dead ? .3 : 1}"/>
-      <path d="${tr.d}" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="${px(.8)}"/></g>
+      <path class="ol" d="${tr.d}" fill="none" stroke="url(#${id}ol)" stroke-width="${px(G.dead ? .9 : 1.6)}" stroke-linejoin="round" opacity="${G.dead ? .35 : .95}"/></g>
     ${ok ? `<g id="${id}bar" class="bar" transform="translate(${b.tip[0].toFixed(2)} ${b.tip[1].toFixed(2)}) rotate(${ang.toFixed(3)})" opacity="${G.dead ? .6 : 1}">
       <path class="heat" d="M${-.5 * w} ${-1.05 * w}L${heatTo} ${-1.05 * w}L${heatTo} ${1.05 * w}L${-.5 * w} ${1.05 * w}Z" fill="url(#${id}heat)" opacity="0"/>${rings}</g>` : ''}
   </g></g>
@@ -1106,6 +1111,7 @@ function heroBuild(tr, o) {
     const nv = bake(G, G.dead, s), old = cv; cv = nv;
     const rim = $('.rim', svg), bar = $('.bar', svg);
     if (rim) { setA(rim, 'stroke-width', px(G.dead ? 1.1 : 2.3)); setA(rim, 'opacity', G.dead ? .3 : 1); }
+    const ol = $('.ol', svg); if (ol) { setA(ol, 'stroke-width', px(G.dead ? .9 : 1.6)); setA(ol, 'opacity', G.dead ? .35 : .95); }
     if (bar) setA(bar, 'opacity', G.dead ? .6 : 1);
     if (!fx) { el.replaceChild(nv, old); return; }
     nv.style.opacity = '0'; el.insertBefore(nv, svg);
@@ -1317,12 +1323,12 @@ function slam(s) {
   tween(640, (e, k) => { s.style.opacity = k >= 1 ? '' : Math.min(1, k * 2.4).toFixed(3); s.style.transform = k >= 1 ? '' : `skewX(-14deg) rotate(${lerp(-14, -4, e).toFixed(2)}deg) scale(${lerp(2.3, 1, e).toFixed(3)})`; }, { ease: EASE.back, back: true });
 }
 function shell(cls, top, inner) {
-  return html(`<div class="mk ${cls}" style="margin-top:${top}px"><div class="sh"></div><div class="bgp"></div><div class="hl"></div><div class="tabs"></div>${inner}</div>`);
+  return html(`<div class="mk ${cls}" style="margin-top:${top}px"><div class="sh"></div><div class="bgp"></div><div class="hl"></div><div class="tabs"></div>${inner}<div class="hbox"></div><div class="fxbox"></div></div>`);
 }
 
 // ---- ангар ----
 function hgBuild(vm) {
-  const el = shell('hg', 26, `<div class="hg-top" style="height:${vm.low ? 128 : 206}px"><div class="l">
+  const el = shell('hg', 44, `<div class="hg-top" style="height:${vm.low ? 128 : 190}px"><div class="l">
       <div class="nm">${chipsHTML(vm)}<span class="name" style="font-size:${vm.nameFit.px}px">${esc(vm.nameFit.txt)}</span></div>
       ${vm.low ? '<div class="sub">Отметки дают <b>с V уровня</b></div>' : '<div class="big"><i class="ap" hidden>≈</i><b class="pv"></b><i class="u">%</i></div><div class="sub2"><span class="s1"></span><br><span class="s2"></span></div>'}
     </div></div>
@@ -1342,18 +1348,18 @@ function hgBoxes(vm) { // коробки текста (.hg-top)
   return out;
 }
 function hgHero(c, vm, late) {
-  const top = c.r.top, h = HERO.get(vm.tk), tr = h && h.tr;
+  const top = c.r.top, hb = $('.hbox', c.el), h = HERO.get(vm.tk), tr = h && h.tr;
   if (vm.low) {
     if (!tr) return;
-    c.hero = heroBuild(tr, { tw: 200, th: 150, x: 176, y: -24, ax: 1, ay: 0, w: 380, h: 140, dead: true, noRings: true });
-    top.appendChild(c.hero.el);
+    c.hero = heroBuild(tr, { tw: 204, th: 140, x: 176, y: -20, ax: 1, ay: 0, w: 380, h: 128, dead: true, noRings: true });
+    hb.appendChild(c.hero.el);
   } else if (tr) {
-    const pl = placeHero(tr, { tw: 252, th: 214, x: 128, y: -4, ax: 1, ay: 0, w: 380, h: 232 }, hgBoxes(vm));
-    const need = Math.max(206, Math.ceil(pl.lay.bottom + 6), pl.lay.L ? Math.ceil(pl.lay.L.y + pl.lay.L.R + 10) : 0);
+    const pl = placeHero(tr, { tw: 258, th: 216, x: 122, y: -22, ax: 1, ay: 0, w: 380, h: 232 }, hgBoxes(vm), PLACE_HG);
+    const need = Math.max(160, Math.ceil(pl.lay.bottom + 8), pl.lay.L ? Math.ceil(pl.lay.L.y + pl.lay.L.R + 10) : 0);
     setS(top, 'height', need + 'px'); pl.o.h = need;
-    const H = heroBuild(tr, pl.o); top.appendChild(H.el);
-    if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, Math.round((need - 34) / 2)); top.appendChild(c.hero.el); }
-  } else if (h && h.err) { c.hero = badgeBuild(208, 99); top.appendChild(c.hero.el); }
+    const H = heroBuild(tr, pl.o); hb.appendChild(H.el);
+    if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, Math.round((need - 34) / 2)); hb.appendChild(c.hero.el); }
+  } else if (h && h.err) { c.hero = badgeBuild(208, 99); hb.appendChild(c.hero.el); }
   else return;
   if (late) { // картинка опоздала — выезжает одна
     if (c.hero.set && !vm.low) c.hero.set(vm.marks, vm.prog, false, false);
@@ -1486,7 +1492,7 @@ function btBuild(vm) {
         <div class="nt" style="left:${ev.toFixed(2)}%"></div>${nd ? `<div class="nt hot" style="left:${nd.toFixed(2)}%"></div>` : ''}</div>
       <div class="nts"><span class="e${eL ? ' l' : ''}" style="left:${ev.toFixed(2)}%">${eTxt}</span>${nd ? `<span class="n">${nTxt}</span>` : ''}</div></div>`;
   }
-  const el = shell('bt s-bt', 64, `<div class="bt-top"><div class="l"><div class="lbl"></div>
+  const el = shell('bt s-bt', 60, `<div class="bt-top"><div class="l"><div class="lbl"></div>
       <div class="big"><i class="ap" hidden>≈</i><b class="pv"></b><i class="u">%</i><span class="bd"></span></div>
       <div class="row2"><span class="dl zero"><span class="dv"></span></span><span class="dnote"></span></div></div></div>
     ${nb ? '' : '<div class="dmg"><span class="tag"><span>УРОН + ПОМОЩЬ</span></span><span class="num"></span><span class="popslot"></span></div>'}
@@ -1504,13 +1510,12 @@ function btBoxes(vm) { // самые широкие варианты текст�
   return [[x, 16, x + lw, 30], [x, 39, x + bw, 76], [x, 85, x + rw, 109]];
 }
 function btHero(c, vm, late) {
-  const top = c.r.top, h = HERO.get(vm.tk), tr = h && h.tr;
+  const top = c.r.top, hb = $('.hbox', c.el), h = HERO.get(vm.tk), tr = h && h.tr;
   if (tr) {
-    const pl = placeHero(tr, { tw: 184, th: 156, x: 196, y: -50, ax: 1, ay: 0, w: 380, h: 170, dead: vm.dead }, btBoxes(vm),
-      [[0, 0], [10, -4], [20, -8], [30, -10], [40, -12], [50, -14]]);
-    const H = heroBuild(tr, pl.o); top.appendChild(H.el);
-    if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, 18); top.appendChild(c.hero.el); }
-  } else if (h && h.err) { c.hero = badgeBuild(208, 18); top.appendChild(c.hero.el); }
+    const pl = placeHero(tr, { tw: 220, th: 156, x: 160, y: -44, ax: 1, ay: 1, w: 380, h: 122, pad: 64, dead: vm.dead }, btBoxes(vm), PLACE_BT);
+    const H = heroBuild(tr, pl.o); hb.appendChild(H.el);
+    if (H.ok) c.hero = H; else { c.tank = H; c.hero = badgeBuild(208, 18); hb.appendChild(c.hero.el); }
+  } else if (h && h.err) { c.hero = badgeBuild(208, 18); hb.appendChild(c.hero.el); }
   else return;
   if (late) { const R = vm.ring; if (R && c.hero.set) c.hero.set(R.marks, R.prog, false, R.edge); [c.tank, c.hero].forEach(H => H && slideIn(H.el, 500, 46, 0, 2)); }
 }
@@ -1566,7 +1571,7 @@ function burst(c, i) {
   if (H.pop) H.pop(i);
   const p = H.ringPt(i), host = document.createElement('div');
   host.className = 'burst'; host.style.left = p.x.toFixed(1) + 'px'; host.style.top = p.y.toFixed(1) + 'px';
-  H.el.parentNode.appendChild(host);
+  ($('.fxbox', c.el) || H.el.parentNode).appendChild(host);
   const R = rng(77 + i);
   let left = 17;
   const done = () => { if (--left <= 0) host.remove(); };
